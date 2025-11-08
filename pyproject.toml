@@ -1,0 +1,28 @@
+[project]
+name = "smart-file-finder"
+version = "0.0.1"
+description = "Advanced file search engine powered by AI"
+authors = [
+    {name = "Hamza Abbad",email = "hamza.abbad@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pydantic (>=2.12.4,<3.0.0)",
+    "pydantic-settings (>=2.11.0,<3.0.0)",
+    "watchdog (>=6.0.0,<7.0.0)",
+    "docling[easyocr] (>=2.60.1,<3.0.0)",
+    "typesense (>=1.1.1,<2.0.0)",
+    "python-magic (>=0.4.27,<0.5.0)",
+    "fastapi[standard-no-fastapi-cloud-cli] (>=0.121.0,<0.122.0)",
+    "sqlalchemy (>=2.0.44,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+
