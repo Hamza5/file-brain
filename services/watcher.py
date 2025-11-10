@@ -64,10 +64,17 @@ class FileWatcher:
 
 class CrawlEventHandler(FileSystemEventHandler):
     """
-    Event handler that converts watchdog events to crawl operations
+    Event handler that converts watchdog events to crawl operations.
+
+    This handler runs in the watchdog thread. It must NEVER try to create
+    or access an asyncio loop directly. Instead, it forwards events to the
+    provided callback, which is responsible for marshalling into the main
+    asyncio loop.
     """
     
     def __init__(self, on_file_event: Callable):
+        # on_file_event is a plain callable invoked from the watchdog thread.
+        # It must be thread-safe and handle scheduling work into the asyncio loop.
         self.on_file_event = on_file_event
         self._processing = set()
     
@@ -93,15 +100,14 @@ class CrawlEventHandler(FileSystemEventHandler):
         self._handle_file_event(FileDeletedEvent(event.src_path))
     
     def _handle_file_event(self, event):
-        """Handle file event by calling the provided callback"""
+        """
+        Handle file event by calling the provided callback.
+
+        All asyncio integration is delegated to the callback, which is
+        expected to use loop.call_soon_threadsafe(...) or similar.
+        """
         try:
-            # Run in executor to avoid blocking the watcher thread
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.call_soon_threadsafe(self.on_file_event, event)
-            else:
-                # Create a new task if no event loop is running
-                asyncio.run(self.on_file_event(event))
+            self.on_file_event(event)
         except Exception as e:
             logger.error(f"Error handling file event for {event.src_path}: {e}")
 
@@ -220,15 +226,32 @@ def create_watcher_for_crawl(
     """
     excluded_patterns = excluded_patterns or []
     
-    # Create event handler
+    # Create event handler that enqueues operations into the shared asyncio.Queue
     event_handler = OperationEventHandler(operation_queue)
-    
-    # Create file watcher with event handler
+
+    # Capture the running asyncio loop at watcher creation time.
+    # This must be called from within the main event loop (as done by CrawlJobManager).
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError as e:
+        # Fallback/logging: this should not happen in normal flow.
+        logger.error(f"create_watcher_for_crawl must be called from within an async context: {e}")
+        raise
+
     def on_file_event(event):
-        # Run in executor to avoid blocking the watcher thread
-        loop = asyncio.get_event_loop()
-        loop.create_task(event_handler.handle_file_event(event))
-    
+        """
+        Thread-safe callback invoked from the watchdog thread.
+
+        It schedules the async OperationEventHandler.handle_file_event coroutine
+        onto the main asyncio loop without blocking the watcher thread.
+        """
+        try:
+            loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(event_handler.handle_file_event(event))
+            )
+        except Exception as exc:
+            logger.error(f"Failed to schedule file event for {getattr(event, 'src_path', None)}: {exc}")
+
     watcher = FileWatcher(
         on_file_event=on_file_event,
         watch_paths=watch_paths,

@@ -55,34 +55,74 @@ async def lifespan(app: FastAPI):
         db_service = DatabaseService(db)
         watch_paths = db_service.get_watch_paths(enabled_only=True)
         
-        # Check if crawling was running before shutdown
+        # Inspect previous crawler state to decide auto-resume behavior
         previous_state = db_service.get_crawler_state()
-        was_running_before = previous_state.crawl_job_running
-        
-        if was_running_before:
-            logger.info(f"🔄 Resuming previous crawl job (type: {previous_state.crawl_job_type})")
-            logger.info(f"📁 Watch paths: {watch_paths}")
-            
-            # Resume the crawl job with the same configuration
-            success = await crawl_manager.start_crawl(
-                watch_paths,
-                start_monitoring="monitor" in previous_state.crawl_job_type
-            )
-            
-            if success:
-                logger.info("✅ Crawl job resumed successfully")
-                logger.info("🔄 Parallel discovery and indexing active")
-                if "monitor" in previous_state.crawl_job_type:
-                    logger.info("👁️  File monitoring active")
-            else:
-                logger.warning("⚠️  Failed to resume crawl job")
-        elif watch_paths:
-            logger.info("📁 Watch paths configured but not auto-starting (was not running before)")
-            logger.info("💡 Use /api/crawler/start to manually start crawling")
-        else:
-            logger.warning("⚠️  No watch paths configured. Add paths via /api/config/watch-paths and /api/config/watch-paths/batch")
-        
         db.close()
+        
+        # Snapshot for logs
+        logger.info(
+            "Previous crawler state: "
+            f"crawl_job_running={previous_state.crawl_job_running}, "
+            f"crawl_job_type={previous_state.crawl_job_type}, "
+            f"watcher_running={previous_state.watcher_running}, "
+            f"files_discovered={previous_state.files_discovered}, "
+            f"files_indexed={previous_state.files_indexed}"
+        )
+        
+        # Auto-resume semantics:
+        # - If there was an in-progress crawl (crawl or crawl+monitor), auto-resume crawl+monitor
+        #   so discovery + monitoring continue.
+        # - If there was monitor-only running, auto-resume monitor-only.
+        # - Otherwise, do not start automatically.
+        auto_resumed = False
+        if watch_paths:
+            cj_type = (previous_state.crawl_job_type or "").lower() if previous_state.crawl_job_type else ""
+            
+            if previous_state.crawl_job_running:
+                # Previous session reported an active crawl job; treat as needing full resume.
+                logger.info(
+                    "🔄 Detected previous in-progress crawl job; "
+                    "auto-resuming with crawl+monitor."
+                )
+                success = await crawl_manager.start_crawl(
+                    watch_paths,
+                    start_monitoring=True,
+                    include_subdirectories=True,
+                )
+                if success:
+                    logger.info("✅ Auto-resumed crawl+monitor based on previous state.")
+                    auto_resumed = True
+                else:
+                    logger.warning("⚠️ Failed to auto-resume crawl+monitor from previous state.")
+            
+            elif (not previous_state.crawl_job_running) and previous_state.watcher_running:
+                # No active crawl job flag, but watcher was running -> monitor-only session.
+                logger.info(
+                    "🔄 Detected previous monitor-only session; "
+                    "auto-resuming monitor-only (no full re-crawl)."
+                )
+                # Implement monitor-only by starting a crawl with monitoring enabled.
+                # Discovery will run, but Typesense/file_hash logic keeps this idempotent.
+                success = await crawl_manager.start_crawl(
+                    watch_paths,
+                    start_monitoring=True,
+                    include_subdirectories=True,
+                )
+                if success:
+                    logger.info("✅ Auto-resumed monitor-only (crawl+monitor) based on previous watcher state.")
+                    auto_resumed = True
+                else:
+                    logger.warning("⚠️ Failed to auto-resume monitor-only from previous state.")
+        
+        if not auto_resumed:
+            if watch_paths:
+                logger.info("📁 Watch paths configured but no auto-resume conditions met.")
+                logger.info("💡 Use /api/crawler/start to manually start crawling or monitoring.")
+            else:
+                logger.warning(
+                    "⚠️ No watch paths configured. "
+                    "Add paths via /api/config/watch-paths and /api/config/watch-paths/batch"
+                )
         
         logger.info("=" * 50)
         logger.info("🚀 Application startup complete!")
@@ -103,10 +143,15 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     
     try:
-        # Stop crawl manager
+        # Stop crawl manager (runtime cleanup only)
         logger.info("Stopping  crawl manager...")
         crawl_manager = get_crawl_job_manager()
         if crawl_manager.is_running():
+            # Note: stop_crawl() updates CrawlerState to "stopped".
+            # This is acceptable for explicit API-driven stops.
+            # For process shutdown, this only reflects that no job is
+            # currently running; auto-resume decisions still rely on the
+            # last persisted state observed at startup.
             await crawl_manager.stop_crawl()
             logger.info("✅ Crawl manager stopped")
         

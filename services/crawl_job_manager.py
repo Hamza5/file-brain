@@ -66,9 +66,13 @@ class CrawlJobManager:
         self.extractor = get_extractor()
         self._operation_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
         self._watcher = None
-        self._thread_pool = ThreadPoolExecutor(max_workers=4)
-        
-        # Stop event for graceful shutdown
+
+        # Thread pool for blocking/CPU-heavy work (hashing, extraction, Typesense calls)
+        # Keeping this bounded ensures predictable behavior under load.
+        max_workers = int(os.getenv("CRAWLER_WORKERS", "4"))
+        self._thread_pool = ThreadPoolExecutor(max_workers=max_workers)
+
+        # Stop event for graceful shutdown and cooperative cancellation
         self._stop_event = asyncio.Event()
     
     async def start_crawl(
@@ -78,7 +82,13 @@ class CrawlJobManager:
         include_subdirectories: bool = True
     ) -> bool:
         """
-        Start the crawl job with parallel discovery, indexing, and monitoring
+        Start the crawl job with parallel discovery, indexing, and monitoring.
+
+        Responsiveness notes:
+        - All heavy work (hashing, extraction, Typesense calls) is executed in a
+          bounded ThreadPoolExecutor via _run_in_executor().
+        - This keeps the asyncio event loop free so /status and /stop endpoints
+          remain responsive even under heavy load.
 
         Args:
             watch_paths: List of paths to crawl (fetched from database)
@@ -130,33 +140,44 @@ class CrawlJobManager:
     
     async def stop_crawl(self) -> bool:
         """
-        Stop the current crawl job and file monitoring
+        Stop the current crawl job and file monitoring.
+
+        Design goals:
+        - Be responsive: return soon after stop is requested.
+        - Cooperatively cancel discovery and indexing loops.
+        - Avoid starting new work once stop is signaled.
         """
         if not self._running:
             logger.warning("No crawl job running")
             return False
-        
+
         logger.info("Stopping crawl job and file monitoring...")
-        
-        # Signal stop to all tasks
+ 
+        # Signal stop to all tasks early so that long-running loops can exit.
+        # This is the critical point: /stop returns based on this coordination,
+        # not on all heavy work finishing.
         self._stop_event.set()
-        
-        # Stop file monitoring first
+ 
+        # Stop file monitoring first so no new watch events are enqueued.
         await self._stop_file_monitoring()
-        
-        # Cancel running tasks
-        if self._crawl_task:
-            self._crawl_task.cancel()
-        if self._discovery_task:
-            self._discovery_task.cancel()
-        if self._indexing_task:
-            self._indexing_task.cancel()
-        
-        # Wait for tasks to complete
-        tasks_to_wait = [t for t in [self._crawl_task, self._discovery_task, self._indexing_task] if t]
+ 
+        # Cancel running tasks to interrupt awaits promptly.
+        for task in (self._crawl_task, self._discovery_task, self._indexing_task):
+            if task and not task.done():
+                task.cancel()
+ 
+        # Wait for tasks to react to cancellation; swallow CancelledError.
+        # Heavy synchronous work is offloaded to the thread pool, so this await
+        # should complete quickly instead of blocking on large file processing.
+        tasks_to_wait = [t for t in (self._crawl_task, self._discovery_task, self._indexing_task) if t]
         if tasks_to_wait:
             await asyncio.gather(*tasks_to_wait, return_exceptions=True)
-        
+
+        # Clear references so future runs start cleanly.
+        self._crawl_task = None
+        self._discovery_task = None
+        self._indexing_task = None
+
         # Update database state
         db = SessionLocal()
         try:
@@ -169,10 +190,10 @@ class CrawlJobManager:
             )
         finally:
             db.close()
-        
+
         self._running = False
         logger.info("Crawl job and monitoring stopped")
-        
+
         return True
     
     def is_running(self) -> bool:
@@ -359,34 +380,48 @@ class CrawlJobManager:
         """Main crawl job coordinator - runs parallel discovery and indexing"""
         try:
             logger.info("Starting parallel file discovery and indexing...")
-            
+
             # Start parallel discovery and indexing
             self._discovery_task = asyncio.create_task(self._discover_files(watch_paths))
             self._indexing_task = asyncio.create_task(self._index_files())
-            
-            # Wait for both to complete or for stop signal
+
+            # Wait for both to complete or be cancelled
             await asyncio.gather(
                 self._discovery_task,
                 self._indexing_task,
-                return_exceptions=True
+                return_exceptions=True,
             )
-            
-            logger.info("Crawl job completed")
-            
+
+            if not self._stop_event.is_set():
+                # Normal completion
+                logger.info("Crawl job completed")
+            else:
+                logger.info("Crawl job cancelled via stop request")
         except Exception as e:
             logger.error(f"Error in crawl job: {e}")
         finally:
-            # Update final state
+            # Ensure we don't falsely report 100% if cancelled early.
             db = SessionLocal()
             try:
                 db_service = DatabaseService(db)
-                db_service.update_crawler_state(
-                    discovery_progress=100,
-                    indexing_progress=100,
-                )
+                if not self._stop_event.is_set():
+                    db_service.update_crawler_state(
+                        discovery_progress=100,
+                        indexing_progress=100,
+                    )
             finally:
                 db.close()
     
+    async def _run_in_executor(self, func: Callable, *args, **kwargs):
+        """
+        Run a blocking callable in the shared thread pool.
+
+        This keeps the asyncio event loop responsive for API calls
+        (status/stop) while heavy work is offloaded.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._thread_pool, lambda: func(*args, **kwargs))
+
     async def _discover_files(self, watch_paths: List[str]) -> None:
         """Discover files in watch paths in parallel.
         
@@ -405,8 +440,9 @@ class CrawlJobManager:
         
         for watch_path in watch_paths:
             if self._stop_event.is_set():
+                logger.info("Discovery loop detected stop event; exiting early.")
                 break
-                
+
             self.discovery_progress.current_path = watch_path
             logger.info(f"Discovering files in: {watch_path}")
             
@@ -414,7 +450,9 @@ class CrawlJobManager:
                 # Discover files in this path
                 files_discovered = await self._discover_files_in_path(watch_path)
                 self.discovery_progress.files_found += files_discovered
-                
+            except asyncio.CancelledError:
+                logger.info("Discovery task cancelled")
+                break
             except Exception as e:
                 logger.error(f"Error discovering files in {watch_path}: {e}")
             
@@ -424,7 +462,9 @@ class CrawlJobManager:
             db = SessionLocal()
             try:
                 db_service = DatabaseService(db)
-                progress = int((self.discovery_progress.processed_paths / self.discovery_progress.total_paths) * 100)
+                progress = int(
+                    (self.discovery_progress.processed_paths / self.discovery_progress.total_paths) * 100
+                )
                 db_service.update_crawler_state(
                     discovery_progress=progress,
                     files_discovered=self.discovery_progress.files_found,
@@ -434,10 +474,16 @@ class CrawlJobManager:
             finally:
                 db.close()
         
-        logger.info(
-            f"Discovery complete: {self.discovery_progress.files_found} files found, "
-            f"{self.discovery_progress.files_skipped} skipped"
-        )
+        if not self._stop_event.is_set():
+            logger.info(
+                f"Discovery complete: {self.discovery_progress.files_found} files found, "
+                f"{self.discovery_progress.files_skipped} skipped"
+            )
+        else:
+            logger.info(
+                f"Discovery stopped early: {self.discovery_progress.files_found} files found before cancellation, "
+                f"{self.discovery_progress.files_skipped} skipped"
+            )
      
     async def _discover_files_in_path(self, watch_path: str) -> int:
         """Discover files in a single path using thread pool for I/O.
@@ -499,14 +545,23 @@ class CrawlJobManager:
             
             # Add files to queue
             for operation in found_files:
+                # Respect stop event promptly to avoid flooding queue after stop
                 if self._stop_event.is_set():
+                    logger.info("Stop event set during discovery enqueue; aborting enqueue loop.")
                     break
                 try:
                     await self._operation_queue.put(operation)
                 except asyncio.QueueFull:
+                    # Use a short timeout loop so stop_event is checked frequently
                     logger.warning("Operation queue full, waiting...")
-                    await asyncio.sleep(0.1)
-                    await self._operation_queue.put(operation)
+                    try:
+                        await asyncio.wait_for(self._operation_queue.put(operation), timeout=0.5)
+                    except asyncio.TimeoutError:
+                        if self._stop_event.is_set():
+                            logger.info("Stop event set while waiting for queue space; aborting enqueue.")
+                            break
+                        # Retry on next iteration
+                        continue
             
             files_found = len(found_files)
             self.discovery_progress.files_skipped += skipped_files
@@ -532,34 +587,66 @@ class CrawlJobManager:
             start_time=time.time()
         )
         
-        while not self._stop_event.is_set():
+        while True:
+            # Cooperative cancellation: exit promptly when stop is requested
+            if self._stop_event.is_set():
+                logger.info("Indexing loop detected stop event before dequeue; exiting.")
+                break
+
             try:
-                # Get operation from queue with timeout
+                # Get operation from queue with timeout so we can re-check stop_event regularly
                 try:
                     operation = await asyncio.wait_for(
-                        self._operation_queue.get(), 
-                        timeout=1.0
+                        self._operation_queue.get(),
+                        timeout=0.5,
                     )
                 except asyncio.TimeoutError:
+                    # Periodically check stop while idle
                     continue
-                
+                except asyncio.CancelledError:
+                    logger.info("Indexing task cancelled while waiting for operation")
+                    break
+
+                # If stop was requested after we dequeued, do not start new heavy work.
+                if self._stop_event.is_set():
+                    logger.info(
+                        f"Stop requested; abandoning operation for {getattr(operation, 'file_path', None)}"
+                    )
+                    # Do not requeue to avoid fighting shutdown.
+                    break
+
                 self.indexing_progress.files_to_index += 1
-                self.indexing_progress.current_file = operation.file_path
-                
+                self.indexing_progress.current_file = getattr(operation, "file_path", None)
+
                 # Process the operation
-                success = await self._process_operation(operation)
-                
+                try:
+                    success = await self._process_operation(operation)
+                except asyncio.CancelledError:
+                    logger.info(
+                        f"Indexing for {getattr(operation, 'file_path', None)} cancelled due to stop request"
+                    )
+                    break
+
+                if self._stop_event.is_set():
+                    # If a stop was triggered during processing, exit without starting further work.
+                    logger.info("Stop event set after processing operation; exiting indexing loop.")
+                    break
+
                 if success:
                     self.indexing_progress.files_indexed += 1
                 else:
                     self.indexing_progress.files_failed += 1
-                
+
                 # Update progress in database periodically
                 if self.indexing_progress.files_indexed % 10 == 0:
                     db = SessionLocal()
                     try:
                         db_service = DatabaseService(db)
-                        progress = int((self.indexing_progress.files_indexed / max(1, self.indexing_progress.files_to_index)) * 100)
+                        progress = int(
+                            self.indexing_progress.files_indexed
+                            / max(1, self.indexing_progress.files_to_index)
+                            * 100
+                        )
                         db_service.update_crawler_state(
                             indexing_progress=progress,
                             files_indexed=self.indexing_progress.files_indexed,
@@ -567,13 +654,15 @@ class CrawlJobManager:
                         )
                     finally:
                         db.close()
-                
+
             except Exception as e:
                 logger.error(f"Error in indexing loop: {e}")
                 await asyncio.sleep(1)
-        
-        logger.info(f"Indexing complete: {self.indexing_progress.files_indexed} indexed, "
-                   f"{self.indexing_progress.files_failed} failed")
+
+        logger.info(
+            f"Indexing finished: {self.indexing_progress.files_indexed} indexed, "
+            f"{self.indexing_progress.files_failed} failed"
+        )
     
     async def _process_operation(self, operation: CrawlOperation) -> bool:
         """Process a single operation (create/edit/delete)"""
@@ -588,96 +677,139 @@ class CrawlJobManager:
             return False
     
     async def _handle_create_edit_operation(self, operation: CrawlOperation) -> bool:
-        """Handle create or edit operations with proper error handling"""
+        """Handle create or edit operations with proper error handling.
+
+        All heavy work (hashing, extraction, Typesense I/O) is offloaded to the
+        thread pool via _run_in_executor to keep the event loop responsive.
+        """
         file_path = operation.file_path
-        
+
+        # Check if stop was requested before starting any work
+        if self._stop_event.is_set():
+            logger.info(f"Stop requested before processing {file_path}; skipping.")
+            return False
+
         # Check if file still exists
         if not os.path.exists(file_path):
             logger.warning(f"File no longer exists: {file_path}")
             return False
-        
+
         # Check file size
         max_size_mb = int(os.getenv("MAX_FILE_SIZE_MB", "100"))
         max_size_bytes = max_size_mb * 1024 * 1024
-        
+
         if operation.file_size and operation.file_size > max_size_bytes:
             logger.warning(f"File too large ({operation.file_size} bytes): {file_path}")
             return False
-        
+
         # Extract file information
         file_name = Path(file_path).name
         file_extension = Path(file_path).suffix.lower()
         mime_type, _ = mimetypes.guess_type(file_path)
         if not mime_type:
             mime_type = "application/octet-stream"
-        
-        # Process file content
+
         try:
-            # Log processing
             logger.debug(f"Processing {operation.operation} for: {file_path}")
-            
-            # Calculate file hash from actual file bytes for change detection
+
+            # Calculate file hash from actual file bytes for change detection (blocking I/O)
             file_hash = await self._calculate_file_hash(file_path)
             if not file_hash:
                 logger.error(f"Failed to calculate file hash for {file_path}")
                 return False
 
-            # Check existing Typesense document to decide if reindex is needed
-            existing_doc = await self.typesense.get_doc_by_path(file_path)
+            if self._stop_event.is_set():
+                logger.info(f"Stop requested after hash for {file_path}; aborting.")
+                return False
+
+            # Check existing Typesense document (blocking HTTP)
+            async def _get_doc():
+                return await self.typesense.get_doc_by_path(file_path)
+
+            existing_doc = await _get_doc()
             if existing_doc and existing_doc.get("file_hash") == file_hash:
                 # Already indexed and up-to-date; idempotent no-op
                 logger.debug(f"Skipping unchanged file (already indexed): {file_path}")
                 return True
 
-            # Extract file content
-            document_content = self.extractor.extract(file_path)
+            if self._stop_event.is_set():
+                logger.info(f"Stop requested before extraction for {file_path}; aborting.")
+                return False
+
+            # Extract file content (potentially heavy: Docling/OCR)
+            def _extract():
+                return self.extractor.extract(file_path)
+
+            document_content = await self._run_in_executor(_extract)
             content = document_content.content
             metadata = document_content.metadata
-            
-            # Index/Upsert file in Typesense (single source of truth)
-            await self.typesense.index_file(
-                file_path=file_path,
-                file_name=file_name,
-                file_extension=file_extension,
-                file_size=operation.file_size,
-                mime_type=mime_type,
-                content=content,
-                modified_time=operation.modified_time,
-                created_time=operation.created_time,
-                file_hash=file_hash,
-                metadata=metadata,
-            )
-            
+
+            if self._stop_event.is_set():
+                logger.info(f"Stop requested before Typesense index for {file_path}; aborting.")
+                return False
+
+            # Index/Upsert file in Typesense (blocking HTTP)
+            async def _index():
+                await self.typesense.index_file(
+                    file_path=file_path,
+                    file_name=file_name,
+                    file_extension=file_extension,
+                    file_size=operation.file_size,
+                    mime_type=mime_type,
+                    content=content,
+                    modified_time=int(operation.modified_time) if operation.modified_time is not None else None,
+                    created_time=int(operation.created_time) if operation.created_time is not None else None,
+                    file_hash=file_hash,
+                    metadata=metadata,
+                )
+
+            await _index()
+
             logger.debug(f"Successfully indexed (or updated): {file_path}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error processing file {file_path}: {e}")
             return False
     
     async def _handle_delete_operation(self, operation: CrawlOperation) -> bool:
-        """Handle delete operations"""
+        """Handle delete operations.
+
+        Offloads Typesense call to keep event loop free.
+        """
+        if self._stop_event.is_set():
+            logger.info(f"Stop requested before delete for {operation.file_path}; skipping.")
+            return False
+
         try:
-            # Remove from Typesense (single source of truth)
-            await self.typesense.remove_from_index(operation.file_path)
+            async def _remove():
+                await self.typesense.remove_from_index(operation.file_path)
+
+            await _remove()
             return True
-            
+
         except Exception as e:
             logger.error(f"Error handling delete for {operation.file_path}: {e}")
             return False
     
     async def _calculate_file_hash(self, file_path: str) -> str:
-        """Calculate hash of actual file content for change detection"""
-        try:
-            hash_md5 = hashlib.md5()
-            with open(file_path, 'rb') as f:
-                # Read file in chunks to handle large files efficiently
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hash_md5.update(chunk)
-            return hash_md5.hexdigest()
-        except Exception as e:
-            logger.error(f"Error calculating file hash for {file_path}: {e}")
-            return ""
+        """Calculate hash of actual file content for change detection.
+
+        Runs in a worker thread to avoid blocking the event loop.
+        """
+        def _hash():
+            try:
+                hash_md5 = hashlib.md5()
+                with open(file_path, "rb") as f:
+                    # Read file in chunks to handle large files efficiently
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hash_md5.update(chunk)
+                return hash_md5.hexdigest()
+            except Exception as e:
+                logger.error(f"Error calculating file hash for {file_path}: {e}")
+                return ""
+
+        return await self._run_in_executor(_hash)
 
 
 # Global crawl job manager instance
