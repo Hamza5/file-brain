@@ -180,7 +180,15 @@ class CrawlJobManager:
         return self._running
     
     def get_status(self) -> Dict[str, Any]:
-        """Get current crawl status and progress"""
+        """
+        Get current crawl status and progress.
+
+        Semantics:
+        - indexing_progress reflects both initial crawl and any queued operations.
+        - indexing_progress reaches 100 ONLY when there is no pending work (queue_size == 0)
+          and all known operations have been processed (success/failed).
+        """
+        # If manager is not running, expose an idle status
         if not self._running:
             return {
                 "running": False,
@@ -196,40 +204,97 @@ class CrawlJobManager:
                 "monitoring_active": False,
                 "estimated_completion": None,
             }
-        
-        # Calculate elapsed time
+
+        # Load persisted state for authoritative timestamps and job_type
         db = SessionLocal()
         try:
             db_service = DatabaseService(db)
             state = db_service.get_crawler_state()
             start_time = state.crawl_job_started_at
-            elapsed_time = (datetime.utcnow() - start_time).total_seconds() if start_time else None
+            job_type = state.crawl_job_type or "crawl+monitor"
         finally:
             db.close()
-        
-        # Calculate estimated completion
+
+        # Elapsed time based on DB start time (if available)
+        if start_time:
+            elapsed_time = (datetime.utcnow() - start_time).total_seconds()
+        else:
+            elapsed_time = None
+
+        # In-memory metrics
+        discovered = self.discovery_progress.files_found
+        skipped = self.discovery_progress.files_skipped
+        queue_size = self._operation_queue.qsize()
+        indexed_success = self.indexing_progress.files_indexed
+        indexed_failed = self.indexing_progress.files_failed
+        completed = indexed_success + indexed_failed
+
+        # Discovery progress (paths-based as before, clamped)
+        if self.discovery_progress.total_paths > 0:
+            discovery_progress = int(
+                (self.discovery_progress.processed_paths / max(1, self.discovery_progress.total_paths)) * 100
+            )
+            discovery_progress = max(0, min(discovery_progress, 100))
+        else:
+            discovery_progress = 0
+
+        # Total known operations:
+        # - For initial crawl: approximated by discovered
+        # - With monitoring: also consider completed + queued so progress never exceeds reality
+        total_known_ops = max(discovered, completed + queue_size)
+
+        # Compute indexing progress against all known work
+        if total_known_ops == 0:
+            indexing_progress = 0
+        else:
+            indexing_progress = int((completed / total_known_ops) * 100)
+            indexing_progress = max(0, min(indexing_progress, 100))
+
+        # Enforce invariant: if there is pending work, never show 100%
+        if queue_size > 0 and indexing_progress >= 100:
+            indexing_progress = 99
+
+        # Estimated completion:
+        # Only when we have some completed work and there is outstanding work
         estimated_completion = None
-        if (self.discovery_progress.files_found > 0 and 
-            self.indexing_progress.files_indexed > 0):
-            completion_rate = self.indexing_progress.files_indexed / max(1, self.discovery_progress.files_found)
-            if elapsed_time and completion_rate > 0:
-                total_estimated_time = elapsed_time / completion_rate
-                remaining_time = total_estimated_time - elapsed_time
-                estimated_completion = datetime.utcnow() + timedelta(seconds=remaining_time)
-        
+        remaining = total_known_ops - completed
+        if (
+            elapsed_time
+            and elapsed_time > 0
+            and completed > 0
+            and remaining > 0
+        ):
+            # Simple linear estimate based on current throughput
+            throughput = completed / elapsed_time  # ops per second
+            if throughput > 0:
+                remaining_time = remaining / throughput
+                estimated_completion_dt = datetime.utcnow() + timedelta(seconds=remaining_time)
+                estimated_completion = int(estimated_completion_dt.timestamp() * 1000)
+
+        # Monitoring flag from watcher
+        monitoring_active = self._watcher is not None and self._watcher.is_running()
+
+        # Log suspicious situations for debugging progress correctness
+        if indexing_progress == 100 and (queue_size > 0 or remaining > 0):
+            logger.warning(
+                "Inconsistent progress state detected in get_status: "
+                f"indexing_progress=100, queue_size={queue_size}, "
+                f"completed={completed}, total_known_ops={total_known_ops}"
+            )
+
         return {
             "running": True,
-            "job_type": "crawl+monitor",
+            "job_type": job_type,
             "start_time": int(start_time.timestamp() * 1000) if start_time else None,
-            "elapsed_time": int(elapsed_time) if elapsed_time else None,
-            "discovery_progress": min(100, int((self.discovery_progress.processed_paths / max(1, self.discovery_progress.total_paths)) * 100)),
-            "indexing_progress": min(100, int((self.indexing_progress.files_indexed / max(1, self.indexing_progress.files_to_index)) * 100)),
-            "files_discovered": self.discovery_progress.files_found,
-            "files_indexed": self.indexing_progress.files_indexed,
-            "files_skipped": self.discovery_progress.files_skipped,
-            "queue_size": self._operation_queue.qsize(),
-            "monitoring_active": self._watcher is not None and self._watcher.is_running(),
-            "estimated_completion": int(estimated_completion.timestamp() * 1000) if estimated_completion else None,
+            "elapsed_time": int(elapsed_time) if elapsed_time is not None else None,
+            "discovery_progress": discovery_progress,
+            "indexing_progress": indexing_progress,
+            "files_discovered": discovered,
+            "files_indexed": indexed_success,
+            "files_skipped": skipped,
+            "queue_size": queue_size,
+            "monitoring_active": monitoring_active,
+            "estimated_completion": estimated_completion,
         }
     
     async def clear_indexes(self) -> bool:
