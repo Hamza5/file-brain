@@ -39,11 +39,17 @@ async def lifespan(app: FastAPI):
         db.close()
         logger.info("✅ Database initialized")
         
-        # Initialize Typesense collection
+        # Initialize Typesense collection (non-fatal, resilient)
         logger.info("Initializing Typesense collection...")
         typesense = get_typesense_client()
         await typesense.initialize_collection()
-        logger.info("✅ Typesense initialized")
+        if typesense.collection_ready:
+            logger.info("✅ Typesense initialized")
+        else:
+            logger.warning(
+                "⚠️ Typesense collection is not ready. "
+                "Starting API in degraded mode; search endpoints may return errors until Typesense is available."
+            )
         
         # Initialize crawl manager
         logger.info("Initializing  crawl manager...")

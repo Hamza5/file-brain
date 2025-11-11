@@ -68,7 +68,9 @@ export function StatusProvider({ children }: { children: ReactNode }) {
         applySnapshot(initialStatus, initialStats);
       } catch (e) {
         console.error("Failed to load initial crawler state", e);
-        setError("Failed to load crawler status");
+        setError(
+          "Failed to load crawler status. Some features may be temporarily unavailable."
+        );
       } finally {
         setIsLoading(false);
       }
@@ -92,7 +94,9 @@ export function StatusProvider({ children }: { children: ReactNode }) {
           applySnapshot(nextStatus, nextStats);
         } catch (e) {
           console.error("Polling error", e);
-          setError("Lost connection to crawler status");
+          setError(
+            "Lost connection to crawler status. Some information may be out of date."
+          );
         }
       }, intervalMs);
     }

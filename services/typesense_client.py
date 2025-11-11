@@ -2,6 +2,7 @@
 Typesense client for search operations
 """
 import hashlib
+import asyncio
 from typing import Optional, Dict, Any
 
 import typesense
@@ -15,6 +16,9 @@ class TypesenseClient:
     """Typesense client wrapper"""
     
     def __init__(self):
+        # We intentionally keep initialization cheap and robust:
+        # - Short connection timeout so slow/booting Typesense does not block app startup for long.
+        # - All heavy / retry logic is handled in initialize_collection().
         self.client = typesense.Client({
             "nodes": [{
                 "host": settings.typesense_host,
@@ -22,24 +26,84 @@ class TypesenseClient:
                 "protocol": settings.typesense_protocol,
             }],
             "api_key": settings.typesense_api_key,
-            "connection_timeout_seconds": 10,
+            "connection_timeout_seconds": 5,
         })
         self.collection_name = settings.typesense_collection_name
+        # Flag to indicate whether the collection is confirmed ready.
+        self.collection_ready = False
 
-    async def initialize_collection(self) -> None:
-        """Initialize Typesense collection if it doesn't exist"""
-        try:
-            # Try to retrieve the collection
-            self.client.collections[self.collection_name].retrieve()
-            logger.info(f"Collection '{self.collection_name}' already exists")
-        except typesense.exceptions.ObjectNotFound:
-            # Collection doesn't exist, create it
-            schema = get_collection_schema(self.collection_name)
-            self.client.collections.create(schema)
-            logger.info(f"Collection '{self.collection_name}' created successfully")
-        except Exception as e:
-            logger.error(f"Error initializing collection: {e}")
-            raise
+    async def initialize_collection(
+        self,
+        max_attempts: int = 5,
+        initial_backoff_seconds: float = 1.0,
+    ) -> None:
+        """
+        Initialize Typesense collection in an idempotent and resilient way.
+
+        Requirements:
+        - If the collection already exists -> treat as success.
+        - If Typesense is slow / returns timeouts while creating the collection -> retry with backoff.
+        - If a concurrent creator wins and we get 409 (already exists) -> treat as success.
+        - On persistent failure -> log error and let the API start in degraded mode,
+          leaving collection_ready = False so callers can react appropriately.
+        """
+        attempt = 0
+        backoff = initial_backoff_seconds
+
+        while attempt < max_attempts:
+            attempt += 1
+            try:
+                # 1. Fast path: collection exists
+                self.client.collections[self.collection_name].retrieve()
+                logger.info(
+                    f"Collection '{self.collection_name}' already exists (attempt {attempt}/{max_attempts})"
+                )
+                self.collection_ready = True
+                return
+            except typesense.exceptions.ObjectNotFound:
+                # 2. Not found -> try to create it
+                try:
+                    schema = get_collection_schema(self.collection_name)
+                    self.client.collections.create(schema)
+                    logger.info(
+                        f"Collection '{self.collection_name}' created successfully "
+                        f"(attempt {attempt}/{max_attempts})"
+                    )
+                    self.collection_ready = True
+                    return
+                except typesense.exceptions.ObjectAlreadyExists:
+                    # Race condition: someone else created it between our 404 and create.
+                    logger.info(
+                        f"Collection '{self.collection_name}' already exists after race "
+                        f"(attempt {attempt}/{max_attempts})"
+                    )
+                    self.collection_ready = True
+                    return
+                except Exception as e:
+                    # Network/timeout/other error while creating. Retry.
+                    logger.warning(
+                        f"Attempt {attempt}/{max_attempts} to create Typesense collection "
+                        f"'{self.collection_name}' failed: {e}"
+                    )
+            except Exception as e:
+                # 3. Retrieval failed for transient reasons (Typesense starting up, timeouts, etc.)
+                logger.warning(
+                    f"Attempt {attempt}/{max_attempts} to verify Typesense collection "
+                    f"'{self.collection_name}' failed: {e}"
+                )
+
+            # Backoff before next attempt
+            if attempt < max_attempts:
+                await asyncio.sleep(backoff)
+                backoff *= 2
+
+        # If we reach here, all attempts failed.
+        # Do NOT raise to avoid crashing FastAPI startup.
+        logger.error(
+            f"Failed to initialize Typesense collection '{self.collection_name}' "
+            f"after {max_attempts} attempts. Continuing in degraded mode."
+        )
+        self.collection_ready = False
     
     @staticmethod
     def generate_doc_id(file_path: str) -> str:
