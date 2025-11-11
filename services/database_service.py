@@ -45,85 +45,91 @@ class DatabaseService:
             self.set_setting("crawler_include_subdirectories", "true", "Whether to include subdirectories in crawl")
     
     # Watch Paths
-    
-    def get_watch_paths(self, enabled_only: bool = True) -> List[str]:
-        """Get list of watch paths"""
+
+    def list_watch_paths(self, enabled_only: bool = False) -> List[WatchPath]:
+        """Return WatchPath rows for API/UI."""
         query = self.db.query(WatchPath)
         if enabled_only:
             query = query.filter(WatchPath.enabled == True)
-        paths = query.all()
+        return query.order_by(WatchPath.id.asc()).all()
+
+    def get_watch_paths(self, enabled_only: bool = True) -> List[str]:
+        """Get list of watch path strings (legacy helper)."""
+        paths = self.list_watch_paths(enabled_only=enabled_only)
         return [p.path for p in paths]
-    
-    def add_watch_path(self, path: str) -> WatchPath:
-        """Add a new watch path"""
+
+    def add_watch_path(self, path: str, enabled: bool = True) -> WatchPath:
+        """Add a new watch path."""
         existing = self.db.query(WatchPath).filter(WatchPath.path == path).first()
         if existing:
             raise ValueError(f"Watch path already exists: {path}")
-        
-        watch_path = WatchPath(path=path, enabled=True)
+
+        watch_path = WatchPath(path=path, enabled=enabled)
         self.db.add(watch_path)
         self.db.commit()
         self.db.refresh(watch_path)
         logger.info(f"Added watch path: {path}")
         return watch_path
-    
+
     def remove_watch_path(self, path: str) -> bool:
-        """Remove a watch path"""
+        """Remove a watch path by path string."""
         watch_path = self.db.query(WatchPath).filter(WatchPath.path == path).first()
         if not watch_path:
             return False
-        
+
         self.db.delete(watch_path)
         self.db.commit()
         logger.info(f"Removed watch path: {path}")
         return True
-    
+
     def toggle_watch_path(self, path: str, enabled: bool) -> Optional[WatchPath]:
-        """Enable/disable a watch path"""
+        """Enable/disable a watch path by path string."""
         watch_path = self.db.query(WatchPath).filter(WatchPath.path == path).first()
         if not watch_path:
             return None
-        
+
         watch_path.enabled = enabled
         watch_path.updated_at = datetime.utcnow()
         self.db.commit()
         self.db.refresh(watch_path)
         logger.info(f"Toggled watch path {path}: enabled={enabled}")
         return watch_path
-    
+
     def get_watch_path_by_path(self, path: str) -> Optional[WatchPath]:
-        """Get watch path by exact path"""
+        """Get watch path by exact path."""
         return self.db.query(WatchPath).filter(WatchPath.path == path).first()
-    
+
     def create_watch_path(self, path: str, enabled: bool = True) -> WatchPath:
-        """Create a new watch path"""
-        return self.add_watch_path(path)
-    
+        """Create a new watch path (alias for add_watch_path)."""
+        return self.add_watch_path(path, enabled=enabled)
+
     def update_watch_path(self, path_id: int, **kwargs) -> Optional[WatchPath]:
-        """Update an existing watch path"""
+        """Update an existing watch path by ID."""
         watch_path = self.db.query(WatchPath).filter(WatchPath.id == path_id).first()
         if not watch_path:
             return None
-        
+
         for key, value in kwargs.items():
             if hasattr(watch_path, key):
                 setattr(watch_path, key, value)
-        
+
         watch_path.updated_at = datetime.utcnow()
         self.db.commit()
         self.db.refresh(watch_path)
+        logger.info(f"Updated watch path {path_id}")
         return watch_path
-    
+
     def delete_watch_path(self, path_id: int) -> bool:
-        """Delete a watch path by ID"""
+        """Delete a watch path by ID."""
         watch_path = self.db.query(WatchPath).filter(WatchPath.id == path_id).first()
         if not watch_path:
             return False
-        
+
         self.db.delete(watch_path)
         self.db.commit()
+        logger.info(f"Deleted watch path {path_id}")
         return True
-    
+
     def remove_all_watch_paths(self) -> int:
         """Remove all watch paths and return count of removed paths"""
         count = self.db.query(WatchPath).delete()

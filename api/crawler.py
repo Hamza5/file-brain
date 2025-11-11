@@ -2,6 +2,7 @@
 Crawl control API endpoints (Database-backed)
 All original crawler requirements replaced with improved functionality
 """
+import asyncio
 import time
 import os
 from datetime import datetime
@@ -224,6 +225,180 @@ async def clear_all_indexes(db: Session = Depends(get_db)):
 # Note:
 # Watch path management is now exclusively handled by the configuration API
 # under /api/config/watch-paths* using batch semantics.
+
+
+# --- Stats & Streaming endpoints for UI ---
+
+@router.get("/stats")
+async def get_crawler_stats(db: Session = Depends(get_db)):
+    """
+    Aggregate crawler statistics for UI (totals, ratios, simple time buckets).
+
+    This is intentionally lightweight and based on current CrawlerState plus cheap
+    derived values. It can be extended later with richer historical data.
+    """
+    try:
+        db_service = DatabaseService(db)
+        state = db_service.get_crawler_state()
+
+        discovered = (state.files_discovered or 0)
+        indexed = (state.files_indexed or 0)
+        skipped = (state.files_skipped or 0) if hasattr(state, "files_skipped") else 0
+        failed = (state.files_error or 0)
+        deleted = (state.files_deleted or 0)
+
+        # bytes indexed: optional field, default 0 when missing
+        indexed_bytes = getattr(state, "indexed_bytes", 0) or 0
+
+        # Ratios
+        indexed_vs_discovered = float(indexed) / discovered if discovered > 0 else 0.0
+        total_attempted = indexed + failed
+        success_rate = float(indexed) / total_attempted if total_attempted > 0 else 0.0
+
+        # Runtime metadata: last known start/completion from state
+        last_crawl_started_at = (
+            int(state.crawl_job_started_at.timestamp() * 1000)
+            if getattr(state, "crawl_job_started_at", None)
+            else None
+        )
+        last_crawl_completed_at = (
+            int(state.last_completion_at.timestamp() * 1000)
+            if hasattr(state, "last_completion_at") and state.last_completion_at
+            else None
+        )
+
+        # Simple time-series placeholders (can be enriched later).
+        # For now, return empty arrays so frontend Recharts have a stable shape.
+        indexed_per_hour = []
+        indexed_per_day = []
+
+        # Current running flag derived from state and manager
+        crawl_manager = get_crawl_job_manager()
+        running = bool(crawl_manager.is_running())
+
+        return {
+            "totals": {
+                "discovered": discovered,
+                "indexed": indexed,
+                "skipped": skipped,
+                "failed": failed,
+                "deleted": deleted,
+                "indexed_bytes": indexed_bytes,
+            },
+            "ratios": {
+                "indexed_vs_discovered": indexed_vs_discovered,
+                "success_rate": success_rate,
+            },
+            "timeseries": {
+                "indexed_per_hour": indexed_per_hour,
+                "indexed_per_day": indexed_per_day,
+            },
+            "runtime": {
+                "last_crawl_started_at": last_crawl_started_at,
+                "last_crawl_completed_at": last_crawl_completed_at,
+                "running": running,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error getting crawler stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stream")
+async def stream_crawler_status(db: Session = Depends(get_db)):
+    """
+    Server-Sent Events (SSE) stream that pushes crawl status + stats.
+
+    - Emits a JSON payload compatible with frontend StreamPayload:
+      { "status": { ... }, "stats": { ... }, "timestamp": ms }
+    - Designed to be lightweight; uses existing get_status() and /stats-style aggregation.
+    """
+
+    async def event_generator():
+        from fastapi.encoders import jsonable_encoder
+
+        while True:
+            try:
+                crawl_manager = get_crawl_job_manager()
+                status_dict = crawl_manager.get_status()
+
+                # Load stats via the same logic as get_crawler_stats()
+                db_service_local = DatabaseService(db)
+                state = db_service_local.get_crawler_state()
+
+                discovered = (state.files_discovered or 0)
+                indexed = (state.files_indexed or 0)
+                skipped = (state.files_skipped or 0) if hasattr(state, "files_skipped") else 0
+                failed = (state.files_error or 0)
+                deleted = (state.files_deleted or 0)
+                indexed_bytes = getattr(state, "indexed_bytes", 0) or 0
+
+                indexed_vs_discovered = float(indexed) / discovered if discovered > 0 else 0.0
+                total_attempted = indexed + failed
+                success_rate = float(indexed) / total_attempted if total_attempted > 0 else 0.0
+
+                last_crawl_started_at = (
+                    int(state.crawl_job_started_at.timestamp() * 1000)
+                    if getattr(state, "crawl_job_started_at", None)
+                    else None
+                )
+                last_crawl_completed_at = (
+                    int(state.last_completion_at.timestamp() * 1000)
+                    if hasattr(state, "last_completion_at") and state.last_completion_at
+                    else None
+                )
+
+                payload = {
+                    "status": status_dict,
+                    "stats": {
+                        "totals": {
+                            "discovered": discovered,
+                            "indexed": indexed,
+                            "skipped": skipped,
+                            "failed": failed,
+                            "deleted": deleted,
+                            "indexed_bytes": indexed_bytes,
+                        },
+                        "ratios": {
+                            "indexed_vs_discovered": indexed_vs_discovered,
+                            "success_rate": success_rate,
+                        },
+                        "timeseries": {
+                            "indexed_per_hour": [],
+                            "indexed_per_day": [],
+                        },
+                        "runtime": {
+                            "last_crawl_started_at": last_crawl_started_at,
+                            "last_crawl_completed_at": last_crawl_completed_at,
+                            "running": bool(crawl_manager.is_running()),
+                        },
+                    },
+                    "timestamp": int(time.time() * 1000),
+                }
+
+                # Ensure strict JSON in SSE payload (no Python literals)
+                data = jsonable_encoder(payload)
+                import json as _json
+
+                yield f"data: {_json.dumps(data)}\n\n"
+
+                # Dynamic interval: faster when running, slower when idle.
+                await asyncio.sleep(1.0 if status_dict.get("running") else 5.0)
+            except Exception as e:
+                logger.error(f"Error in crawler SSE stream: {e}")
+                break
+
+    from fastapi import Response
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # Crawler Settings Management

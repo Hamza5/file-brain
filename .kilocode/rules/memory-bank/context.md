@@ -1,11 +1,15 @@
 # Context: Smart File Finder
 
 ## Current focus
-- Initialize and standardize the Memory Bank for ongoing work.
+- Provide a full crawler & search console UI over the existing FastAPI + Typesense backend.
 - Backend orchestrated by [lifespan()](main.py:22) with crawl control via [CrawlJobManager](services/crawl_job_manager.py:46).
 - Real-time monitoring enabled through [FileWatcher](services/watcher.py:16).
 - Typesense collection auto-init via [initialize_collection()](services/typesense_client.py:29) with schema [get_collection_schema()](config/typesense_schema.py:7) including embeddings.
-- Frontend is a minimal InstantSearch client in [App.tsx](frontend/src/App.tsx:1) targeting index "files".
+- Frontend is a multi-page React InstantSearch app in [App.tsx](frontend/src/App.tsx:1) with:
+  - AppShell layout and sidebar navigation.
+  - SearchPage with custom hit renderer, icons, and pagination.
+  - StatsPage with live stats from /api/crawler/stats and Recharts visualizations.
+  - SettingsPage with crawler controls, crawler options, and Watch Paths manager.
 
 ## Recent changes
 - Authored Memory Bank docs:
@@ -17,7 +21,22 @@
   - Indexing and discovery loops use cooperative cancellation via _stop_event to ensure responsive shutdown.
 - Control-plane responsiveness:
   - [/api/crawler/status](api/crawler.py:129) reads cheap in-memory/DB state; no heavy work on the event loop.
-  - [/api/crawler/stop](api/crawler.py:146) signals _stop_event, stops watcher, cancels tasks, and returns without waiting for long-running extraction/indexing, so it no longer “hangs” while extra files are processed.
+  - [/api/crawler/stop](api/crawler.py:146) signals _stop_event, stops watcher, cancels tasks, and returns without waiting for long-running extraction/indexing.
+- New frontend console:
+  - App shell with sidebar and header in [AppShell.tsx](frontend/src/layout/AppShell.tsx:1).
+  - Search UI in [SearchPage.tsx](frontend/src/pages/SearchPage.tsx:1) using TypesenseInstantSearchAdapter, custom hit cards with React Icons, and InstantSearch Pagination.
+  - Stats UI in [StatsPage.tsx](frontend/src/pages/StatsPage.tsx:1) using /api/crawler/stats and Recharts (coverage pie + hourly bar).
+  - Settings UI in [SettingsPage.tsx](frontend/src/pages/SettingsPage.tsx:1) including:
+    - Crawler controls mapped to /api/crawler/start, /stop, /clear-indexes.
+    - Crawler options (start_monitoring, include_subdirectories) bound to /api/crawler/settings.
+    - Watch Paths manager wired to /api/config/watch-paths* endpoints.
+  - Shared StatusContext in [StatusContext.tsx](frontend/src/context/StatusContext.tsx:1) consuming:
+    - /api/crawler/status and /api/crawler/stats snapshots.
+    - /api/crawler/stream SSE for live updates, with polling fallback.
+- Backend APIs:
+  - /api/crawler/stats implemented for structured CrawlStats.
+  - /api/crawler/stream emits strict JSON SSE payloads for UI consumption.
+  - /api/config/watch-paths* endpoints used as the single source of truth for UI-managed watch paths.
 
 ## Implementation snapshot
 - API surfaces:
