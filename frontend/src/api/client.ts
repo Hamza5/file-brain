@@ -202,6 +202,30 @@ export async function clearWatchPaths(): Promise<void> {
   });
 }
 
+// Filesystem browsing (for folder picker)
+export interface FsRoot {
+  name: string;
+  path: string;
+  type: "directory";
+  isDefault?: boolean;
+}
+
+export interface FsEntry {
+  name: string;
+  path: string;
+  type: "directory";
+  has_children: boolean;
+}
+
+export async function getFsRoots(): Promise<FsRoot[]> {
+  return requestJSON("/api/fs/roots");
+}
+
+export async function listFs(path: string): Promise<FsEntry[]> {
+  const qs = `?path=${encodeURIComponent(path)}`;
+  return requestJSON(`/api/fs/list${qs}`);
+}
+
 // SSE stream connection
 export interface StreamPayload {
   status: CrawlStatus["status"];

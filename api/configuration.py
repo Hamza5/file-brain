@@ -157,10 +157,11 @@ async def replace_watch_paths(
             continue
 
     logger.info(f"Replaced watch paths via batch API: {added_count} added")
-
+ 
     return MessageResponse(
         message=f"Replaced all watch paths. Added {added_count} path(s).",
         success=True,
+        timestamp=None,
     )
 
 

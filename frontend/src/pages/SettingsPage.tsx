@@ -5,6 +5,7 @@ import {
   FiTrash2,
   FiPlus,
   FiRefreshCw,
+  FiFolderPlus,
 } from "react-icons/fi";
 import {
   getCrawlerSettings,
@@ -19,6 +20,7 @@ import {
   type WatchPath,
 } from "../api/client";
 import { useStatus } from "../context/StatusContext";
+import { FolderSelectModal } from "../components/FolderSelectModal";
 
 type SettingsState = {
   start_monitoring: boolean;
@@ -34,7 +36,10 @@ export function SettingsPage() {
   const [watchPaths, setWatchPaths] = useState<WatchPath[]>([]);
   const [watchPathsLoading, setWatchPathsLoading] = useState(true);
   const [newPath, setNewPath] = useState("");
-  const [busyAction, setBusyAction] = useState<"start" | "stop" | "clear" | "addPath" | "replace" | "clearPaths" | null>(null);
+  const [busyAction, setBusyAction] = useState<
+    "start" | "stop" | "clear" | "addPath" | "replace" | "clearPaths" | null
+  >(null);
+  const [folderModalOpen, setFolderModalOpen] = useState(false);
 
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -388,6 +393,18 @@ export function SettingsPage() {
                 <FiPlus className="w-3 h-3" />
                 Add
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActionError(null);
+                  setActionMessage(null);
+                  setFolderModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-100"
+              >
+                <FiFolderPlus className="w-3 h-3" />
+                Browse…
+              </button>
             </div>
 
             <div className="mt-2 space-y-1 max-h-40 overflow-y-auto text-[10px]">
@@ -422,6 +439,30 @@ export function SettingsPage() {
       {actionError && (
         <div className="text-[10px] text-rose-400">{actionError}</div>
       )}
+
+      {/* Folder picker modal for selecting watch paths */}
+      <FolderSelectModal
+        isOpen={folderModalOpen}
+        onClose={() => setFolderModalOpen(false)}
+        onConfirm={async (path) => {
+          setFolderModalOpen(false);
+          setBusyAction("addPath");
+          setActionError(null);
+          setActionMessage(null);
+          try {
+            const added = await addWatchPath(path);
+            setWatchPaths((prev) => [...prev, added]);
+            setActionMessage(`Watch path added: ${path}`);
+          } catch (e) {
+            console.error(e);
+            setActionError(
+              "Failed to add watch path from selection. Ensure it exists and is a directory."
+            );
+          } finally {
+            setBusyAction(null);
+          }
+        }}
+      />
     </div>
   );
 }

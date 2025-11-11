@@ -16,6 +16,7 @@ from services.typesense_client import get_typesense_client
 from services.crawl_job_manager import get_crawl_job_manager
 from api.crawler import router as crawler_router
 from api.configuration import router as config_router
+from api.fs import router as fs_router
 from utils.logger import logger
 
 
@@ -180,6 +181,7 @@ app = FastAPI(
 # Include routers
 app.include_router(crawler_router)
 app.include_router(config_router)
+app.include_router(fs_router)
 
 
 @app.get("/")
