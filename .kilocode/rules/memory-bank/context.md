@@ -37,6 +37,13 @@
   - /api/crawler/stats implemented for structured CrawlStats.
   - /api/crawler/stream emits strict JSON SSE payloads for UI consumption.
   - /api/config/watch-paths* endpoints used as the single source of truth for UI-managed watch paths.
+- Hybrid semantic search integration:
+  - Typesense collection schema includes an "embedding" field with "embed.from" over [title, description, content] using ts/e5-small-v2 ([get_collection_schema()](config/typesense_schema.py:7)).
+  - Frontend TypesenseInstantSearchAdapter in [App.tsx](frontend/src/App.tsx:11) configured with:
+    - additionalSearchParameters.query_by = "file_name,file_path,content,title,description,embedding"
+    - additionalSearchParameters.exclude_fields = "embedding"
+    - additionalSearchParameters.vector_query = "embedding:([], k:50)"
+  - This makes all non-empty queries run hybrid (lexical + semantic) without user toggles, aligned with Typesense InstantSearch adapter semantics.
 
 ## Implementation snapshot
 - API surfaces:
@@ -53,31 +60,32 @@
   - Upserts: [index_file()](services/typesense_client.py:77).
   - Deletes: [remove_from_index()](services/typesense_client.py:143).
   - Progress semantics: [get_status()](services/crawl_job_manager.py:189) clamps indexing_progress below 100 when pending work exists.
+- Search / Hybrid semantics:
+  - Typesense is the single source of truth; collection schema includes embedding field.
+  - Frontend uses TypesenseInstantSearchAdapter with:
+    - query_by covering file_name, file_path, content, title, description, embedding.
+    - vector_query targeting the embedding field for k-NN.
+    - embedding excluded from hits.
+  - Result: Always-on hybrid (keyword + semantic) search from the React InstantSearch UI, modeled after official Typesense adapter patterns.
 
 ## Gaps and observations
 - Dual processing implementations present:
   - Primary: [CrawlJobManager](services/crawl_job_manager.py:46) handles discovery/indexing/monitoring with cooperative cancellation and thread-pooled heavy work.
   - Legacy/aux: [FileProcessor](workers/file_processor.py:18) exists but is not wired into startup paths; consider deprecating or consolidating.
-- Embedding config uses Typesense "embed" with model ts/e5-small-v2 in [get_collection_schema()](config/typesense_schema.py:54). Ensure local Typesense build supports embeddings.
-- Frontend currently lacks facets, hit rendering, and config UI; only basic search box and hits.
+- Hybrid search assumes:
+  - Typesense server version supports embed + vector_query.
+  - Collection was (re)created with the embedding field active.
+- Frontend hybrid behavior:
+  - Currently configured globally via additionalSearchParameters; no per-query toggle.
 
-## Next steps (short-term)
-1. Add basic facets and custom hit renderer in [App.tsx](frontend/src/App.tsx:1) (file_extension, mime_type).
-2. Confirm Typesense setup and keys:
-   - Search-only key in frontend [App.tsx](frontend/src/App.tsx:1).
-   - Admin key only server-side [settings.typesense_api_key](config/settings.py:29).
-3. Harden progress reporting and edge cases in [get_status()](services/crawl_job_manager.py:189).
-4. Document and verify .env; align with [Settings(BaseSettings)](config/settings.py:12).
-5. Write minimal e2e flow test for start/stop crawl in [router](api/crawler.py:40,146) to assert:
-   - /status remains responsive during heavy indexing.
-   - /stop returns quickly and does not process substantial new work after the stop request.
-
-## Medium-term items
-- Create Docker Compose for app + Typesense.
-- UI for managing watch paths and crawler settings (if not already fully covered in [router](api/configuration.py:1)).
-- Optional: consolidate or remove [FileProcessor](workers/file_processor.py:18); ensure a single ingestion path.
+## Next steps
+- Confirm Typesense deployment:
+  - Version supports embeddings and vector_query.
+  - Embedding provider/model configured for ts/e5-small-v2 (or chosen model).
+- Optionally:
+  - Align backend search_files() in [TypesenseClient](services/typesense_client.py:220) to use the same hybrid parameters for API consumers.
+- Maintain docs so future changes respect always-on hybrid semantics.
 
 ## Risks
-- Embeddings require Typesense with embedding provider support; verify local environment version and feature flags.
-- Large file performance and OCR throughput; tune thread pool and queue size in [CrawlJobManager](services/crawl_job_manager.py:46).
-- Misconfiguration of CRAWLER_WORKERS or MAX_FILE_SIZE_MB could affect throughput or resource use; defaults are conservative.
+- If server or collection is not correctly configured for embeddings, vector_query calls will error.
+- Need to ensure operational docs clearly specify Typesense embedding requirements for this hybrid mode.

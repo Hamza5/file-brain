@@ -23,10 +23,13 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
     cacheSearchResultsForSeconds: 0,
   },
   additionalSearchParameters: {
-    // Ensure these fields exist in Typesense schema:
-    // file_name, content, file_path, file_extension, mime_type, etc.
-    // Remove "path" which is not in the schema and caused 404 validation errors.
-    query_by: "file_name,content",
+    // Hybrid search defaults:
+    // - Lexical over file_name, file_path, content, title, description
+    // - Embeddings-backed semantic search via "embedding" field (server-side configured)
+    // - Exclude embedding vector from responses
+    query_by: "file_name,file_path,content,title,description,embedding",
+    exclude_fields: "embedding",
+    vector_query: "embedding:([], k:50)",
   },
 });
 

@@ -1,4 +1,4 @@
-import { Hits, SearchBox, Pagination } from "react-instantsearch";
+import { Hits, SearchBox, Pagination, Configure, useInstantSearch } from "react-instantsearch";
 import {
   FiFile,
   FiFileText,
@@ -95,6 +95,29 @@ function Hit({ hit }: { hit: HitType }) {
   );
 }
 
+function HybridSemanticConfigure() {
+  // React InstantSearch v7: useInstantSearch gives access to UI state.
+  const { uiState } = useInstantSearch();
+
+  // Our single index is "files" (see App.tsx InstantSearch indexName).
+  const indexState = uiState.files || {};
+  const query = (indexState.query as string | undefined) || "";
+  const hasQuery = query.trim().length > 0;
+
+  // `typesenseVectorQuery` is a special passthrough param understood by
+  // typesense-instantsearch-adapter and forwarded as `vector_query`.
+  // We use a typed extension of the underlying search parameters to satisfy TS/ESLint.
+  type TypesenseConfigureProps = React.ComponentProps<typeof Configure> & {
+    typesenseVectorQuery?: string;
+  };
+
+  const configureProps: TypesenseConfigureProps = hasQuery
+    ? { typesenseVectorQuery: "embedding:([], k:50)" }
+    : { typesenseVectorQuery: undefined };
+
+  return <Configure {...configureProps} />;
+}
+
 export function SearchPage() {
   return (
     <div className="space-y-4">
@@ -121,6 +144,12 @@ export function SearchPage() {
           }}
         />
       </div>
+
+      {/* Always-on hybrid semantic search:
+          - When query is non-empty, HybridSemanticConfigure injects typesenseVectorQuery
+          - When query is empty, only lexical search runs
+      */}
+      <HybridSemanticConfigure />
 
       <div className="space-y-2">
         <Hits<HitType> hitComponent={Hit} />
