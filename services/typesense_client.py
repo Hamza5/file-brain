@@ -259,6 +259,36 @@ class TypesenseClient:
             logger.error(f"Error getting stats: {e}")
             raise
     
+    async def get_file_type_distribution(self) -> Dict[str, int]:
+        """
+        Get distribution of indexed files by file extension via faceting.
+        
+        Returns:
+            Dict mapping file_extension to count, e.g. {".pdf": 42, ".txt": 15}
+        """
+        try:
+            # Search with facet_by to get counts per file_extension
+            results = self.client.collections[self.collection_name].documents.search({
+                "q": "*",
+                "facet_by": "file_extension",
+                "per_page": 0,  # We only want facet counts, not documents
+            })
+            
+            facets = results.get("facet_counts", [])
+            distribution = {}
+            
+            for facet in facets:
+                if facet.get("field_name") == "file_extension":
+                    for count in facet.get("counts", []):
+                        ext = count.get("value", "unknown")
+                        cnt = count.get("count", 0)
+                        distribution[ext] = cnt
+            
+            return distribution
+        except Exception as e:
+            logger.error(f"Error getting file type distribution: {e}")
+            return {}
+    
     async def clear_all_documents(self) -> None:
         """Clear all documents from the collection"""
         try:

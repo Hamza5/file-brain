@@ -232,72 +232,67 @@ async def clear_all_indexes(db: Session = Depends(get_db)):
 @router.get("/stats")
 async def get_crawler_stats(db: Session = Depends(get_db)):
     """
-    Aggregate crawler statistics for UI (totals, ratios, simple time buckets).
-
-    This is intentionally lightweight and based on current CrawlerState plus cheap
-    derived values. It can be extended later with richer historical data.
+    Aggregate crawler statistics for UI using Typesense as the single source of truth.
+    
+    Typesense provides:
+    - num_documents: total indexed files
+    - file_type_distribution: breakdown by file_extension
+    
+    CrawlJobManager provides:
+    - running: current crawl status
     """
     try:
-        db_service = DatabaseService(db)
-        state = db_service.get_crawler_state()
+        from services.typesense_client import get_typesense_client
+        
+        typesense_client = get_typesense_client()
+        crawl_manager = get_crawl_job_manager()
+        
+        # Get stats from Typesense
+        try:
+            ts_stats = await typesense_client.get_collection_stats()
+            total_indexed = ts_stats.get("num_documents", 0)
+            healthy = True
+        except Exception as e:
+            logger.warning(f"Typesense unavailable for stats: {e}")
+            total_indexed = 0
+            healthy = False
+        
+        # Get file type distribution from Typesense
+        try:
+            file_types = await typesense_client.get_file_type_distribution()
+        except Exception as e:
+            logger.warning(f"Failed to get file type distribution: {e}")
+            file_types = {}
+        
+        # Runtime state from CrawlJobManager
+        status_dict = crawl_manager.get_status()
+        running = bool(status_dict.get("running", False))
 
-        discovered = (state.files_discovered or 0)
-        indexed = (state.files_indexed or 0)
-        skipped = (state.files_skipped or 0) if hasattr(state, "files_skipped") else 0
-        failed = (state.files_error or 0)
-        deleted = (state.files_deleted or 0)
+        # Discovered comes from live runtime status (discovery_progress metrics),
+        # not from Typesense. This reflects how many files we've seen so far.
+        discovered = int(status_dict.get("files_discovered", 0))
 
-        # bytes indexed: optional field, default 0 when missing
-        indexed_bytes = getattr(state, "indexed_bytes", 0) or 0
+        # Indexed comes from Typesense and is the single source of truth for indexed docs.
+        indexed = int(total_indexed)
 
         # Ratios
-        indexed_vs_discovered = float(indexed) / discovered if discovered > 0 else 0.0
-        total_attempted = indexed + failed
-        success_rate = float(indexed) / total_attempted if total_attempted > 0 else 0.0
-
-        # Runtime metadata: last known start/completion from state
-        last_crawl_started_at = (
-            int(state.crawl_job_started_at.timestamp() * 1000)
-            if getattr(state, "crawl_job_started_at", None)
-            else None
+        indexed_vs_discovered = (
+            float(indexed) / discovered if discovered > 0 else 0.0
         )
-        last_crawl_completed_at = (
-            int(state.last_completion_at.timestamp() * 1000)
-            if hasattr(state, "last_completion_at") and state.last_completion_at
-            else None
-        )
-
-        # Simple time-series placeholders (can be enriched later).
-        # For now, return empty arrays so frontend Recharts have a stable shape.
-        indexed_per_hour = []
-        indexed_per_day = []
-
-        # Current running flag derived from state and manager
-        crawl_manager = get_crawl_job_manager()
-        running = bool(crawl_manager.is_running())
 
         return {
             "totals": {
                 "discovered": discovered,
                 "indexed": indexed,
-                "skipped": skipped,
-                "failed": failed,
-                "deleted": deleted,
-                "indexed_bytes": indexed_bytes,
             },
             "ratios": {
                 "indexed_vs_discovered": indexed_vs_discovered,
-                "success_rate": success_rate,
             },
-            "timeseries": {
-                "indexed_per_hour": indexed_per_hour,
-                "indexed_per_day": indexed_per_day,
-            },
+            "file_types": file_types,
             "runtime": {
-                "last_crawl_started_at": last_crawl_started_at,
-                "last_crawl_completed_at": last_crawl_completed_at,
                 "running": running,
             },
+            "healthy": healthy,
         }
     except Exception as e:
         logger.error(f"Error getting crawler stats: {e}")
@@ -307,45 +302,45 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
 @router.get("/stream")
 async def stream_crawler_status(db: Session = Depends(get_db)):
     """
-    Server-Sent Events (SSE) stream that pushes crawl status + stats.
+    Server-Sent Events (SSE) stream that pushes crawl status + stats using Typesense as source of truth.
 
     - Emits a JSON payload compatible with frontend StreamPayload:
       { "status": { ... }, "stats": { ... }, "timestamp": ms }
-    - Designed to be lightweight; uses existing get_status() and /stats-style aggregation.
+    - Stats are derived from Typesense (num_documents, file_types) + CrawlJobManager (running flag).
     """
 
     async def event_generator():
         from fastapi.encoders import jsonable_encoder
+        from services.typesense_client import get_typesense_client
 
         while True:
             try:
                 crawl_manager = get_crawl_job_manager()
                 status_dict = crawl_manager.get_status()
+                typesense_client = get_typesense_client()
 
-                # Load stats via the same logic as get_crawler_stats()
-                db_service_local = DatabaseService(db)
-                state = db_service_local.get_crawler_state()
-
-                discovered = (state.files_discovered or 0)
-                indexed = (state.files_indexed or 0)
-                skipped = (state.files_skipped or 0) if hasattr(state, "files_skipped") else 0
-                failed = (state.files_error or 0)
-                deleted = (state.files_deleted or 0)
-                indexed_bytes = getattr(state, "indexed_bytes", 0) or 0
-
-                indexed_vs_discovered = float(indexed) / discovered if discovered > 0 else 0.0
-                total_attempted = indexed + failed
-                success_rate = float(indexed) / total_attempted if total_attempted > 0 else 0.0
-
-                last_crawl_started_at = (
-                    int(state.crawl_job_started_at.timestamp() * 1000)
-                    if getattr(state, "crawl_job_started_at", None)
-                    else None
-                )
-                last_crawl_completed_at = (
-                    int(state.last_completion_at.timestamp() * 1000)
-                    if hasattr(state, "last_completion_at") and state.last_completion_at
-                    else None
+                # Get stats from Typesense
+                try:
+                    ts_stats = await typesense_client.get_collection_stats()
+                    total_indexed = ts_stats.get("num_documents", 0)
+                    healthy = True
+                except Exception as e:
+                    logger.warning(f"Typesense unavailable in SSE stream: {e}")
+                    total_indexed = 0
+                    healthy = False
+                
+                # Get file type distribution from Typesense
+                try:
+                    file_types = await typesense_client.get_file_type_distribution()
+                except Exception as e:
+                    logger.warning(f"Failed to get file type distribution in SSE: {e}")
+                    file_types = {}
+                
+                # Discovered from runtime status, Indexed from Typesense.
+                discovered = int(status_dict.get("files_discovered", 0))
+                indexed = int(total_indexed)
+                indexed_vs_discovered = (
+                    float(indexed) / discovered if discovered > 0 else 0.0
                 )
 
                 payload = {
@@ -354,24 +349,15 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                         "totals": {
                             "discovered": discovered,
                             "indexed": indexed,
-                            "skipped": skipped,
-                            "failed": failed,
-                            "deleted": deleted,
-                            "indexed_bytes": indexed_bytes,
                         },
                         "ratios": {
                             "indexed_vs_discovered": indexed_vs_discovered,
-                            "success_rate": success_rate,
                         },
-                        "timeseries": {
-                            "indexed_per_hour": [],
-                            "indexed_per_day": [],
-                        },
+                        "file_types": file_types,
                         "runtime": {
-                            "last_crawl_started_at": last_crawl_started_at,
-                            "last_crawl_completed_at": last_crawl_completed_at,
                             "running": bool(crawl_manager.is_running()),
                         },
+                        "healthy": healthy,
                     },
                     "timestamp": int(time.time() * 1000),
                 }

@@ -1,6 +1,6 @@
 [project]
 name = "smart-file-finder"
-version = "0.0.8"
+version = "0.0.9"
 description = "Advanced file search engine powered by AI"
 authors = [
     {name = "Hamza Abbad",email = "hamza.abbad@gmail.com"}

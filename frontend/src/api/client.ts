@@ -46,39 +46,26 @@ async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-// Types for stats API
+// Types for stats API (Typesense-backed)
 export interface CrawlTotals {
   discovered: number;
   indexed: number;
-  skipped: number;
-  failed: number;
-  indexed_bytes: number;
 }
 
 export interface CrawlRatios {
   indexed_vs_discovered: number;
-  success_rate: number;
-}
-
-export interface TimeBucket {
-  bucket: string;
-  count: number;
 }
 
 export interface CrawlRuntime {
-  last_crawl_started_at: number | null;
-  last_crawl_completed_at: number | null;
   running: boolean;
 }
 
 export interface CrawlStats {
   totals: CrawlTotals;
   ratios: CrawlRatios;
-  timeseries: {
-    indexed_per_hour: TimeBucket[];
-    indexed_per_day: TimeBucket[];
-  };
+  file_types: Record<string, number>; // e.g. { ".pdf": 42, ".txt": 15 }
   runtime: CrawlRuntime;
+  healthy: boolean; // true if Typesense is available
 }
 
 export interface CrawlerRunSummary {

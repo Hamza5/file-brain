@@ -2,6 +2,7 @@ import { useStatus } from "../context/StatusContext";
 import { useNotification } from "../context/NotificationContext";
 import { Chart } from "primereact/chart";
 import { Card } from "primereact/card";
+import { useMemo } from "react";
 
 interface StatCardProps {
   label: string;
@@ -14,96 +15,129 @@ export function StatsPage() {
 
   const totals = stats?.totals;
   const ratios = stats?.ratios;
+  const fileTypes = stats?.file_types ?? {};
+  const healthy = stats?.healthy ?? false;
 
   const discovered = totals?.discovered ?? 0;
   const indexed = totals?.indexed ?? 0;
   const remaining = Math.max(discovered - indexed, 0);
 
-  const pieData =
-    discovered > 0
-      ? {
-          labels: ["Indexed", "Remaining"],
-          datasets: [
-            {
-              data: [indexed, remaining],
-              backgroundColor: ["var(--green-500)", "var(--surface-border)"],
-              hoverBackgroundColor: ["var(--green-400)", "var(--surface-500)"],
-            },
-          ],
-        }
-      : null;
+  // Build Chart.js datasets/options using PrimeReact CSS variables resolved via getComputedStyle,
+  // following the official pattern so colors track the active theme.
+  const {
+    coverageData,
+    coverageOptions,
+    fileTypesData,
+    fileTypesOptions,
+  } = useMemo(() => {
+    // In non-browser environments (SSR / tests), guard against missing document.
+    if (typeof document === "undefined") {
+      return {
+        coverageData: null,
+        coverageOptions: {},
+        fileTypesData: null,
+        fileTypesOptions: {},
+      };
+    }
 
-  const hourlyData = stats?.timeseries.indexed_per_hour ?? [];
-  const barData =
-    hourlyData.length > 0
-      ? {
-          labels: hourlyData.map((h) => h.bucket),
-          datasets: [
-            {
-              label: "Indexed files",
-              data: hourlyData.map((h) => h.count),
-              backgroundColor: "var(--blue-400)",
-              borderColor: "var(--blue-600)",
-              borderRadius: 4,
-            },
-          ],
-        }
-      : null;
+    const documentStyle = getComputedStyle(document.documentElement);
+
+    const textSecondary =
+      documentStyle.getPropertyValue("--text-color-secondary").trim() ||
+      "#6B7280";
+
+    // Index coverage colors
+    const indexedBg =
+      documentStyle.getPropertyValue("--green-500").trim() || "#10B981";
+    const indexedHover =
+      documentStyle.getPropertyValue("--green-400").trim() || "#22C55E";
+    const remainingBg =
+      documentStyle.getPropertyValue("--surface-200").trim() || "#E5E7EB";
+    const remainingHover =
+      documentStyle.getPropertyValue("--surface-300").trim() || "#D1D5DB";
+
+    const basePieOptions = {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: textSecondary,
+            font: { size: 12 },
+            usePointStyle: true,
+          },
+        },
+      },
+    };
+
+    const coverageDataLocal =
+      discovered > 0
+        ? {
+            labels: ["Indexed", "Remaining"],
+            datasets: [
+              {
+                data: [indexed, remaining],
+                backgroundColor: [indexedBg, remainingBg],
+                hoverBackgroundColor: [indexedHover, remainingHover],
+                borderColor: [indexedBg, remainingBg],
+                borderWidth: 1,
+              },
+            ],
+          }
+        : null;
+
+    // File types palette from PrimeReact variables with fallbacks.
+    const palette = [
+      documentStyle.getPropertyValue("--blue-500").trim() || "#3B82F6",
+      documentStyle.getPropertyValue("--green-500").trim() || "#22C55E",
+      documentStyle.getPropertyValue("--yellow-500").trim() || "#EAB308",
+      documentStyle.getPropertyValue("--cyan-500").trim() || "#06B6D4",
+      documentStyle.getPropertyValue("--pink-500").trim() || "#EC4899",
+      documentStyle.getPropertyValue("--indigo-500").trim() || "#6366F1",
+      documentStyle.getPropertyValue("--teal-500").trim() || "#14B8A6",
+      documentStyle.getPropertyValue("--orange-500").trim() || "#F97316",
+      documentStyle.getPropertyValue("--purple-500").trim() || "#8B5CF6",
+      documentStyle.getPropertyValue("--red-500").trim() || "#EF4444",
+    ];
+
+    const fileTypeEntries = Object.entries(fileTypes).sort(
+      (a, b) => b[1] - a[1]
+    );
+
+    const fileTypesDataLocal =
+      fileTypeEntries.length > 0
+        ? {
+            labels: fileTypeEntries.map(([ext]) => ext || "unknown"),
+            datasets: [
+              {
+                data: fileTypeEntries.map(([, count]) => count),
+                backgroundColor: fileTypeEntries.map(
+                  (_, idx) => palette[idx % palette.length]
+                ),
+                hoverBackgroundColor: fileTypeEntries.map(
+                  (_, idx) => palette[idx % palette.length]
+                ),
+                borderColor: fileTypeEntries.map(
+                  (_, idx) => palette[idx % palette.length]
+                ),
+                borderWidth: 1,
+              },
+            ],
+          }
+        : null;
+
+    return {
+      coverageData: coverageDataLocal,
+      coverageOptions: basePieOptions,
+      fileTypesData: fileTypesDataLocal,
+      fileTypesOptions: basePieOptions,
+    };
+  }, [discovered, indexed, remaining, fileTypes]);
 
   if (error) {
     showError("Failed to load crawl statistics", error);
   }
-
-  const chartOptions = {
-    animation: false,
-    responsive: true,
-    maintainAspectRatio: false,
-  };
-
-  const pieOptions = {
-    ...chartOptions,
-    plugins: {
-      legend: {
-        labels: {
-          color: "var(--text-color-secondary)",
-          font: { size: 12 },
-        },
-      },
-    },
-  };
-
-  const barOptions = {
-    ...chartOptions,
-    indexAxis: "x" as const,
-    plugins: {
-      legend: {
-        labels: {
-          color: "var(--text-color-secondary)",
-          font: { size: 12 },
-        },
-      },
-    },
-    scales: {
-      x: {
-        ticks: {
-          color: "var(--text-color-secondary)",
-          font: { size: 10 },
-        },
-        grid: {
-          display: false,
-        },
-      },
-      y: {
-        ticks: {
-          color: "var(--text-color-secondary)",
-          font: { size: 10 },
-        },
-        grid: {
-          color: "var(--surface-border)",
-        },
-      },
-    },
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -141,14 +175,35 @@ export function StatsPage() {
       >
         <div>
           Stream:{" "}
-          <span style={{ color: isLive ? "var(--blue-500)" : "var(--orange-400)", fontWeight: 600 }}>
+          <span
+            style={{
+              color: isLive ? "var(--blue-500)" : "var(--orange-400)",
+              fontWeight: 600,
+            }}
+          >
             {isLive ? "Live (SSE)" : "Polling"}
           </span>
         </div>
         <div>
           Status:{" "}
-          <span style={{ color: status?.running ? "var(--green-500)" : "var(--text-color)", fontWeight: 600 }}>
+          <span
+            style={{
+              color: status?.running ? "var(--green-500)" : "var(--text-color)",
+              fontWeight: 600,
+            }}
+          >
             {status?.running ? "Running" : "Idle"}
+          </span>
+        </div>
+        <div>
+          Typesense:{" "}
+          <span
+            style={{
+              color: healthy ? "var(--green-500)" : "var(--red-500)",
+              fontWeight: 600,
+            }}
+          >
+            {healthy ? "Healthy" : "Unavailable"}
           </span>
         </div>
         <div>
@@ -179,12 +234,6 @@ export function StatsPage() {
         <Card style={{ border: "1px solid var(--surface-border)" }}>
           <SummaryStat label="Indexed" value={indexed} />
         </Card>
-        <Card style={{ border: "1px solid var(--surface-border)" }}>
-          <SummaryStat label="Skipped" value={totals?.skipped ?? 0} />
-        </Card>
-        <Card style={{ border: "1px solid var(--surface-border)" }}>
-          <SummaryStat label="Failed" value={totals?.failed ?? 0} />
-        </Card>
       </div>
 
       {/* Charts Grid */}
@@ -207,13 +256,13 @@ export function StatsPage() {
           >
             Index Coverage
           </h3>
-          {pieData ? (
+          {coverageData ? (
             <>
-              <div style={{ height: "250px" }}>
+              <div style={{ height: "270px" }}>
                 <Chart
                   type="pie"
-                  data={pieData}
-                  options={pieOptions}
+                  data={coverageData}
+                  options={coverageOptions}
                 />
               </div>
               <div
@@ -238,7 +287,7 @@ export function StatsPage() {
           )}
         </Card>
 
-        {/* Bar Chart: Indexed Files Per Hour */}
+        {/* Pie Chart: File Types Distribution */}
         <Card style={{ border: "1px solid var(--surface-border)" }}>
           <h3
             style={{
@@ -248,20 +297,19 @@ export function StatsPage() {
               color: "var(--text-color)",
             }}
           >
-            Indexed Files Per Hour
+            Indexed File Types
           </h3>
-          {barData ? (
-            <div style={{ height: "250px" }}>
+          {fileTypesData ? (
+            <div style={{ height: "270px" }}>
               <Chart
-                type="bar"
-                data={barData}
-                options={barOptions}
+                type="pie"
+                data={fileTypesData}
+                options={fileTypesOptions}
               />
             </div>
           ) : (
             <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
-              No hourly breakdown available yet. This will populate as more crawl
-              history is collected.
+              No file type data available yet. Start a crawl to populate statistics.
             </div>
           )}
         </Card>
