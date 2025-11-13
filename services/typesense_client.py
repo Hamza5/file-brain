@@ -221,7 +221,7 @@ class TypesenseClient:
         self,
         query: str,
         page: int = 1,
-        per_page: int = 10,
+        per_page: int = 9,
         filter_by: Optional[str] = None,
         sort_by: str = "modified_time:desc",
     ) -> Dict[str, Any]:

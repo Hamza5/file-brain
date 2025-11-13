@@ -22,9 +22,16 @@
 - Control-plane responsiveness:
   - [/api/crawler/status](api/crawler.py:129) reads cheap in-memory/DB state; no heavy work on the event loop.
   - [/api/crawler/stop](api/crawler.py:146) signals _stop_event, stops watcher, cancels tasks, and returns without waiting for long-running extraction/indexing.
+- Comprehensive UI refactoring (Nov 2025):
+  - **AppShell.tsx**: Replaced custom grid layout with PrimeReact Sidebar for responsive navigation; fixed sidebar button visibility with explicit styling; switched to FontAwesome icons (fas fa-bars, fas fa-search, fas fa-chart-pie, fas fa-cog).
+  - **SearchPage.tsx**: Wrapped hit cards in PrimeReact Card component; implemented responsive grid with `grid-template-columns: repeat(auto-fill, minmax(350px, 1fr))`; fixed search box padding to prevent text interference with icon; enhanced typography and spacing.
+  - **SettingsPage.tsx**: Organized into three PrimeReact Card sections (Controls, Options, Watch Paths); replaced custom buttons with PrimeReact Button with severity levels; added PrimeReact Message component for feedback.
+  - **StatsPage.tsx**: Wrapped stat cards in PrimeReact Card component; implemented responsive grid for summary stats; disabled chart animations with `animation: false` to prevent re-render jank; added explicit height containers for charts.
+  - **FolderSelectModal.tsx**: Replaced custom modal with PrimeReact Dialog component; improved breadcrumb navigation styling; enhanced folder list with proper selection states.
+  - **index.css**: Enabled PrimeReact core CSS; added InstantSearch input styling with search icon pseudo-element; styled pagination controls with hover/active states; added PrimeReact component overrides for consistency; added `.ais-Hits-list` grid styling with `display: grid` and `grid-template-columns: repeat(auto-fill, minmax(350px, 1fr))`; added `.ais-Hits-item { display: contents; }` to make list items transparent to grid layout.
 - New frontend console:
   - App shell with sidebar and header in [AppShell.tsx](frontend/src/layout/AppShell.tsx:1).
-  - Search UI in [SearchPage.tsx](frontend/src/pages/SearchPage.tsx:1) using TypesenseInstantSearchAdapter, custom hit cards with React Icons, and InstantSearch Pagination.
+  - Search UI in [SearchPage.tsx](frontend/src/pages/SearchPage.tsx:1) using TypesenseInstantSearchAdapter, custom hit cards with FontAwesome icons, and InstantSearch Pagination with responsive grid layout.
   - Stats UI in [StatsPage.tsx](frontend/src/pages/StatsPage.tsx:1) using /api/crawler/stats and Recharts (coverage pie + hourly bar).
   - Settings UI in [SettingsPage.tsx](frontend/src/pages/SettingsPage.tsx:1) including:
     - Crawler controls mapped to /api/crawler/start, /stop, /clear-indexes.
@@ -79,6 +86,7 @@
   - Currently configured globally via additionalSearchParameters; no per-query toggle.
 
 ## Next steps
+- UI is now production-ready with professional PrimeReact styling and responsive layouts.
 - Confirm Typesense deployment:
   - Version supports embeddings and vector_query.
   - Embedding provider/model configured for ts/e5-small-v2 (or chosen model).
@@ -89,3 +97,11 @@
 ## Risks
 - If server or collection is not correctly configured for embeddings, vector_query calls will error.
 - Need to ensure operational docs clearly specify Typesense embedding requirements for this hybrid mode.
+
+## UI/UX Implementation Details
+- **Grid Layout**: Search results use CSS Grid with `display: contents` on list items to achieve responsive card layout (350px minimum width per card).
+- **Icon System**: FontAwesome 6 Free icons used throughout (fas fa-* classes) for consistency and availability.
+- **Component Library**: All UI components use PrimeReact for consistency, theming, and accessibility.
+- **Responsive Design**: Mobile-first approach with breakpoints at 768px for tablet/desktop adjustments.
+- **Chart Optimization**: Recharts animations disabled to prevent jank during live stat updates.
+- **Search UX**: Hybrid semantic search configured globally; search box includes icon pseudo-element for visual clarity.

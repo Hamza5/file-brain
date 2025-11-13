@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
-import {
-  FiPlay,
-  FiStopCircle,
-  FiTrash2,
-  FiPlus,
-  FiRefreshCw,
-  FiFolderPlus,
-} from "react-icons/fi";
+import { Button } from "primereact/button";
+import { Checkbox } from "primereact/checkbox";
+import { InputText } from "primereact/inputtext";
+import { Card } from "primereact/card";
+import { Message } from "primereact/message";
 import {
   getCrawlerSettings,
   updateCrawlerSettings,
@@ -20,6 +17,7 @@ import {
   type WatchPath,
 } from "../api/client";
 import { useStatus } from "../context/StatusContext";
+import { useNotification } from "../context/NotificationContext";
 import { FolderSelectModal } from "../components/FolderSelectModal";
 
 type SettingsState = {
@@ -45,13 +43,13 @@ export function SettingsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const running = status?.running ?? false;
+  const { showSuccess, showError } = useNotification();
 
   useEffect(() => {
     let mounted = true;
 
     async function loadSettings() {
       try {
-        // /api/crawler/settings returns a flat dict with keys like 'start_monitoring'
         const raw = await getCrawlerSettings();
         if (!mounted) return;
         setSettings({
@@ -103,9 +101,11 @@ export function SettingsPage() {
         include_subdirectories: settings.include_subdirectories,
       });
       setActionMessage("Settings saved successfully.");
+      showSuccess("Settings saved");
     } catch (e) {
       console.error(e);
       setActionError("Failed to save settings.");
+      showError("Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -118,9 +118,11 @@ export function SettingsPage() {
     try {
       const res = await startCrawler();
       setActionMessage(res.message || "Crawl started.");
+      showSuccess("Crawl started");
     } catch (e) {
       console.error(e);
       setActionError("Failed to start crawl. Check watch paths and logs.");
+      showError("Failed to start crawl", "Check watch paths and backend logs.");
     } finally {
       setBusyAction(null);
     }
@@ -133,9 +135,11 @@ export function SettingsPage() {
     try {
       const res = await stopCrawler();
       setActionMessage(res.message || "Crawl stop requested.");
+      showSuccess("Crawl stop requested");
     } catch (e) {
       console.error(e);
       setActionError("Failed to stop crawl.");
+      showError("Failed to stop crawl");
     } finally {
       setBusyAction(null);
     }
@@ -151,144 +155,171 @@ export function SettingsPage() {
     try {
       const res = await clearIndexes();
       setActionMessage(res.message || "Indexes cleared.");
+      showSuccess("Indexes cleared");
     } catch (e) {
       console.error(e);
-      setActionError(
-        "Failed to clear indexes. Ensure crawler is not running and try again."
-      );
+      const msg =
+        "Failed to clear indexes. Ensure crawler is not running and try again.";
+      setActionError(msg);
+      showError("Failed to clear indexes", msg);
     } finally {
       setBusyAction(null);
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-50">Settings</h1>
-          <p className="text-xs text-slate-400">
-            Control crawler behavior and manage crawl lifecycle actions.
-          </p>
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* Header */}
+      <div>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "1.75rem",
+            fontWeight: 600,
+            color: "var(--text-color)",
+          }}
+        >
+          Settings
+        </h1>
+        <p
+          style={{
+            margin: "0.5rem 0 0 0",
+            fontSize: "0.9rem",
+            color: "var(--text-color-secondary)",
+          }}
+        >
+          Control crawler behavior and manage crawl lifecycle actions.
+        </p>
       </div>
 
-      {/* Crawler actions */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-3">
-        <div className="text-xs text-slate-300 mb-1">Crawler controls</div>
-        <div className="flex flex-wrap gap-3">
-          <button
+      {/* Crawler Controls */}
+      <Card style={{ border: "1px solid var(--surface-border)" }}>
+        <div style={{ marginBottom: "1rem" }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: "1rem",
+              fontWeight: 600,
+              color: "var(--text-color)",
+            }}
+          >
+            Crawler Controls
+          </h3>
+        </div>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <Button
+            label="Start Crawl"
+            icon="fas fa-play"
             onClick={handleStart}
             disabled={running || busyAction !== null}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${
-              running || busyAction
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                : "bg-emerald-600 hover:bg-emerald-500 text-white"
-            }`}
-          >
-            <FiPlay className="w-3 h-3" />
-            Start crawl
-          </button>
-          <button
+            loading={busyAction === "start"}
+          />
+          <Button
+            label="Stop Crawl"
+            icon="fas fa-stop"
+            severity="warning"
             onClick={handleStop}
             disabled={!running || busyAction !== null}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${
-              !running || busyAction
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                : "bg-amber-600 hover:bg-amber-500 text-white"
-            }`}
-          >
-            <FiStopCircle className="w-3 h-3" />
-            Stop crawl
-          </button>
-          <button
+            loading={busyAction === "stop"}
+          />
+          <Button
+            label="Clear Indexes"
+            icon="fas fa-trash"
+            severity="danger"
             onClick={handleClear}
             disabled={running || busyAction !== null}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${
-              running || busyAction
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                : "bg-rose-600 hover:bg-rose-500 text-white"
-            }`}
-          >
-            <FiTrash2 className="w-3 h-3" />
-            Clear indexes
-          </button>
+            loading={busyAction === "clear"}
+          />
         </div>
-        {busyAction && (
-          <div className="text-[10px] text-slate-400">
-            {busyAction === "start" && "Starting crawl…"}
-            {busyAction === "stop" && "Stopping crawl…"}
-            {busyAction === "clear" && "Clearing indexes…"}
-          </div>
-        )}
-      </div>
+      </Card>
 
-      {/* Crawler settings */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-3">
-        <div className="text-xs text-slate-300 mb-1">Crawler options</div>
-        {loadingSettings && (
-          <div className="text-[10px] text-slate-400">Loading settings…</div>
-        )}
-        {settings && (
-          <div className="space-y-2 text-xs text-slate-200">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="w-3 h-3 accent-sky-500"
+      {/* Crawler Options */}
+      <Card style={{ border: "1px solid var(--surface-border)" }}>
+        <div style={{ marginBottom: "1rem" }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: "1rem",
+              fontWeight: 600,
+              color: "var(--text-color)",
+            }}
+          >
+            Crawler Options
+          </h3>
+        </div>
+        {loadingSettings ? (
+          <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+            Loading settings…
+          </div>
+        ) : settings ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <Checkbox
+                inputId="startMonitoring"
                 checked={settings.start_monitoring}
                 onChange={(e) =>
                   setSettings((prev) =>
                     prev
-                      ? { ...prev, start_monitoring: e.target.checked }
+                      ? { ...prev, start_monitoring: e.checked ?? false }
                       : prev
                   )
                 }
               />
-              <span>
-                Start monitoring for file changes automatically after crawl
-                starts
-              </span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="w-3 h-3 accent-sky-500"
+              <label htmlFor="startMonitoring" style={{ cursor: "pointer" }}>
+                Start monitoring for file changes automatically after crawl starts
+              </label>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <Checkbox
+                inputId="includeSubdirectories"
                 checked={settings.include_subdirectories}
                 onChange={(e) =>
                   setSettings((prev) =>
                     prev
                       ? {
                           ...prev,
-                          include_subdirectories: e.target.checked,
+                          include_subdirectories: e.checked ?? false,
                         }
                       : prev
                   )
                 }
               />
-              <span>
+              <label htmlFor="includeSubdirectories" style={{ cursor: "pointer" }}>
                 Include subdirectories when discovering files in watch paths
-              </span>
-            </label>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={`mt-2 inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium ${
-                saving
-                  ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                  : "bg-sky-600 hover:bg-sky-500 text-white"
-              }`}
-            >
-              {saving ? "Saving…" : "Save settings"}
-            </button>
+              </label>
+            </div>
+            <div style={{ marginTop: "0.5rem" }}>
+              <Button
+                label={saving ? "Saving…" : "Save Settings"}
+                icon="fas fa-save"
+                onClick={handleSave}
+                disabled={saving}
+                loading={saving}
+              />
+            </div>
           </div>
-        )}
-      </div>
+        ) : null}
+      </Card>
 
-      {/* Watch paths management */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs text-slate-300">Watch paths</div>
-          <div className="flex items-center gap-2 text-[9px] text-slate-500">
-            <button
+      {/* Watch Paths Management */}
+      <Card style={{ border: "1px solid var(--surface-border)" }}>
+        <div style={{ marginBottom: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: "1rem",
+              fontWeight: 600,
+              color: "var(--text-color)",
+            }}
+          >
+            Watch Paths
+          </h3>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Button
+              label="Sync"
+              icon="fas fa-sync"
+              size="small"
+              outlined
               disabled={busyAction === "replace" || busyAction === "clearPaths"}
               onClick={async () => {
                 if (!watchPaths.length) return;
@@ -305,19 +336,22 @@ export function SettingsPage() {
                   setActionMessage(null);
                   await replaceWatchPaths(watchPaths.map((w) => w.path));
                   setActionMessage("Watch paths replaced.");
+                  showSuccess("Watch paths replaced");
                 } catch (e) {
                   console.error(e);
                   setActionError("Failed to replace watch paths.");
+                  showError("Failed to replace watch paths");
                 } finally {
                   setBusyAction(null);
                 }
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40"
-            >
-              <FiRefreshCw className="w-3 h-3" />
-              Sync
-            </button>
-            <button
+            />
+            <Button
+              label="Clear All"
+              icon="fas fa-trash"
+              size="small"
+              severity="danger"
+              outlined
               disabled={busyAction === "clearPaths"}
               onClick={async () => {
                 if (
@@ -334,36 +368,35 @@ export function SettingsPage() {
                   await clearWatchPaths();
                   setWatchPaths([]);
                   setActionMessage("All watch paths cleared.");
+                  showSuccess("All watch paths cleared");
                 } catch (e) {
                   console.error(e);
                   setActionError("Failed to clear watch paths.");
+                  showError("Failed to clear watch paths");
                 } finally {
                   setBusyAction(null);
                 }
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-rose-300 disabled:opacity-40"
-            >
-              <FiTrash2 className="w-3 h-3" />
-              Clear all
-            </button>
+            />
           </div>
         </div>
 
         {watchPathsLoading ? (
-          <div className="text-[10px] text-slate-400">
+          <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
             Loading watch paths…
           </div>
         ) : (
           <>
-            <div className="flex gap-2 items-center">
-              <input
-                type="text"
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+              <InputText
                 value={newPath}
                 onChange={(e) => setNewPath(e.target.value)}
                 placeholder="/absolute/path/to/index"
-                className="flex-1 bg-slate-950 text-slate-50 text-xs px-2 py-1 rounded border border-slate-700 focus:border-sky-500 outline-none"
+                style={{ flex: 1 }}
               />
-              <button
+              <Button
+                label="Add"
+                icon="fas fa-plus"
                 onClick={async () => {
                   if (!newPath.trim()) return;
                   setBusyAction("addPath");
@@ -374,73 +407,98 @@ export function SettingsPage() {
                     setWatchPaths((prev) => [...prev, added]);
                     setNewPath("");
                     setActionMessage("Watch path added.");
+                    showSuccess("Watch path added");
                   } catch (e) {
                     console.error(e);
-                    setActionError(
-                      "Failed to add watch path. Ensure it exists and is a directory."
-                    );
+                    const msg =
+                      "Failed to add watch path. Ensure it exists and is a directory.";
+                    setActionError(msg);
+                    showError("Failed to add watch path", msg);
                   } finally {
                     setBusyAction(null);
                   }
                 }}
                 disabled={busyAction === "addPath"}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium ${
-                  busyAction === "addPath"
-                    ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                    : "bg-sky-600 hover:bg-sky-500 text-white"
-                }`}
-              >
-                <FiPlus className="w-3 h-3" />
-                Add
-              </button>
-              <button
-                type="button"
+              />
+              <Button
+                label="Browse…"
+                icon="fas fa-folder-open"
+                outlined
                 onClick={() => {
                   setActionError(null);
                   setActionMessage(null);
                   setFolderModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-100"
-              >
-                <FiFolderPlus className="w-3 h-3" />
-                Browse…
-              </button>
+              />
             </div>
 
-            <div className="mt-2 space-y-1 max-h-40 overflow-y-auto text-[10px]">
-              {watchPaths.length === 0 && (
-                <div className="text-slate-500">
-                  No watch paths configured. Add at least one directory to start
-                  crawling.
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                maxHeight: "12rem",
+                overflowY: "auto",
+              }}
+            >
+              {watchPaths.length === 0 ? (
+                <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+                  No watch paths configured. Add at least one directory to start crawling.
                 </div>
+              ) : (
+                watchPaths.map((wp) => (
+                  <div
+                    key={wp.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "0.75rem",
+                      borderRadius: "6px",
+                      border: "1px solid var(--surface-border)",
+                      backgroundColor: "var(--surface-50)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        color: "var(--text-color)",
+                        fontSize: "0.9rem",
+                      }}
+                      title={wp.path}
+                    >
+                      {wp.path}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: wp.enabled ? "var(--green-500)" : "var(--orange-500)",
+                        fontWeight: 600,
+                        marginLeft: "0.5rem",
+                      }}
+                    >
+                      {wp.enabled ? "enabled" : "disabled"}
+                    </span>
+                  </div>
+                ))
               )}
-              {watchPaths.map((wp) => (
-                <div
-                  key={wp.id}
-                  className="flex items-center justify-between gap-2 px-2 py-1 rounded bg-slate-950/60 border border-slate-800"
-                >
-                  <div className="flex-1 truncate text-slate-200">
-                    {wp.path}
-                  </div>
-                  <div className="text-[9px] text-slate-500">
-                    {wp.enabled ? "enabled" : "disabled"}
-                  </div>
-                </div>
-              ))}
             </div>
           </>
         )}
-      </div>
+      </Card>
 
       {/* Messages */}
       {actionMessage && (
-        <div className="text-[10px] text-emerald-400">{actionMessage}</div>
+        <Message severity="success" text={actionMessage} />
       )}
       {actionError && (
-        <div className="text-[10px] text-rose-400">{actionError}</div>
+        <Message severity="error" text={actionError} />
       )}
 
-      {/* Folder picker modal for selecting watch paths */}
+      {/* Folder picker modal */}
       <FolderSelectModal
         isOpen={folderModalOpen}
         onClose={() => setFolderModalOpen(false)}

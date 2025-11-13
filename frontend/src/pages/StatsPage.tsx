@@ -1,10 +1,16 @@
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, XAxis, YAxis, Bar, CartesianGrid, Legend } from "recharts";
 import { useStatus } from "../context/StatusContext";
+import { useNotification } from "../context/NotificationContext";
+import { Chart } from "primereact/chart";
+import { Card } from "primereact/card";
 
-const PIE_COLORS = ["#22c55e", "#334155"];
+interface StatCardProps {
+  label: string;
+  value: number;
+}
 
 export function StatsPage() {
   const { stats, status, isLive, lastUpdate, isLoading, error } = useStatus();
+  const { showError } = useNotification();
 
   const totals = stats?.totals;
   const ratios = stats?.ratios;
@@ -15,158 +21,274 @@ export function StatsPage() {
 
   const pieData =
     discovered > 0
-      ? [
-          { name: "Indexed", value: indexed },
-          { name: "Remaining", value: remaining },
-        ]
-      : [];
+      ? {
+          labels: ["Indexed", "Remaining"],
+          datasets: [
+            {
+              data: [indexed, remaining],
+              backgroundColor: ["var(--green-500)", "var(--surface-border)"],
+              hoverBackgroundColor: ["var(--green-400)", "var(--surface-500)"],
+            },
+          ],
+        }
+      : null;
 
-  // Placeholder hourly data (backend currently returns empty arrays; UI stays stable).
   const hourlyData = stats?.timeseries.indexed_per_hour ?? [];
+  const barData =
+    hourlyData.length > 0
+      ? {
+          labels: hourlyData.map((h) => h.bucket),
+          datasets: [
+            {
+              label: "Indexed files",
+              data: hourlyData.map((h) => h.count),
+              backgroundColor: "var(--blue-400)",
+              borderColor: "var(--blue-600)",
+              borderRadius: 4,
+            },
+          ],
+        }
+      : null;
+
+  if (error) {
+    showError("Failed to load crawl statistics", error);
+  }
+
+  const chartOptions = {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+  };
+
+  const pieOptions = {
+    ...chartOptions,
+    plugins: {
+      legend: {
+        labels: {
+          color: "var(--text-color-secondary)",
+          font: { size: 12 },
+        },
+      },
+    },
+  };
+
+  const barOptions = {
+    ...chartOptions,
+    indexAxis: "x" as const,
+    plugins: {
+      legend: {
+        labels: {
+          color: "var(--text-color-secondary)",
+          font: { size: 12 },
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: "var(--text-color-secondary)",
+          font: { size: 10 },
+        },
+        grid: {
+          display: false,
+        },
+      },
+      y: {
+        ticks: {
+          color: "var(--text-color-secondary)",
+          font: { size: 10 },
+        },
+        grid: {
+          color: "var(--surface-border)",
+        },
+      },
+    },
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* Header */}
+      <div>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "1.75rem",
+            fontWeight: 600,
+            color: "var(--text-color)",
+          }}
+        >
+          Stats
+        </h1>
+        <p
+          style={{
+            margin: "0.5rem 0 0 0",
+            fontSize: "0.9rem",
+            color: "var(--text-color-secondary)",
+          }}
+        >
+          Monitor crawl progress, index coverage, and system health in real time.
+        </p>
+      </div>
+
+      {/* Status Info */}
+      <div
+        style={{
+          display: "flex",
+          gap: "1rem",
+          flexWrap: "wrap",
+          fontSize: "0.9rem",
+        }}
+      >
         <div>
-          <h1 className="text-xl font-semibold text-slate-50">Stats</h1>
-          <p className="text-xs text-slate-400">
-            Monitor crawl progress, index coverage, and system health in real time.
-          </p>
+          Stream:{" "}
+          <span style={{ color: isLive ? "var(--blue-500)" : "var(--orange-400)", fontWeight: 600 }}>
+            {isLive ? "Live (SSE)" : "Polling"}
+          </span>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400">
-          <span>
-            Stream:{" "}
-            <span className={isLive ? "text-sky-400" : "text-amber-400"}>
-              {isLive ? "Live (SSE)" : "Polling"}
-            </span>
+        <div>
+          Status:{" "}
+          <span style={{ color: status?.running ? "var(--green-500)" : "var(--text-color)", fontWeight: 600 }}>
+            {status?.running ? "Running" : "Idle"}
           </span>
+        </div>
+        <div>
+          Updated:{" "}
           <span>
-            Status:{" "}
-            <span className={status?.running ? "text-emerald-400" : "text-slate-400"}>
-              {status?.running ? "Running" : "Idle"}
-            </span>
-          </span>
-          <span>
-            Updated:{" "}
-            <span className="text-slate-300">
-              {lastUpdate ? new Date(lastUpdate).toLocaleTimeString() : "—"}
-            </span>
+            {lastUpdate ? new Date(lastUpdate).toLocaleTimeString() : "—"}
           </span>
         </div>
       </div>
 
       {isLoading && (
-        <div className="text-xs text-slate-400">Loading stats…</div>
-      )}
-
-      {error && (
-        <div className="text-xs text-rose-400">
-          {error}
+        <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+          Loading stats…
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Discovered" value={discovered} />
-        <StatCard label="Indexed" value={indexed} />
-        <StatCard label="Skipped" value={totals?.skipped ?? 0} />
-        <StatCard label="Failed" value={totals?.failed ?? 0} />
+      {/* Summary Stats Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "1rem",
+        }}
+      >
+        <Card style={{ border: "1px solid var(--surface-border)" }}>
+          <SummaryStat label="Discovered" value={discovered} />
+        </Card>
+        <Card style={{ border: "1px solid var(--surface-border)" }}>
+          <SummaryStat label="Indexed" value={indexed} />
+        </Card>
+        <Card style={{ border: "1px solid var(--surface-border)" }}>
+          <SummaryStat label="Skipped" value={totals?.skipped ?? 0} />
+        </Card>
+        <Card style={{ border: "1px solid var(--surface-border)" }}>
+          <SummaryStat label="Failed" value={totals?.failed ?? 0} />
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Pie: Indexed vs Discovered */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-          <div className="text-xs text-slate-300 mb-2">
-            Index coverage
-          </div>
-          {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
+      {/* Charts Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
+          gap: "1rem",
+        }}
+      >
+        {/* Pie Chart: Index Coverage */}
+        <Card style={{ border: "1px solid var(--surface-border)" }}>
+          <h3
+            style={{
+              margin: "0 0 1rem 0",
+              fontSize: "1rem",
+              fontWeight: 600,
+              color: "var(--text-color)",
+            }}
+          >
+            Index Coverage
+          </h3>
+          {pieData ? (
+            <>
+              <div style={{ height: "250px" }}>
+                <Chart
+                  type="pie"
                   data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={40}
-                  outerRadius={80}
-                  paddingAngle={2}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell
-                      key={entry.name}
-                      fill={PIE_COLORS[index % PIE_COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#020817",
-                    borderColor: "#1e293b",
-                    borderRadius: 6,
-                    fontSize: 10,
-                  }}
+                  options={pieOptions}
                 />
-                <Legend
-                  wrapperStyle={{ fontSize: 10, color: "#9ca3af" }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+              </div>
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  marginTop: "1rem",
+                  color: "var(--text-color-secondary)",
+                }}
+              >
+                Indexed ratio:{" "}
+                <span style={{ color: "var(--blue-500)", fontWeight: 600 }}>
+                  {ratios
+                    ? `${(ratios.indexed_vs_discovered * 100).toFixed(1)}%`
+                    : "—"}
+                </span>
+              </div>
+            </>
           ) : (
-            <div className="text-[10px] text-slate-500">
+            <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
               No discovered files yet. Start a crawl to populate statistics.
             </div>
           )}
-          <div className="mt-2 text-[10px] text-slate-400">
-            Indexed ratio:{" "}
-            <span className="text-sky-400">
-              {ratios
-                ? `${(ratios.indexed_vs_discovered * 100).toFixed(1)}%`
-                : "—"}
-            </span>
-          </div>
-        </div>
+        </Card>
 
-        {/* Bar: Indexed files per hour (placeholder-safe) */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-          <div className="text-xs text-slate-300 mb-2">
-            Indexed files per hour
-          </div>
-          {hourlyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={hourlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#0f172a" />
-                <XAxis
-                  dataKey="bucket"
-                  tick={{ fontSize: 9, fill: "#9ca3af" }}
-                />
-                <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#020817",
-                    borderColor: "#1e293b",
-                    borderRadius: 6,
-                    fontSize: 10,
-                  }}
-                />
-                <Bar dataKey="count" fill="#38bdf8" />
-              </BarChart>
-            </ResponsiveContainer>
+        {/* Bar Chart: Indexed Files Per Hour */}
+        <Card style={{ border: "1px solid var(--surface-border)" }}>
+          <h3
+            style={{
+              margin: "0 0 1rem 0",
+              fontSize: "1rem",
+              fontWeight: 600,
+              color: "var(--text-color)",
+            }}
+          >
+            Indexed Files Per Hour
+          </h3>
+          {barData ? (
+            <div style={{ height: "250px" }}>
+              <Chart
+                type="bar"
+                data={barData}
+                options={barOptions}
+              />
+            </div>
           ) : (
-            <div className="text-[10px] text-slate-500">
-              No hourly breakdown available yet. This will populate as we
-              collect more crawl history.
+            <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+              No hourly breakdown available yet. This will populate as more crawl
+              history is collected.
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function SummaryStat({ label, value }: StatCardProps) {
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2">
-      <div className="text-[10px] text-slate-400">{label}</div>
-      <div className="text-lg font-semibold text-slate-50">
+    <div>
+      <div
+        style={{
+          fontSize: "0.85rem",
+          color: "var(--text-color-secondary)",
+          marginBottom: "0.5rem",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "1.75rem",
+          fontWeight: 600,
+          color: "var(--primary-color)",
+        }}
+      >
         {value.toLocaleString()}
       </div>
     </div>

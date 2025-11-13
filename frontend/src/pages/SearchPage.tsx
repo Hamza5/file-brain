@@ -1,12 +1,5 @@
 import { Hits, SearchBox, Pagination, Configure, useInstantSearch } from "react-instantsearch";
-import {
-  FiFile,
-  FiFileText,
-  FiImage,
-  FiCode,
-  FiVideo,
-  FiMusic,
-} from "react-icons/fi";
+import { Card } from "primereact/card";
 
 type HitType = {
   file_name: string;
@@ -36,24 +29,24 @@ function formatDate(ts?: number): string {
   }
 }
 
-function pickIcon(hit: HitType) {
+function pickIconClass(hit: HitType): string {
   const ext = (hit.file_extension || "").toLowerCase();
   const mime = (hit.mime_type || "").toLowerCase();
 
-  if (ext === ".pdf" || mime.includes("pdf")) return <FiFileText />;
+  if (ext === ".pdf" || mime.includes("pdf")) return "far fa-file-pdf";
   if ([".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext))
-    return <FiImage />;
-  if (mime.startsWith("image/")) return <FiImage />;
+    return "far fa-file-image";
+  if (mime.startsWith("image/")) return "far fa-file-image";
   if (
     [".ts", ".tsx", ".js", ".jsx", ".py", ".java", ".go", ".rs", ".cs"].includes(
       ext
     )
   )
-    return <FiCode />;
-  if (mime.startsWith("text/")) return <FiFileText />;
-  if (mime.startsWith("video/")) return <FiVideo />;
-  if (mime.startsWith("audio/")) return <FiMusic />;
-  return <FiFile />;
+    return "far fa-file-code";
+  if (mime.startsWith("text/")) return "far fa-file-alt";
+  if (mime.startsWith("video/")) return "far fa-file-video";
+  if (mime.startsWith("audio/")) return "far fa-file-audio";
+  return "far fa-file";
 }
 
 function Hit({ hit }: { hit: HitType }) {
@@ -62,51 +55,141 @@ function Hit({ hit }: { hit: HitType }) {
     snippet.length > 260 ? `${snippet.slice(0, 260)}…` : snippet;
 
   return (
-    <div className="flex gap-3 p-3 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-sky-500/70 hover:bg-slate-900 transition-colors">
-      <div className="mt-1 text-sky-400">{pickIcon(hit)}</div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <div className="font-semibold text-slate-50 truncate">
-            {hit.file_name}
+    <Card
+      style={{
+        border: "1px solid var(--surface-border)",
+        height: "100%",
+      }}
+    >
+      <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start", height: "100%" }}>
+        <div
+          style={{
+            fontSize: "1.75rem",
+            color: "var(--primary-color)",
+            flexShrink: 0,
+            marginTop: "0.25rem",
+          }}
+        >
+          <i className={pickIconClass(hit)} aria-hidden="true" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              alignItems: "center",
+              marginBottom: "0.35rem",
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: "1rem",
+                color: "var(--text-color)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={hit.file_name}
+            >
+              {hit.file_name}
+            </div>
+            {hit.file_extension && (
+              <span
+                style={{
+                  padding: "0.25rem 0.5rem",
+                  borderRadius: "4px",
+                  fontSize: "0.65rem",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  backgroundColor: "var(--primary-color)",
+                  color: "white",
+                }}
+              >
+                {hit.file_extension.replace(".", "")}
+              </span>
+            )}
+            {hit.mime_type && (
+              <span
+                style={{
+                  padding: "0.25rem 0.5rem",
+                  borderRadius: "4px",
+                  fontSize: "0.6rem",
+                  border: "1px solid var(--surface-border)",
+                  color: "var(--text-color-secondary)",
+                  backgroundColor: "var(--surface-50)",
+                }}
+              >
+                {hit.mime_type}
+              </span>
+            )}
           </div>
-          {hit.file_extension && (
-            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] uppercase text-sky-300">
-              {hit.file_extension.replace(".", "")}
-            </span>
+          <div
+            style={{
+              fontSize: "0.7rem",
+              color: "var(--text-color-secondary)",
+              marginBottom: "0.5rem",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={hit.path}
+          >
+            {hit.path}
+          </div>
+          {shortSnippet && (
+            <div
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--text-color)",
+                marginBottom: "0.5rem",
+                lineHeight: "1.4",
+                maxHeight: "3em",
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {shortSnippet}
+            </div>
           )}
-          {hit.mime_type && (
-            <span className="px-2 py-0.5 rounded-full bg-slate-900 text-[9px] text-slate-400 border border-slate-700">
-              {hit.mime_type}
+          <div
+            style={{
+              display: "flex",
+              gap: "1.5rem",
+              fontSize: "0.75rem",
+              color: "var(--text-color-secondary)",
+              flexWrap: "wrap",
+              marginTop: "auto",
+            }}
+          >
+            <span>
+              <strong>Size:</strong>{" "}
+              <span style={{ color: "var(--text-color)" }}>
+                {formatSize(hit.file_size)}
+              </span>
             </span>
-          )}
-        </div>
-        <div className="text-[10px] text-slate-500 truncate">
-          {hit.path}
-        </div>
-        <div className="mt-2 text-xs text-slate-300 whitespace-pre-line">
-          {shortSnippet || <span className="text-slate-600">No preview.</span>}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-slate-500">
-          <span>Size: <span className="text-slate-200">{formatSize(hit.file_size)}</span></span>
-          <span>Modified: <span className="text-slate-200">{formatDate(hit.modified_time)}</span></span>
+            <span>
+              <strong>Modified:</strong>{" "}
+              <span style={{ color: "var(--text-color)" }}>
+                {formatDate(hit.modified_time)}
+              </span>
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
 function HybridSemanticConfigure() {
-  // React InstantSearch v7: useInstantSearch gives access to UI state.
   const { uiState } = useInstantSearch();
-
-  // Our single index is "files" (see App.tsx InstantSearch indexName).
   const indexState = uiState.files || {};
   const query = (indexState.query as string | undefined) || "";
   const hasQuery = query.trim().length > 0;
 
-  // `typesenseVectorQuery` is a special passthrough param understood by
-  // typesense-instantsearch-adapter and forwarded as `vector_query`.
-  // We use a typed extension of the underlying search parameters to satisfy TS/ESLint.
   type TypesenseConfigureProps = React.ComponentProps<typeof Configure> & {
     typesenseVectorQuery?: string;
   };
@@ -120,52 +203,70 @@ function HybridSemanticConfigure() {
 
 export function SearchPage() {
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-50">Search</h1>
-          <p className="text-xs text-slate-400">
-            Query your indexed files with full-text and metadata-aware search.
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2">
-        <SearchBox
-          placeholder="Search by file name, path, or content..."
-          classNames={{
-            root: "w-full",
-            form: "flex items-center gap-2",
-            input:
-              "w-full bg-slate-950 text-slate-50 text-sm px-3 py-2 rounded outline-none border border-slate-700 focus:border-sky-500",
-            submit:
-              "hidden",
-            reset: "hidden",
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* Header */}
+      <div>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "1.75rem",
+            fontWeight: 600,
+            color: "var(--text-color)",
           }}
-        />
+        >
+          Search
+        </h1>
+        <p
+          style={{
+            margin: "0.5rem 0 0 0",
+            fontSize: "0.9rem",
+            color: "var(--text-color-secondary)",
+          }}
+        >
+          Query your indexed files with full-text and semantic-powered search.
+        </p>
       </div>
 
-      {/* Always-on hybrid semantic search:
-          - When query is non-empty, HybridSemanticConfigure injects typesenseVectorQuery
-          - When query is empty, only lexical search runs
-      */}
+      {/* Search box */}
+      <Card style={{ border: "1px solid var(--surface-border)" }}>
+        <div style={{ position: "relative" }}>
+          <SearchBox
+            placeholder="Search by file name, path, or content..."
+            classNames={{
+              root: "",
+              form: "",
+              input: "ais-SearchBox-input",
+              submit: "hidden",
+              reset: "hidden",
+            }}
+          />
+        </div>
+      </Card>
+
+      {/* Hybrid semantic search configuration */}
       <HybridSemanticConfigure />
 
-      <div className="space-y-2">
+      {/* Results Grid */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <Hits<HitType> hitComponent={Hit} />
       </div>
 
-      <div className="pt-2 flex justify-center">
+      {/* Pagination */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          paddingTop: "1rem",
+        }}
+      >
         <Pagination
           classNames={{
-            root: "inline-flex items-center gap-1 text-[10px]",
-            list: "flex items-center gap-1",
-            item: "px-2 py-1 rounded border border-slate-800 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-sky-400 cursor-pointer",
-            selectedItem:
-              "px-2 py-1 rounded border border-sky-500 bg-sky-600/20 text-sky-300 font-semibold",
-            disabledItem:
-              "px-2 py-1 rounded border border-slate-900 bg-slate-900/60 text-slate-600 cursor-not-allowed",
-            link: "outline-none",
+            root: "p-d-flex",
+            list: "p-d-flex",
+            item: "p-px-2 p-py-1",
+            selectedItem: "p-px-2 p-py-1",
+            disabledItem: "p-px-2 p-py-1",
+            link: "",
           }}
         />
       </div>

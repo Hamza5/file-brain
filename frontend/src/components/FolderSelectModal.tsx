@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  FiFolder,
-  FiFolderPlus,
-  FiChevronRight,
-  FiX,
-  FiHardDrive,
-} from "react-icons/fi";
+import { Dialog } from "primereact/dialog";
+import { Button } from "primereact/button";
+import { Message } from "primereact/message";
 import { getFsRoots, listFs, type FsRoot, type FsEntry } from "../api/client";
 
 type FolderSelectModalProps = {
@@ -14,13 +10,6 @@ type FolderSelectModalProps = {
   onConfirm: (path: string) => void;
 };
 
-/**
- * Native-like folder picker:
- * - Left: roots (Home, /, drives on Windows).
- * - Top: breadcrumb-style address bar for current path.
- * - Main: current folder subdirectories (no files).
- * - Single-selection, click-through navigation.
- */
 export function FolderSelectModal({
   isOpen,
   onClose,
@@ -66,7 +55,7 @@ export function FolderSelectModal({
         if (!rootsResp || rootsResp.length === 0) {
           setRoots([]);
           setError(
-            "No filesystem roots available. Please type the path manually."
+            "No filesystem roots available. Please type the path manually in the Settings page."
           );
           return;
         }
@@ -85,7 +74,7 @@ export function FolderSelectModal({
         if (!cancelled) {
           console.error("Failed to load filesystem roots", e);
           setError(
-            "Unable to browse filesystem. Please type the path manually."
+            "Unable to browse filesystem. Please type the path manually in the Settings page."
           );
         }
       } finally {
@@ -135,6 +124,7 @@ export function FolderSelectModal({
 
   // Navigate into a subdirectory (main pane)
   async function handleEnterDirectory(entry: FsEntry) {
+    if (entry.type && entry.type !== "directory") return;
     const newPath = entry.path;
     setCurrentPath(newPath);
     setSelectedPath(newPath);
@@ -145,11 +135,8 @@ export function FolderSelectModal({
   function getBreadcrumbSegments(path: string): string[] {
     if (!path) return [];
     if (path.includes("\\") && !path.includes("/")) {
-      // Windows-style path, e.g. C:\Users\You
-      const norm = path.replace(/\\/g, "\\");
-      const parts = norm.split("\\").filter((p) => p.length > 0);
+      const parts = path.split("\\").filter((p) => p.length > 0);
       if (parts.length === 0) return [path];
-      // First segment is drive like "C:"
       const [drive, ...rest] = parts;
       const segments = [`${drive}:`];
       let current = `${drive}:`;
@@ -160,7 +147,6 @@ export function FolderSelectModal({
       return segments;
     }
 
-    // POSIX-style path
     if (path === "/") return ["/"];
     const parts = path.split("/").filter((p) => p.length > 0);
     const segments: string[] = ["/"];
@@ -172,13 +158,9 @@ export function FolderSelectModal({
     return segments;
   }
 
-  function getBreadcrumbLabel(
-    segmentPath: string,
-    index: number
-  ): string {
+  function getBreadcrumbLabel(segmentPath: string, index: number): string {
     if (segmentPath === "/") return "/";
-    if (index === 0 && segmentPath.endsWith(":")) return segmentPath; // drive root
-    // For others, show only the last part
+    if (index === 0 && segmentPath.endsWith(":")) return segmentPath;
     const normalized = segmentPath.replace(/\\/g, "/");
     const parts = normalized.split("/").filter((p) => p.length > 0);
     return parts[parts.length - 1] || segmentPath;
@@ -191,75 +173,114 @@ export function FolderSelectModal({
     await loadEntries(targetPath);
   }
 
-  if (!isOpen) {
-    return null;
+  function handleConfirm() {
+    if (!selectedPath) return;
+    onConfirm(selectedPath);
   }
 
   const breadcrumbSegments = getBreadcrumbSegments(currentPath);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70">
-      <div className="bg-slate-950 border border-slate-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800">
-          <div className="flex items-center gap-2 text-xs text-slate-200">
-            <FiFolderPlus className="w-3 h-3 text-sky-400" />
-            <span>Select folder to watch</span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-200"
+    <Dialog
+      visible={isOpen}
+      onHide={onClose}
+      header="Select Folder to Watch"
+      modal
+      style={{ width: "90vw", maxWidth: "800px" }}
+      maximizable
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "500px" }}>
+        {/* Breadcrumb */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            fontSize: "0.9rem",
+            padding: "0.75rem",
+            backgroundColor: "var(--surface-50)",
+            borderRadius: "6px",
+            border: "1px solid var(--surface-border)",
+          }}
+        >
+          {breadcrumbSegments.length === 0 ? (
+            <span style={{ color: "var(--text-color-secondary)" }}>No location</span>
+          ) : (
+            breadcrumbSegments.map((segPath, idx) => {
+              const label = getBreadcrumbLabel(segPath, idx);
+              const isLast = idx === breadcrumbSegments.length - 1;
+              return (
+                <span key={segPath} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <button
+                    type="button"
+                    disabled={isLast}
+                    onClick={() =>
+                      !isLast && void handleBreadcrumbClick(segPath)
+                    }
+                    style={{
+                      border: "none",
+                      padding: "0.25rem 0.5rem",
+                      margin: 0,
+                      background: "none",
+                      cursor: isLast ? "default" : "pointer",
+                      fontSize: "0.9rem",
+                      fontWeight: isLast ? 600 : 400,
+                      color: isLast
+                        ? "var(--primary-color)"
+                        : "var(--text-color)",
+                      borderRadius: "4px",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isLast) {
+                        (e.target as HTMLButtonElement).style.backgroundColor = "var(--surface-100)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLButtonElement).style.backgroundColor = "transparent";
+                    }}
+                  >
+                    {label}
+                  </button>
+                  {!isLast && (
+                    <i
+                      className="fas fa-chevron-right"
+                      aria-hidden="true"
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "var(--text-color-secondary)",
+                      }}
+                    />
+                  )}
+                </span>
+              );
+            })
+          )}
+        </div>
+
+        {/* Main content */}
+        <div style={{ display: "flex", gap: "1rem", flex: 1, overflow: "hidden" }}>
+          {/* Roots (left sidebar) */}
+          <div
+            style={{
+              width: "150px",
+              borderRight: "1px solid var(--surface-border)",
+              padding: "0.75rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              overflowY: "auto",
+            }}
           >
-            <FiX className="w-3 h-3" />
-          </button>
-        </div>
-
-        {/* Address bar */}
-        <div className="px-3 py-1.5 border-b border-slate-800 bg-slate-950/90">
-          <div className="flex items-center gap-1 text-[9px] text-slate-300 flex-wrap">
-            {breadcrumbSegments.length === 0 ? (
-              <span className="text-slate-500">No location</span>
-            ) : (
-              breadcrumbSegments.map((segPath, idx) => {
-            const label = getBreadcrumbLabel(segPath, idx);
-                const isLast = idx === breadcrumbSegments.length - 1;
-                return (
-                  <span key={segPath} className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={isLast}
-                      onClick={() =>
-                        !isLast && void handleBreadcrumbClick(segPath)
-                      }
-                      className={
-                        isLast
-                          ? "font-semibold text-sky-300 cursor-default"
-                          : "hover:text-sky-400"
-                      }
-                    >
-                      {label}
-                    </button>
-                    {!isLast && (
-                      <FiChevronRight className="w-2 h-2 text-slate-500" />
-                    )}
-                  </span>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Roots (left) */}
-          <div className="w-36 border-r border-slate-800 p-2 space-y-1 overflow-y-auto">
             {initializing && (
-              <div className="text-[9px] text-slate-400">Loading roots…</div>
+              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+                Loading roots…
+              </div>
             )}
             {!initializing && roots.length === 0 && (
-              <div className="text-[9px] text-slate-500">
-                No roots. Use manual input.
+              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+                No roots available
               </div>
             )}
             {roots.map((root) => {
@@ -269,15 +290,40 @@ export function FolderSelectModal({
                   key={root.path}
                   type="button"
                   onClick={() => void handleSelectRoot(root)}
-                  className={`w-full flex items-center gap-1 px-2 py-1 rounded text-[9px] text-left ${
-                    isActive
-                      ? "bg-sky-600/30 text-sky-200"
-                      : "bg-transparent text-slate-300 hover:bg-slate-900"
-                  }`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.5rem",
+                    borderRadius: "6px",
+                    border: isActive
+                      ? "2px solid var(--primary-color)"
+                      : "1px solid var(--surface-border)",
+                    backgroundColor: isActive
+                      ? "var(--primary-color-emphasis)"
+                      : "var(--surface-card)",
+                    color: isActive
+                      ? "var(--primary-color)"
+                      : "var(--text-color)",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    fontWeight: isActive ? 600 : 400,
+                    transition: "all 0.2s ease",
+                  }}
                 >
-                  <FiHardDrive className="w-3 h-3 text-sky-400" />
-                  <span className="truncate">
-                    {root.name === root.path ? root.name : root.name}
+                  <i
+                    className="fas fa-hdd"
+                    aria-hidden="true"
+                    style={{ fontSize: "1rem" }}
+                  />
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {root.name}
                   </span>
                 </button>
               );
@@ -285,76 +331,151 @@ export function FolderSelectModal({
           </div>
 
           {/* Main folder list */}
-          <div className="flex-1 p-2 flex flex-col">
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+              overflow: "hidden",
+            }}
+          >
+            {error && (
+              <Message severity="error" text={error} style={{ margin: 0 }} />
+            )}
+
             {loading && (
-              <div className="text-[9px] text-slate-400 mb-1">
+              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
                 Loading folders…
               </div>
             )}
-            {error && (
-              <div className="text-[9px] text-rose-400 mb-1">{error}</div>
-            )}
+
             {!loading && !error && entries.length === 0 && (
-              <div className="text-[9px] text-slate-500">
+              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
                 This folder has no subdirectories.
               </div>
             )}
-            <div className="flex-1 overflow-y-auto space-y-0.5">
+
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
               {entries.map((entry) => {
                 const isSelected = selectedPath === entry.path;
                 return (
                   <div
                     key={entry.path}
-                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-[10px] ${
-                      isSelected
-                        ? "bg-sky-600/40 text-sky-100"
-                        : "bg-slate-950/40 text-slate-200 hover:bg-slate-900"
-                    }`}
                     onClick={() => setSelectedPath(entry.path)}
                     onDoubleClick={() => void handleEnterDirectory(entry)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      padding: "0.75rem",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "0.95rem",
+                      backgroundColor: isSelected
+                        ? "var(--primary-color-emphasis)"
+                        : "var(--surface-card)",
+                      border: isSelected
+                        ? "2px solid var(--primary-color)"
+                        : "1px solid var(--surface-border)",
+                      color: isSelected
+                        ? "var(--primary-color)"
+                        : "var(--text-color)",
+                      transition: "all 0.2s ease",
+                    }}
                   >
-                    <FiFolder className="w-3 h-3 text-sky-400" />
-                    <span className="truncate">{entry.name}</span>
+                    <i
+                      className="fas fa-folder"
+                      aria-hidden="true"
+                      style={{
+                        fontSize: "1.1rem",
+                        color: isSelected
+                          ? "var(--primary-color)"
+                          : "var(--blue-400)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {entry.name}
+                    </span>
                   </div>
                 );
               })}
             </div>
 
-            {/* Selected + actions */}
-            <div className="mt-2 flex flex-col gap-1 border-t border-slate-800 pt-2">
-              <div className="text-[9px] text-slate-400">Selected folder</div>
-              <div className="text-[9px] text-sky-300 break-all bg-slate-950/80 border border-slate-800 rounded px-2 py-1 min-h-[32px]">
-                {selectedPath || "None selected"}
+            {/* Selected path display */}
+            <div
+              style={{
+                borderTop: "1px solid var(--surface-border)",
+                paddingTop: "0.75rem",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.85rem",
+                  color: "var(--text-color-secondary)",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                Selected Folder
               </div>
-              <div className="flex justify-end gap-2 mt-1">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[9px] text-slate-300 hover:bg-slate-900"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedPath}
-                  onClick={() => {
-                    if (!selectedPath) return;
-                    onConfirm(selectedPath);
-                  }}
-                  className={`inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md text-[9px] font-medium ${
-                    !selectedPath
-                      ? "bg-slate-800 text-slate-600 cursor-not-allowed"
-                      : "bg-sky-600 hover:bg-sky-500 text-white"
-                  }`}
-                >
-                  <FiFolderPlus className="w-3 h-3" />
-                  Use this folder
-                </button>
+              <div
+                style={{
+                  minHeight: "2.5rem",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--surface-border)",
+                  backgroundColor: "var(--surface-50)",
+                  color: selectedPath
+                    ? "var(--primary-color)"
+                    : "var(--text-color-secondary)",
+                  wordBreak: "break-all",
+                  fontSize: "0.9rem",
+                  fontFamily: "monospace",
+                }}
+              >
+                {selectedPath || "None selected"}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Footer buttons */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "0.75rem",
+            borderTop: "1px solid var(--surface-border)",
+            paddingTop: "1rem",
+          }}
+        >
+          <Button
+            label="Cancel"
+            severity="secondary"
+            onClick={onClose}
+          />
+          <Button
+            label="Use This Folder"
+            onClick={handleConfirm}
+            disabled={!selectedPath}
+            icon="fas fa-check"
+          />
+        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

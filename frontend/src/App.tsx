@@ -6,6 +6,7 @@ import { SearchPage } from "./pages/SearchPage";
 import { StatsPage } from "./pages/StatsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StatusProvider } from "./context/StatusContext";
+import { NotificationProvider } from "./context/NotificationProvider";
 
 // Configure Typesense InstantSearch adapter
 const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
@@ -30,6 +31,7 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
     query_by: "file_name,file_path,content,title,description,embedding",
     exclude_fields: "embedding",
     vector_query: "embedding:([], k:50)",
+    per_page: 6,
   },
 });
 
@@ -39,16 +41,22 @@ export default function App() {
   return (
     <BrowserRouter>
       <StatusProvider>
-        <InstantSearch indexName="files" searchClient={searchClient} future={{ preserveSharedStateOnUnmount: true }}>
-          <AppShell>
-            <Routes>
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/stats" element={<StatsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/search" replace />} />
-            </Routes>
-          </AppShell>
-        </InstantSearch>
+        <NotificationProvider>
+          <InstantSearch
+            indexName="files"
+            searchClient={searchClient}
+            future={{ preserveSharedStateOnUnmount: true }}
+          >
+            <AppShell>
+              <Routes>
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/stats" element={<StatsPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<Navigate to="/search" replace />} />
+              </Routes>
+            </AppShell>
+          </InstantSearch>
+        </NotificationProvider>
       </StatusProvider>
     </BrowserRouter>
   );
