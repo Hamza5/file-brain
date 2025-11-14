@@ -22,7 +22,6 @@ class DatabaseService:
         settings = self.get_all_settings()
         return {
             "start_monitoring": self.get_setting_bool("crawler_start_monitoring", default=True),
-            "include_subdirectories": self.get_setting_bool("crawler_include_subdirectories", default=True),
         }
     
     def set_crawler_setting(self, key: str, value: Any) -> Setting:
@@ -41,8 +40,6 @@ class DatabaseService:
         if self.get_setting("crawler_start_monitoring") is None:
             self.set_setting("crawler_start_monitoring", "true", "Whether to start file monitoring with crawl")
         
-        if self.get_setting("crawler_include_subdirectories") is None:
-            self.set_setting("crawler_include_subdirectories", "true", "Whether to include subdirectories in crawl")
     
     # Watch Paths
 
@@ -58,13 +55,13 @@ class DatabaseService:
         paths = self.list_watch_paths(enabled_only=enabled_only)
         return [p.path for p in paths]
 
-    def add_watch_path(self, path: str, enabled: bool = True) -> WatchPath:
+    def add_watch_path(self, path: str, enabled: bool = True, include_subdirectories: bool = True) -> WatchPath:
         """Add a new watch path."""
         existing = self.db.query(WatchPath).filter(WatchPath.path == path).first()
         if existing:
             raise ValueError(f"Watch path already exists: {path}")
 
-        watch_path = WatchPath(path=path, enabled=enabled)
+        watch_path = WatchPath(path=path, enabled=enabled, include_subdirectories=include_subdirectories)
         self.db.add(watch_path)
         self.db.commit()
         self.db.refresh(watch_path)
@@ -99,9 +96,9 @@ class DatabaseService:
         """Get watch path by exact path."""
         return self.db.query(WatchPath).filter(WatchPath.path == path).first()
 
-    def create_watch_path(self, path: str, enabled: bool = True) -> WatchPath:
+    def create_watch_path(self, path: str, enabled: bool = True, include_subdirectories: bool = True) -> WatchPath:
         """Create a new watch path (alias for add_watch_path)."""
-        return self.add_watch_path(path, enabled=enabled)
+        return self.add_watch_path(path, enabled=enabled, include_subdirectories=include_subdirectories)
 
     def update_watch_path(self, path_id: int, **kwargs) -> Optional[WatchPath]:
         """Update an existing watch path by ID."""

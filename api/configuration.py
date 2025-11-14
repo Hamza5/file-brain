@@ -24,6 +24,7 @@ class WatchPathResponse(BaseModel):
     id: int
     path: str
     enabled: bool
+    include_subdirectories: bool
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -42,6 +43,15 @@ class SettingResponse(BaseModel):
 
 class ToggleRequest(BaseModel):
     enabled: bool
+
+
+class ToggleRequest(BaseModel):
+    enabled: bool
+
+
+class WatchPathUpdateRequest(BaseModel):
+    enabled: bool | None = None
+    include_subdirectories: bool | None = None
 
 
 class ConfigurationResponse(BaseModel):
@@ -71,6 +81,7 @@ async def get_watch_paths(
             id=p.id,
             path=p.path,
             enabled=p.enabled,
+            include_subdirectories=p.include_subdirectories,
             created_at=p.created_at.isoformat() if p.created_at else None,
             updated_at=p.updated_at.isoformat() if p.updated_at else None,
         )
@@ -107,12 +118,15 @@ async def add_watch_paths_batch(
             skipped_paths.append({"path": path, "reason": "Path is not a directory"})
             continue
         try:
-            watch_path = db_service.add_watch_path(path)
+            watch_path = db_service.add_watch_path(
+                path, include_subdirectories=request.include_subdirectories
+            )
             added_paths.append(
                 WatchPathResponse(
                     id=watch_path.id,
                     path=watch_path.path,
                     enabled=watch_path.enabled,
+                    include_subdirectories=watch_path.include_subdirectories,
                     created_at=watch_path.created_at.isoformat() if watch_path.created_at else None,
                     updated_at=watch_path.updated_at.isoformat() if watch_path.updated_at else None,
                 ).model_dump()
@@ -150,7 +164,8 @@ async def replace_watch_paths(
         if not os.path.exists(path) or not os.path.isdir(path):
             continue
         try:
-            db_service.add_watch_path(path)
+            # include_subdirectories is not part of this batch request, so it defaults to True
+            db_service.add_watch_path(path, include_subdirectories=True)
             added_count += 1
         except ValueError:
             # Skip duplicates or invalid entries
@@ -180,6 +195,62 @@ async def clear_watch_paths(
     return MessageResponse(
         message=f"Removed all watch paths. Deleted {count} path(s).",
         success=True,
+    )
+
+
+@router.put("/watch-paths/{path_id}", response_model=WatchPathResponse)
+async def update_watch_path_by_id(
+    path_id: int,
+    request: WatchPathUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Update a single watch path by its ID.
+    """
+    db_service = DatabaseService(db)
+    
+    update_data = request.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+
+    updated_path = db_service.update_watch_path(path_id, **update_data)
+
+    if not updated_path:
+        raise HTTPException(status_code=404, detail="Watch path not found")
+
+    logger.info(f"Updated watch path with ID {path_id} via API: {update_data}")
+
+    return WatchPathResponse(
+        id=updated_path.id,
+        path=updated_path.path,
+        enabled=updated_path.enabled,
+        include_subdirectories=updated_path.include_subdirectories,
+        created_at=updated_path.created_at.isoformat() if updated_path.created_at else None,
+        updated_at=updated_path.updated_at.isoformat() if updated_path.updated_at else None,
+    )
+
+
+@router.delete("/watch-paths/{path_id}", response_model=MessageResponse)
+async def delete_watch_path_by_id(
+    path_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a single watch path by its ID.
+    """
+    db_service = DatabaseService(db)
+    success = db_service.delete_watch_path(path_id)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Watch path not found")
+
+    logger.info(f"Deleted watch path with ID {path_id} via API")
+
+    import time
+    return MessageResponse(
+        message=f"Watch path with ID {path_id} deleted.",
+        success=True,
+        timestamp=int(time.time() * 1000),
     )
 
 
@@ -249,6 +320,7 @@ async def get_full_configuration(db: Session = Depends(get_db)):
                 id=p.id,
                 path=p.path,
                 enabled=p.enabled,
+                include_subdirectories=p.include_subdirectories,
                 created_at=p.created_at.isoformat() if p.created_at else None,
                 updated_at=p.updated_at.isoformat() if p.updated_at else None
             )

@@ -1,19 +1,24 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "primereact/dialog";
 import { Button } from "primereact/button";
+import { Checkbox } from "primereact/checkbox";
 import { Message } from "primereact/message";
 import { getFsRoots, listFs, type FsRoot, type FsEntry } from "../api/client";
 
 type FolderSelectModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (path: string) => void;
+  onConfirm: (path: string, includeSubdirectories: boolean) => void;
+  includeSubdirectories: boolean;
+  onIncludeSubdirectoriesChange: (checked: boolean) => void;
 };
 
 export function FolderSelectModal({
   isOpen,
   onClose,
   onConfirm,
+  includeSubdirectories,
+  onIncludeSubdirectoriesChange,
 }: FolderSelectModalProps) {
   const [roots, setRoots] = useState<FsRoot[]>([]);
   const [activeRoot, setActiveRoot] = useState<FsRoot | null>(null);
@@ -175,7 +180,7 @@ export function FolderSelectModal({
 
   function handleConfirm() {
     if (!selectedPath) return;
-    onConfirm(selectedPath);
+    onConfirm(selectedPath, includeSubdirectories);
   }
 
   const breadcrumbSegments = getBreadcrumbSegments(currentPath);
@@ -457,23 +462,36 @@ export function FolderSelectModal({
         <div
           style={{
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: "space-between",
+            alignItems: "center",
             gap: "0.75rem",
             borderTop: "1px solid var(--surface-border)",
             paddingTop: "1rem",
           }}
         >
-          <Button
-            label="Cancel"
-            severity="secondary"
-            onClick={onClose}
-          />
-          <Button
-            label="Use This Folder"
-            onClick={handleConfirm}
-            disabled={!selectedPath}
-            icon="fas fa-check"
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Checkbox
+              inputId="modalIncludeSubdirectories"
+              checked={includeSubdirectories}
+              onChange={(e) => onIncludeSubdirectoriesChange(e.checked ?? true)}
+            />
+            <label htmlFor="modalIncludeSubdirectories" style={{ cursor: "pointer", fontSize: "0.85rem" }}>
+              Include Subdirectories
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <Button
+              label="Cancel"
+              severity="secondary"
+              onClick={onClose}
+            />
+            <Button
+              label="Use This Folder"
+              onClick={handleConfirm}
+              disabled={!selectedPath}
+              icon="fas fa-check"
+            />
+          </div>
         </div>
       </div>
     </Dialog>

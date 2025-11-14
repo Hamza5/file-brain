@@ -4,6 +4,7 @@ import { Checkbox } from "primereact/checkbox";
 import { InputText } from "primereact/inputtext";
 import { Card } from "primereact/card";
 import { Message } from "primereact/message";
+import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import {
   getCrawlerSettings,
   updateCrawlerSettings,
@@ -11,10 +12,9 @@ import {
   stopCrawler,
   clearIndexes,
   listWatchPaths,
-  addWatchPath,
-  replaceWatchPaths,
-  clearWatchPaths,
   type WatchPath,
+  deleteWatchPath,
+  updateWatchPath,
 } from "../api/client";
 import { useStatus } from "../context/StatusContext";
 import { useNotification } from "../context/NotificationContext";
@@ -22,7 +22,6 @@ import { FolderSelectModal } from "../components/FolderSelectModal";
 
 type SettingsState = {
   start_monitoring: boolean;
-  include_subdirectories: boolean;
 };
 
 export function SettingsPage() {
@@ -34,6 +33,8 @@ export function SettingsPage() {
   const [watchPaths, setWatchPaths] = useState<WatchPath[]>([]);
   const [watchPathsLoading, setWatchPathsLoading] = useState(true);
   const [newPath, setNewPath] = useState("");
+  const [newPathIncludeSubdirectories, setNewPathIncludeSubdirectories] =
+    useState(true);
   const [busyAction, setBusyAction] = useState<
     "start" | "stop" | "clear" | "addPath" | "replace" | "clearPaths" | null
   >(null);
@@ -55,8 +56,6 @@ export function SettingsPage() {
         setSettings({
           start_monitoring:
             (raw.start_monitoring as boolean | undefined) ?? true,
-          include_subdirectories:
-            (raw.include_subdirectories as boolean | undefined) ?? true,
         });
       } catch (e) {
         console.error("Failed to load crawler settings", e);
@@ -98,7 +97,6 @@ export function SettingsPage() {
     try {
       await updateCrawlerSettings({
         start_monitoring: settings.start_monitoring,
-        include_subdirectories: settings.include_subdirectories,
       });
       setActionMessage("Settings saved successfully.");
       showSuccess("Settings saved");
@@ -269,25 +267,6 @@ export function SettingsPage() {
                 Start monitoring for file changes automatically after crawl starts
               </label>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <Checkbox
-                inputId="includeSubdirectories"
-                checked={settings.include_subdirectories}
-                onChange={(e) =>
-                  setSettings((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          include_subdirectories: e.checked ?? false,
-                        }
-                      : prev
-                  )
-                }
-              />
-              <label htmlFor="includeSubdirectories" style={{ cursor: "pointer" }}>
-                Include subdirectories when discovering files in watch paths
-              </label>
-            </div>
             <div style={{ marginTop: "0.5rem" }}>
               <Button
                 label={saving ? "Saving…" : "Save Settings"}
@@ -314,71 +293,6 @@ export function SettingsPage() {
           >
             Watch Paths
           </h3>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <Button
-              label="Sync"
-              icon="fas fa-sync"
-              size="small"
-              outlined
-              disabled={busyAction === "replace" || busyAction === "clearPaths"}
-              onClick={async () => {
-                if (!watchPaths.length) return;
-                if (
-                  !window.confirm(
-                    "Replace all watch paths with the current list as-is?"
-                  )
-                ) {
-                  return;
-                }
-                try {
-                  setBusyAction("replace");
-                  setActionError(null);
-                  setActionMessage(null);
-                  await replaceWatchPaths(watchPaths.map((w) => w.path));
-                  setActionMessage("Watch paths replaced.");
-                  showSuccess("Watch paths replaced");
-                } catch (e) {
-                  console.error(e);
-                  setActionError("Failed to replace watch paths.");
-                  showError("Failed to replace watch paths");
-                } finally {
-                  setBusyAction(null);
-                }
-              }}
-            />
-            <Button
-              label="Clear All"
-              icon="fas fa-trash"
-              size="small"
-              severity="danger"
-              outlined
-              disabled={busyAction === "clearPaths"}
-              onClick={async () => {
-                if (
-                  !window.confirm(
-                    "Clear all configured watch paths? This will stop future crawls from using them until new paths are added."
-                  )
-                ) {
-                  return;
-                }
-                try {
-                  setBusyAction("clearPaths");
-                  setActionError(null);
-                  setActionMessage(null);
-                  await clearWatchPaths();
-                  setWatchPaths([]);
-                  setActionMessage("All watch paths cleared.");
-                  showSuccess("All watch paths cleared");
-                } catch (e) {
-                  console.error(e);
-                  setActionError("Failed to clear watch paths.");
-                  showError("Failed to clear watch paths");
-                } finally {
-                  setBusyAction(null);
-                }
-              }}
-            />
-          </div>
         </div>
 
         {watchPathsLoading ? (
@@ -387,13 +301,23 @@ export function SettingsPage() {
           </div>
         ) : (
           <>
-            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+            <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", alignItems: "center" }}>
               <InputText
                 value={newPath}
                 onChange={(e) => setNewPath(e.target.value)}
                 placeholder="/absolute/path/to/index"
                 style={{ flex: 1 }}
               />
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Checkbox
+                  inputId="newPathIncludeSubdirectories"
+                  checked={newPathIncludeSubdirectories}
+                  onChange={(e) => setNewPathIncludeSubdirectories(e.checked ?? true)}
+                />
+                <label htmlFor="newPathIncludeSubdirectories" style={{ cursor: "pointer", fontSize: "0.85rem" }}>
+                  Include Subdirectories
+                </label>
+              </div>
               <Button
                 label="Add"
                 icon="fas fa-plus"
@@ -403,7 +327,16 @@ export function SettingsPage() {
                   setActionError(null);
                   setActionMessage(null);
                   try {
-                    const added = await addWatchPath(newPath.trim());
+                    // Custom add logic that passes include_subdirectories
+                    const body = { paths: [newPath.trim()], include_subdirectories: newPathIncludeSubdirectories };
+                    const res = await fetch("/api/config/watch-paths/batch", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(body),
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    const added = (await res.json()).added[0];
+                    
                     setWatchPaths((prev) => [...prev, added]);
                     setNewPath("");
                     setActionMessage("Watch path added.");
@@ -472,16 +405,55 @@ export function SettingsPage() {
                     >
                       {wp.path}
                     </div>
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        color: wp.enabled ? "var(--green-500)" : "var(--orange-500)",
-                        fontWeight: 600,
-                        marginLeft: "0.5rem",
-                      }}
-                    >
-                      {wp.enabled ? "enabled" : "disabled"}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginLeft: "1rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Checkbox
+                          inputId={`includeSubdirs-${wp.id}`}
+                          checked={wp.include_subdirectories}
+                          onChange={async (e) => {
+                            const updated = await updateWatchPath(wp.id, { include_subdirectories: e.checked ?? true });
+                            setWatchPaths((prev) => prev.map(p => p.id === wp.id ? updated : p));
+                          }}
+                        />
+                        <label htmlFor={`includeSubdirs-${wp.id}`} style={{ cursor: "pointer", fontSize: "0.85rem" }}>
+                          Include Subdirectories
+                        </label>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Checkbox
+                          inputId={`enabled-${wp.id}`}
+                          checked={wp.enabled}
+                          onChange={async (e) => {
+                            const updated = await updateWatchPath(wp.id, { enabled: e.checked ?? true });
+                            setWatchPaths((prev) => prev.map(p => p.id === wp.id ? updated : p));
+                          }}
+                        />
+                         <label htmlFor={`enabled-${wp.id}`} style={{ cursor: "pointer", fontSize: "0.85rem" }}>
+                          Enabled
+                        </label>
+                      </div>
+                      <Button
+                        icon="fas fa-trash"
+                        className="p-button-danger p-button-text"
+                        onClick={() => {
+                          confirmDialog({
+                            message: `Are you sure you want to remove this watch path?`,
+                            header: `Remove: ${wp.path}`,
+                            icon: 'pi pi-exclamation-triangle',
+                            accept: async () => {
+                              try {
+                                await deleteWatchPath(wp.id);
+                                setWatchPaths((prev) => prev.filter((p) => p.id !== wp.id));
+                                showSuccess("Watch path removed");
+                              } catch (e) {
+                                console.error(e);
+                                showError("Failed to remove watch path");
+                              }
+                            },
+                          });
+                        }}
+                      />
+                    </div>
                   </div>
                 ))
               )}
@@ -498,17 +470,31 @@ export function SettingsPage() {
         <Message severity="error" text={actionError} />
       )}
 
+      {/* Confirm Dialog */}
+      <ConfirmDialog />
+
       {/* Folder picker modal */}
       <FolderSelectModal
         isOpen={folderModalOpen}
         onClose={() => setFolderModalOpen(false)}
-        onConfirm={async (path) => {
+        includeSubdirectories={newPathIncludeSubdirectories}
+        onIncludeSubdirectoriesChange={setNewPathIncludeSubdirectories}
+        onConfirm={async (path, includeSubdirectories) => {
           setFolderModalOpen(false);
           setBusyAction("addPath");
           setActionError(null);
           setActionMessage(null);
           try {
-            const added = await addWatchPath(path);
+            // Custom add logic that passes include_subdirectories
+            const body = { paths: [path], include_subdirectories: includeSubdirectories };
+            const res = await fetch("/api/config/watch-paths/batch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const added = (await res.json()).added[0];
+
             setWatchPaths((prev) => [...prev, added]);
             setActionMessage(`Watch path added: ${path}`);
           } catch (e) {

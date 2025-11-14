@@ -34,6 +34,7 @@ class WatchPathResponse(BaseModel):
     id: int
     path: str
     enabled: bool
+    include_subdirectories: bool
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -64,9 +65,9 @@ async def start_crawler(
         db_service.initialize_default_crawler_settings()
         
         # Get watch paths from database
-        watch_paths = db_service.get_watch_paths(enabled_only=True)
+        watch_path_models = db_service.list_watch_paths(enabled_only=True)
         
-        if not watch_paths:
+        if not watch_path_models:
             raise HTTPException(
                 status_code=400,
                 detail="No watch paths configured. Add watch paths first using the watch path endpoints."
@@ -74,14 +75,14 @@ async def start_crawler(
         
         # Validate watch paths
         valid_paths = []
-        for path in watch_paths:
-            if not os.path.exists(path):
-                logger.warning(f"Watch path does not exist: {path}")
+        for path_model in watch_path_models:
+            if not os.path.exists(path_model.path):
+                logger.warning(f"Watch path does not exist: {path_model.path}")
                 continue
-            if not os.path.isdir(path):
-                logger.warning(f"Watch path is not a directory: {path}")
+            if not os.path.isdir(path_model.path):
+                logger.warning(f"Watch path is not a directory: {path_model.path}")
                 continue
-            valid_paths.append(path)
+            valid_paths.append(path_model)
         
         if not valid_paths:
             raise HTTPException(
@@ -92,17 +93,14 @@ async def start_crawler(
         # Get settings from database
         settings = db_service.get_crawler_settings()
         start_monitoring = settings["start_monitoring"]
-        include_subdirectories = settings["include_subdirectories"]
         
-        logger.info(f"Starting crawl job for {len(valid_paths)} paths: {valid_paths}")
+        logger.info(f"Starting crawl job for {len(valid_paths)} paths: {[p.path for p in valid_paths]}")
         logger.info(f"File monitoring: {'enabled' if start_monitoring else 'disabled'}")
-        logger.info(f"Include subdirectories: {include_subdirectories}")
         
         # Start the crawl job
         success = await crawl_manager.start_crawl(
             watch_paths=valid_paths,
             start_monitoring=start_monitoring,
-            include_subdirectories=include_subdirectories
         )
         
         if not success:
@@ -417,7 +415,7 @@ async def update_crawler_settings(
         
         # Update each setting
         for key, value in settings.items():
-            if key in ["start_monitoring", "include_subdirectories"]:
+            if key in ["start_monitoring"]:
                 db_service.set_crawler_setting(key, value)
         
         logger.info(f"Updated crawler settings: {settings}")

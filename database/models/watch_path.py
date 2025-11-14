@@ -13,5 +13,6 @@ class WatchPath(Base):
     id = Column(Integer, primary_key=True, index=True)
     path = Column(String, unique=True, nullable=False, index=True)
     enabled = Column(Boolean, default=True, nullable=False)
+    include_subdirectories = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

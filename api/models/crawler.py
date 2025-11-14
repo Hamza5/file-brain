@@ -65,6 +65,7 @@ class CrawlStatusResponse(BaseModel):
 class BatchWatchPathRequest(BaseModel):
     """Request to add multiple watch paths at once"""
     paths: List[str] = Field(..., description="List of paths to add")
+    include_subdirectories: bool = Field(default=True, description="Whether to include subdirectories for the given paths")
     enabled: bool = Field(default=True, description="Whether paths should be enabled")
 
 

@@ -12,7 +12,7 @@ from typing import List, Optional, Dict, Any, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from database.models import SessionLocal, CrawlerState
+from database.models import SessionLocal, CrawlerState, WatchPath
 from services.database_service import DatabaseService
 from services.typesense_client import get_typesense_client
 from services.watcher import create_watcher_for_crawl
@@ -54,8 +54,6 @@ class CrawlJobManager:
         self._discovery_task: Optional[asyncio.Task] = None
         self._indexing_task: Optional[asyncio.Task] = None
         
-        # Configuration (set during start_crawl)
-        self._include_subdirectories: bool = True
         
         # Progress tracking
         self.discovery_progress = DiscoveryProgress(0, 0, 0, 0)
@@ -77,9 +75,8 @@ class CrawlJobManager:
     
     async def start_crawl(
         self,
-        watch_paths: List[str],
+        watch_paths: List['WatchPath'],
         start_monitoring: bool = True,
-        include_subdirectories: bool = True
     ) -> bool:
         """
         Start the crawl job with parallel discovery, indexing, and monitoring.
@@ -99,16 +96,13 @@ class CrawlJobManager:
             logger.warning("Crawl job already running")
             return False
         
-        logger.info(f"Starting crawl job for {len(watch_paths)} paths")
-        logger.info(f"Watch paths: {watch_paths}")
+        path_strs = [wp.path for wp in watch_paths]
+        logger.info(f"Starting crawl job for {len(path_strs)} paths")
+        logger.info(f"Watch paths: {path_strs}")
         logger.info(f"File monitoring: {'enabled' if start_monitoring else 'disabled'}")
-        logger.info(f"Include subdirectories: {include_subdirectories}")
         
         self._running = True
         self._stop_event.clear()
-        
-        # Store configuration for use during crawl
-        self._include_subdirectories = include_subdirectories
         
         # Update database state
         db = SessionLocal()
@@ -131,7 +125,7 @@ class CrawlJobManager:
         
         # Start file monitoring if requested
         if start_monitoring:
-            await self._start_file_monitoring(watch_paths)
+            await self._start_file_monitoring(path_strs)
         
         # Start the main crawl task
         self._crawl_task = asyncio.create_task(self._run_crawl_job(watch_paths))
@@ -376,7 +370,7 @@ class CrawlJobManager:
             except Exception as e:
                 logger.error(f"Error stopping file monitoring: {e}")
     
-    async def _run_crawl_job(self, watch_paths: List[str]) -> None:
+    async def _run_crawl_job(self, watch_paths: List['WatchPath']) -> None:
         """Main crawl job coordinator - runs parallel discovery and indexing"""
         try:
             logger.info("Starting parallel file discovery and indexing...")
@@ -422,7 +416,7 @@ class CrawlJobManager:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._thread_pool, lambda: func(*args, **kwargs))
 
-    async def _discover_files(self, watch_paths: List[str]) -> None:
+    async def _discover_files(self, watch_paths: List['WatchPath']) -> None:
         """Discover files in watch paths in parallel.
         
         Discovery is stateless: it enqueues operations for all files found.
@@ -438,23 +432,23 @@ class CrawlJobManager:
         
         logger.info(f"Starting file discovery for {len(watch_paths)} paths")
         
-        for watch_path in watch_paths:
+        for watch_path_model in watch_paths:
             if self._stop_event.is_set():
                 logger.info("Discovery loop detected stop event; exiting early.")
                 break
 
-            self.discovery_progress.current_path = watch_path
-            logger.info(f"Discovering files in: {watch_path}")
+            self.discovery_progress.current_path = watch_path_model.path
+            logger.info(f"Discovering files in: {watch_path_model.path}")
             
             try:
                 # Discover files in this path
-                files_discovered = await self._discover_files_in_path(watch_path)
+                files_discovered = await self._discover_files_in_path(watch_path_model)
                 self.discovery_progress.files_found += files_discovered
             except asyncio.CancelledError:
                 logger.info("Discovery task cancelled")
                 break
             except Exception as e:
-                logger.error(f"Error discovering files in {watch_path}: {e}")
+                logger.error(f"Error discovering files in {watch_path_model.path}: {e}")
             
             self.discovery_progress.processed_paths += 1
             
@@ -485,7 +479,7 @@ class CrawlJobManager:
                 f"{self.discovery_progress.files_skipped} skipped"
             )
      
-    async def _discover_files_in_path(self, watch_path: str) -> int:
+    async def _discover_files_in_path(self, watch_path_model: 'WatchPath') -> int:
         """Discover files in a single path using thread pool for I/O.
         
         This does not consult Typesense or any local index; it emits operations for all files.
@@ -500,14 +494,14 @@ class CrawlJobManager:
                 found_files = []
                 skipped_files = 0
                 
-                for root, dirs, files in os.walk(watch_path):
+                for root, dirs, files in os.walk(watch_path_model.path):
                     # Skip excluded directories (you can add pattern matching here)
                     dirs[:] = [d for d in dirs if not d.startswith('.')]
                     
                     # Handle subdirectories based on configuration
-                    if not self._include_subdirectories:
+                    if not watch_path_model.include_subdirectories:
                         # Only process files in the root directory
-                        if root != watch_path:
+                        if root != watch_path_model.path:
                             # We're in a subdirectory, so we should skip this branch
                             # by clearing dirs to prevent further recursion
                             dirs[:] = []
@@ -567,12 +561,12 @@ class CrawlJobManager:
             self.discovery_progress.files_skipped += skipped_files
             
             logger.info(
-                f"Discovered {files_found} files in {watch_path}, "
+                f"Discovered {files_found} files in {watch_path_model.path}, "
                 f"skipped {skipped_files} due to errors"
             )
             
         except Exception as e:
-            logger.error(f"Error scanning directory {watch_path}: {e}")
+            logger.error(f"Error scanning directory {watch_path_model.path}: {e}")
         
         return files_found
     

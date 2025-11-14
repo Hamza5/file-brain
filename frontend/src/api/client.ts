@@ -121,6 +121,7 @@ export interface WatchPath {
   id: number;
   path: string;
   enabled: boolean;
+  include_subdirectories: boolean;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -134,6 +135,7 @@ export interface BatchWatchPathsResponse {
     id: number;
     path: string;
     enabled: boolean;
+    include_subdirectories: boolean;
     created_at?: string | null;
     updated_at?: string | null;
   }[];
@@ -170,6 +172,7 @@ export async function addWatchPath(path: string): Promise<WatchPath> {
     id: added.id,
     path: added.path,
     enabled: added.enabled,
+    include_subdirectories: added.include_subdirectories,
     created_at: added.created_at,
     updated_at: added.updated_at,
   };
@@ -186,6 +189,22 @@ export async function replaceWatchPaths(paths: string[]): Promise<void> {
 export async function clearWatchPaths(): Promise<void> {
   await requestJSON("/api/config/watch-paths", {
     method: "DELETE",
+  });
+}
+
+export async function deleteWatchPath(pathId: number): Promise<void> {
+  await requestJSON(`/api/config/watch-paths/${pathId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function updateWatchPath(
+  pathId: number,
+  update: { enabled?: boolean; include_subdirectories?: boolean }
+): Promise<WatchPath> {
+  return requestJSON(`/api/config/watch-paths/${pathId}`, {
+    method: "PUT",
+    body: JSON.stringify(update),
   });
 }
 
