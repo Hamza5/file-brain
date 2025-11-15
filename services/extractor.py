@@ -62,6 +62,11 @@ class ContentExtractor:
             # Extract content
             content = parsed.get('content', '').strip()
             
+            # If content is empty after Tika extraction, fall back to basic extraction
+            if not content:
+                logger.warning(f"Tika extracted empty content for {file_path}")
+                return self._extract_basic(file_path)
+            
             # Extract and process metadata
             raw_metadata = parsed.get('metadata', {})
             metadata = self._process_tika_metadata(raw_metadata)
@@ -224,60 +229,39 @@ class ContentExtractor:
             
             # Try to read as text
             if mime_type and mime_type.startswith("text"):
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                return DocumentContent(
-                    content=content,
-                    metadata={
-                        "extraction_method": "basic_text",
-                        "mime_type": mime_type
-                    }
-                )
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                    if content:
+                        return DocumentContent(
+                            content=content,
+                            metadata={
+                                "extraction_method": "basic_text",
+                                "mime_type": mime_type
+                            }
+                        )
+                except UnicodeDecodeError:
+                    pass  # Fall through to no content case
             
-            # For image files, try to get basic info
-            if mime_type and mime_type.startswith("image"):
-                file_stats = os.stat(file_path)
-                file_name = Path(file_path).name
-                
-                image_info = f"""# {file_name}
-
-**Image File**
-- Type: {mime_type}
-- Size: {file_stats.st_size} bytes
-- Content extraction not available for images
-
-*Tika could not extract text content from this image file.*"""
-                
-                return DocumentContent(
-                    content=image_info,
-                    metadata={
-                        "extraction_method": "placeholder_image",
-                        "mime_type": mime_type,
-                        "file_size": file_stats.st_size
-                    }
-                )
-            
-            # Return placeholder for binary files
-            file_name = Path(file_path).name
+            # Return empty content for all other cases
             file_stats = os.stat(file_path)
             
             return DocumentContent(
-                content=f"# {file_name}\n\n*Binary file - content extraction not available*\n\n*MIME type: {mime_type or 'unknown'}*",
+                content="",
                 metadata={
-                    "extraction_method": "placeholder",
+                    "extraction_method": "no_content",
                     "mime_type": mime_type,
                     "file_size": file_stats.st_size,
-                    "reason": "Binary file or unsupported format"
+                    "reason": "Unsupported file type or empty content"
                 }
             )
             
         except Exception as e:
             logger.error(f"Error in basic extraction: {e}")
-            file_name = Path(file_path).name
             return DocumentContent(
-                content=f"# {file_name}\n\n*File could not be processed*",
+                content="",
                 metadata={
-                    "extraction_method": "error",
+                    "extraction_method": "no_content",
                     "error": str(e)
                 }
             )
