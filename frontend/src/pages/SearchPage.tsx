@@ -9,6 +9,16 @@ type HitType = {
   file_size?: number;
   modified_time?: number;
   content?: string;
+  // Enhanced metadata from Tika extraction
+  title?: string;
+  author?: string;
+  description?: string;
+  subject?: string;
+  language?: string;
+  producer?: string;
+  application?: string;
+  keywords?: string[];
+  extraction_method?: string;
 };
 
 function formatSize(bytes?: number): string {
@@ -155,6 +165,66 @@ function Hit({ hit }: { hit: HitType }) {
               {shortSnippet}
             </div>
           )}
+          
+          {/* Enhanced metadata from Tika */}
+          {(hit.title || hit.author || hit.subject || hit.language || hit.keywords) && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem",
+                fontSize: "0.75rem",
+                color: "var(--text-color-secondary)",
+                backgroundColor: "var(--surface-50)",
+                padding: "0.5rem",
+                borderRadius: "4px",
+                marginBottom: "0.5rem",
+              }}
+            >
+              {hit.title && (
+                <div>
+                  <strong>Title:</strong>{" "}
+                  <span style={{ color: "var(--text-color)", fontStyle: "italic" }}>
+                    {hit.title}
+                  </span>
+                </div>
+              )}
+              {hit.author && (
+                <div>
+                  <strong>Author:</strong>{" "}
+                  <span style={{ color: "var(--text-color)" }}>
+                    {hit.author}
+                  </span>
+                </div>
+              )}
+              {hit.subject && (
+                <div>
+                  <strong>Subject:</strong>{" "}
+                  <span style={{ color: "var(--text-color)" }}>
+                    {hit.subject}
+                  </span>
+                </div>
+              )}
+              {hit.keywords && hit.keywords.length > 0 && (
+                <div>
+                  <strong>Keywords:</strong>{" "}
+                  <span style={{ color: "var(--text-color)" }}>
+                    {hit.keywords.slice(0, 3).join(", ")}
+                    {hit.keywords.length > 3 && "..."}
+                  </span>
+                </div>
+              )}
+              {hit.language && (
+                <div>
+                  <strong>Language:</strong>{" "}
+                  <span style={{ color: "var(--text-color)" }}>
+                    {hit.language.toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+          
           <div
             style={{
               display: "flex",
@@ -177,6 +247,14 @@ function Hit({ hit }: { hit: HitType }) {
                 {formatDate(hit.modified_time)}
               </span>
             </span>
+            {hit.extraction_method && (
+              <span>
+                <strong>Extracted via:</strong>{" "}
+                <span style={{ color: "var(--text-color)", textTransform: "capitalize" }}>
+                  {hit.extraction_method}
+                </span>
+              </span>
+            )}
           </div>
         </div>
       </div>

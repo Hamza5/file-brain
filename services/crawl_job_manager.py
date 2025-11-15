@@ -730,7 +730,7 @@ class CrawlJobManager:
                 logger.info(f"Stop requested before extraction for {file_path}; aborting.")
                 return False
 
-            # Extract file content (potentially heavy: Docling/OCR)
+            # Extract file content (potentially heavy: Tika/OCR)
             def _extract():
                 return self.extractor.extract(file_path)
 

@@ -23,7 +23,7 @@ Smart File Finder enables fast, reliable search across large local file collecti
 ## Key features
 - Parallel discovery and indexing with back-pressure aware queues.
 - Real-time monitoring via watchdog with conversion to typed crawl operations.
-- Docling-based extraction with OCR for PDFs; graceful fallbacks for unsupported formats.
+- Apache Tika-based extraction with OCR for PDFs and 1400+ file formats; graceful fallbacks for unsupported formats.
 - Typesense-backed full-text + facet search with embeddings for semantic ranking.
 - Auto-resume on startup if a crawl was in progress.
 - Simple REST API for control and configuration, plus a minimal React UI using InstantSearch.

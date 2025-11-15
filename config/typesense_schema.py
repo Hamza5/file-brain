@@ -35,10 +35,26 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
             {"name": "created_time", "type": "int64", "facet": False},
             {"name": "indexed_at", "type": "int64", "facet": False},
             
-            # Additional metadata
+            # Enhanced metadata from Tika extraction
             {"name": "title", "type": "string", "facet": False, "optional": True},
             {"name": "author", "type": "string", "facet": True, "optional": True},
             {"name": "description", "type": "string", "facet": False, "optional": True},
+            {"name": "subject", "type": "string", "facet": True, "optional": True},
+            {"name": "language", "type": "string", "facet": True, "optional": True},
+            {"name": "producer", "type": "string", "facet": True, "optional": True},
+            {"name": "application", "type": "string", "facet": True, "optional": True},
+            {"name": "comments", "type": "string", "facet": False, "optional": True},
+            {"name": "revision", "type": "string", "facet": False, "optional": True},
+            
+            # Date metadata from document content (not filesystem)
+            {"name": "document_created_date", "type": "string", "facet": False, "optional": True},
+            {"name": "document_modified_date", "type": "string", "facet": False, "optional": True},
+            
+            # Keywords as array for faceted search
+            {"name": "keywords", "type": "string[]", "facet": True, "optional": True},
+            
+            # Content type information
+            {"name": "content_type", "type": "string", "facet": True, "optional": True},
 
             # Embedding for semantic search
             {
@@ -46,10 +62,13 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
                 "type": "float[]",
                 "embed": {
                     "from": [
-                        "title",
-                        "description",
-                        "content"
-                    ],
+                            "title",
+                            "description",
+                            "subject",
+                            "keywords",
+                            "author",
+                            "content"
+                        ],
                     "model_config": {
                         "model_name": "ts/e5-small-v2"
                     }

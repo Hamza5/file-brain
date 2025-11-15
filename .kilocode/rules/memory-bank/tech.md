@@ -4,7 +4,7 @@
 - Backend: FastAPI with lifecycle [lifespan()](main.py:22) and routers [router](api/crawler.py:25), [router](api/configuration.py:1), [router](api/system.py:1).
 - Persistence: SQLAlchemy + SQLite at [DATABASE_URL](database/models/base.py:12) and session [SessionLocal](database/models/base.py:19).
 - Search: Typesense via [TypesenseClient](services/typesense_client.py:14) and schema [get_collection_schema()](config/typesense_schema.py:7).
-- Extraction: Docling OCR via [ContentExtractor](services/extractor.py:23) with fallback [ContentExtractor._extract_basic](services/extractor.py:119).
+- Extraction: Apache Tika via [ContentExtractor](services/extractor.py:23) with fallback [ContentExtractor._extract_basic](services/extractor.py:119).
 - Monitoring: Watchdog through [FileWatcher](services/watcher.py:16) and [OperationEventHandler](services/watcher.py:109).
 - Orchestration: [CrawlJobManager](services/crawl_job_manager.py:46) with status [get_status()](services/crawl_job_manager.py:182).
 - Service Management: [ServiceManager](services/service_manager.py:39) for centralized health monitoring and initialization tracking.
@@ -17,7 +17,7 @@
 - pydantic >=2.12.4,<3 ([pyproject.toml](pyproject.toml:11))
 - pydantic-settings >=2.11,<3 ([pyproject.toml](pyproject.toml:12))
 - watchdog >=6,<7 ([pyproject.toml](pyproject.toml:13))
-- docling[easyocr] >=2.60.1,<3 ([pyproject.toml](pyproject.toml:14))
+- tika >=3.1.0,<4 ([pyproject.toml](pyproject.toml:19))
 - typesense >=1.1.1,<2 ([pyproject.toml](pyproject.toml:15))
 - python-magic >=0.4.27,<0.5 ([pyproject.toml](pyproject.toml:16))
 - Frontend libs: typesense-instantsearch-adapter (see [App.tsx](frontend/src/App.tsx:1), [package.json](frontend/package.json:1))

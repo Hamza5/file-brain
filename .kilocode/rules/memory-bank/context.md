@@ -27,7 +27,7 @@
   - Architecture in [architecture.md](.kilocode/rules/memory-bank/architecture.md).
   - Tech stack and operations in [tech.md](.kilocode/rules/memory-bank/tech.md).
 - Improved crawl orchestration:
-  - [CrawlJobManager](services/crawl_job_manager.py:46) now offloads CPU/IO-heavy work (file hashing, Docling extraction, Typesense I/O) to a bounded ThreadPoolExecutor via [_run_in_executor()](services/crawl_job_manager.py:401).
+  - [CrawlJobManager](services/crawl_job_manager.py:46) now offloads CPU/IO-heavy work (file hashing, Tika extraction, Typesense I/O) to a bounded ThreadPoolExecutor via [_run_in_executor()](services/crawl_job_manager.py:401).
   - Indexing and discovery loops use cooperative cancellation via _stop_event to ensure responsive shutdown.
 - Control-plane responsiveness:
   - [/api/crawler/status](api/crawler.py:129) reads cheap in-memory/DB state; no heavy work on the event loop.
@@ -72,7 +72,7 @@
   - Models: [CrawlerState](database/models/crawler_state.py:9), [Setting](database/models/setting.py:9), [WatchPath](database/models/watch_path.py:9).
   - Helper service: [DatabaseService](services/database_service.py:12).
 - Extraction path:
-  - Preferred: [ContentExtractor](services/extractor.py:23) using Docling.
+  - Preferred: [ContentExtractor](services/extractor.py:23) using Apache Tika.
   - Fallback: [ContentExtractor._extract_basic](services/extractor.py:119).
 - Indexing:
   - Upserts: [index_file()](services/typesense_client.py:77).

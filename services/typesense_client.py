@@ -4,6 +4,7 @@ Typesense client for search operations
 import hashlib
 import asyncio
 from typing import Optional, Dict, Any
+import time
 
 import typesense
 
@@ -184,17 +185,47 @@ class TypesenseClient:
             "file_hash": file_hash,
         }
         
-        # Add optional metadata fields
+        # Add enhanced metadata fields from Tika extraction
         if metadata:
-            title = metadata.get("title")
-            author = metadata.get("author")
-            description = metadata.get("description")
-            if title:
+            # Standard document metadata
+            if title := metadata.get("title"):
                 document["title"] = title
-            if author:
+            if author := metadata.get("author"):
                 document["author"] = author
-            if description:
+            if description := metadata.get("description"):
                 document["description"] = description
+            
+            # Additional Tika-extracted metadata
+            if subject := metadata.get("subject"):
+                document["subject"] = subject
+            if language := metadata.get("language"):
+                document["language"] = language
+            if producer := metadata.get("producer"):
+                document["producer"] = producer
+            if application := metadata.get("application"):
+                document["application"] = application
+            if comments := metadata.get("comments"):
+                document["comments"] = comments
+            if revision := metadata.get("revision"):
+                document["revision"] = revision
+            
+            # Document creation/modification dates
+            if doc_created_date := metadata.get("created_date"):
+                document["document_created_date"] = doc_created_date
+            if doc_modified_date := metadata.get("modified_date"):
+                document["document_modified_date"] = doc_modified_date
+            
+            # Keywords array
+            if keywords := metadata.get("keywords"):
+                if isinstance(keywords, list):
+                    document["keywords"] = keywords
+                elif isinstance(keywords, str):
+                    # Split comma-separated keywords into array
+                    document["keywords"] = [k.strip() for k in keywords.split(",")]
+            
+            # Content type with priority: Tika's content_type first, then mime_type
+            tika_content_type = metadata.get("content_type")
+            document["content_type"] = tika_content_type or mime_type
         
         try:
             # Use upsert to handle both create and update
@@ -229,7 +260,7 @@ class TypesenseClient:
         try:
             search_parameters = {
                 "q": query,
-                "query_by": "file_path,content",
+                "query_by": "file_path,file_name,content,title,description,subject,author,keywords,comments",
                 "page": page,
                 "per_page": per_page,
                 "sort_by": sort_by,
@@ -300,10 +331,6 @@ class TypesenseClient:
         except Exception as e:
             logger.error(f"Error clearing documents: {e}")
             raise
-
-
-# Import time for timestamps
-import time
 
 
 # Global client instance

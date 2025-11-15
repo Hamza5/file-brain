@@ -28,7 +28,7 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
     // - Lexical over file_name, file_path, content, title, description
     // - Embeddings-backed semantic search via "embedding" field (server-side configured)
     // - Exclude embedding vector from responses
-    query_by: "file_name,file_path,content,title,description,embedding",
+    query_by: "file_name,file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
     exclude_fields: "embedding",
     vector_query: "embedding:([], k:50)",
     per_page: 6,
