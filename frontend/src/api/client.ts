@@ -269,3 +269,65 @@ export function connectStatusStream(
     es.close();
   };
 }
+
+// System initialization status
+export interface SystemInitialization {
+  timestamp: number;
+  overall_status: "healthy" | "degraded" | "critical";
+  initialization_progress: number;
+  services: Record<string, {
+    status: "healthy" | "unhealthy" | "initializing" | "disabled" | "error" | "retry_scheduled";
+    message?: string;
+    error?: string;
+    timestamp?: number;
+    retry_in_seconds?: number;
+    [key: string]: unknown;
+  }>;
+  summary: {
+    total_services: number;
+    healthy_services: number;
+    failed_services: number;
+  };
+  capabilities: {
+    configuration_api: boolean;
+    search_api: boolean;
+    crawl_api: boolean;
+    full_functionality: boolean;
+  };
+  degraded_mode: boolean;
+  message: string;
+}
+
+export interface ServiceStatus {
+  timestamp: number;
+  services: Record<string, {
+    state: string;
+    last_check: number | null;
+    last_success: number | null;
+    error_message: string | null;
+    retry_count: number;
+    max_retries: number;
+    next_retry: number | null;
+    dependencies: string[];
+    details: Record<string, unknown>;
+    health_check: {
+      status: string;
+      message?: string;
+      error?: string;
+      timestamp?: number;
+      [key: string]: unknown;
+    };
+  }>;
+}
+
+export async function getSystemInitialization(): Promise<SystemInitialization> {
+  return requestJSON("/api/system/initialization");
+}
+
+export async function getServicesStatus(): Promise<ServiceStatus> {
+  return requestJSON("/api/system/services");
+}
+
+export async function retryService(serviceName: string): Promise<{ message: string; timestamp: number }> {
+  return requestJSON(`/api/system/services/${serviceName}/retry`, { method: "POST" });
+}

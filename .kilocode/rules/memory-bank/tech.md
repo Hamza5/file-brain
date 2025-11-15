@@ -1,12 +1,13 @@
 # Tech: Smart File Finder
 
 ## Stack overview
-- Backend: FastAPI with lifecycle [lifespan()](main.py:22) and routers [router](api/crawler.py:25), [router](api/configuration.py:1).
+- Backend: FastAPI with lifecycle [lifespan()](main.py:22) and routers [router](api/crawler.py:25), [router](api/configuration.py:1), [router](api/system.py:1).
 - Persistence: SQLAlchemy + SQLite at [DATABASE_URL](database/models/base.py:12) and session [SessionLocal](database/models/base.py:19).
 - Search: Typesense via [TypesenseClient](services/typesense_client.py:14) and schema [get_collection_schema()](config/typesense_schema.py:7).
 - Extraction: Docling OCR via [ContentExtractor](services/extractor.py:23) with fallback [ContentExtractor._extract_basic](services/extractor.py:119).
 - Monitoring: Watchdog through [FileWatcher](services/watcher.py:16) and [OperationEventHandler](services/watcher.py:109).
 - Orchestration: [CrawlJobManager](services/crawl_job_manager.py:46) with status [get_status()](services/crawl_job_manager.py:182).
+- Service Management: [ServiceManager](services/service_manager.py:39) for centralized health monitoring and initialization tracking.
 - Frontend: React + Vite InstantSearch in [App.tsx](frontend/src/App.tsx:1).
 
 ## Dependencies and versions
@@ -77,8 +78,22 @@ npm run dev
 - Idempotent reindex: compare [get_doc_by_path()](services/typesense_client.py:61) in [CrawlJobManager._handle_create_edit_operation](services/crawl_job_manager.py:626).
 - Queue/back-pressure: asyncio.Queue maxsize=1000 at [CrawlJobManager](services/crawl_job_manager.py:67); thread pool [max_workers=4](services/crawl_job_manager.py:69).
 - File size cap with MAX_FILE_SIZE_MB in [CrawlJobManager](services/crawl_job_manager.py:600) and [FileProcessor](workers/file_processor.py:204).
-- Health endpoint [health_check](main.py:164).
+- Health endpoint [health_check](main.py:396).
 - Logging configured in [logger](utils/logger.py:55).
+
+## Service Management and Health Monitoring
+- **Critical vs Background Initialization**: Database initialization blocks startup, while Typesense, crawl manager, and file watcher initialize in background
+- **Service Health Tracking**: [ServiceManager](services/service_manager.py:39) tracks 4 core services with health checkers running every 30 seconds
+- **Health Checkers**: 
+  - Database: Uses SQLAlchemy `text()` for raw SQL queries
+  - Typesense: Uses `get_collection_stats()` method (not `get_collectionstats`)
+  - Crawl Manager: Queries status via `get_status()` method
+  - File Watcher: Verifies watchdog library availability
+- **Retry Logic**: Failed services retry up to 3 times with exponential backoff (2^n seconds, max 5 minutes)
+- **API Endpoints**: 
+  - `/api/system/initialization` - Real-time service initialization status
+  - `/health` - Comprehensive health check with service status
+  - `/api/crawler/status` - Enhanced with service availability information
 
 ## Security
 - Frontend uses a search-only Typesense key at [App.tsx](frontend/src/App.tsx:6). Server uses admin key from [settings](config/settings.py:32). Do not expose admin key to the browser.
@@ -93,3 +108,10 @@ pytest -q
 - Include/exclude subdirectories via [get_crawler_settings](services/database_service.py:20).
 - Adjust thread pool and queue sizes in [CrawlJobManager](services/crawl_job_manager.py:67) and [services/crawl_job_manager.py](services/crawl_job_manager.py:69).
 - Embedding model configured in [get_collection_schema()](config/typesense_schema.py:54).
+
+## Recent Fixes (2025-11-15)
+- **Health Check Timeout Issue**: Services marked as READY during initialization now maintain healthy status even without active health checkers
+- **SQLAlchemy Compatibility**: Fixed database health checker to use `text("SELECT 1")` instead of raw SQL strings
+- **Typesense Method Names**: Corrected health checker to use `get_collection_stats()` instead of non-existent `get_collectionstats()`
+- **Service Manager**: Added centralized service state management with proper health monitoring
+- **Background Initialization**: Services properly initialize asynchronously without blocking FastAPI startup

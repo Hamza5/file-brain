@@ -12,6 +12,16 @@
   - SettingsPage with crawler controls, crawler options, and Watch Paths manager.
 
 ## Recent changes
+- **Fixed Background Task Health Monitoring (2025-11-15)**:
+  - Implemented [ServiceManager](services/service_manager.py:39) for centralized service state management
+  - Added [critical_init()](main.py:23) for immediate startup with database initialization
+  - Added [background_init()](main.py:62) for non-blocking service initialization (Typesense, crawl manager, file watcher)
+  - Added [health_monitoring_loop()](main.py:317) for continuous service health checks every 30 seconds
+  - Fixed health checker implementations with correct SQLAlchemy text() syntax and Typesense method names
+  - Services now properly maintain "healthy" status instead of failing after 30-second timeouts
+  - Added system API endpoint for service initialization status
+  - Enhanced frontend StatusContext to handle degraded service modes gracefully
+
 - Authored Memory Bank docs:
   - Product overview in [product.md](.kilocode/rules/memory-bank/product.md).
   - Architecture in [architecture.md](.kilocode/rules/memory-bank/architecture.md).
@@ -56,6 +66,7 @@
 - API surfaces:
   - Crawler control endpoints: [router](api/crawler.py:25).
   - Configuration endpoints: [router](api/configuration.py:1).
+  - System health endpoints: [router](api/system.py:1) for service initialization status
 - Persistence and state:
   - DB base and session: [Base](database/models/base.py:9), [SessionLocal](database/models/base.py:19).
   - Models: [CrawlerState](database/models/crawler_state.py:9), [Setting](database/models/setting.py:9), [WatchPath](database/models/watch_path.py:9).
@@ -74,6 +85,11 @@
     - vector_query targeting the embedding field for k-NN.
     - embedding excluded from hits.
   - Result: Always-on hybrid (keyword + semantic) search from the React InstantSearch UI, modeled after official Typesense adapter patterns.
+- Service Management:
+  - ServiceManager tracks 4 core services: database, typesense, crawl_manager, file_watcher
+  - Health checkers registered for continuous monitoring with 30-second intervals
+  - Services marked as READY during initialization maintain healthy status without requiring active health checkers
+  - Failed services automatically retry with exponential backoff (up to 3 attempts)
 
 ## Gaps and observations
 - Dual processing implementations present:
@@ -84,9 +100,13 @@
   - Collection was (re)created with the embedding field active.
 - Frontend hybrid behavior:
   - Currently configured globally via additionalSearchParameters; no per-query toggle.
+- Service Health Monitoring:
+  - Health checkers must use correct method names and SQLAlchemy syntax to avoid false failures
+  - Services without health checkers rely on initialization state rather than active monitoring
 
 ## Next steps
 - UI is now production-ready with professional PrimeReact styling and responsive layouts.
+- Service health monitoring system is robust and handles service failures gracefully.
 - Confirm Typesense deployment:
   - Version supports embeddings and vector_query.
   - Embedding provider/model configured for ts/e5-small-v2 (or chosen model).
@@ -97,6 +117,7 @@
 ## Risks
 - If server or collection is not correctly configured for embeddings, vector_query calls will error.
 - Need to ensure operational docs clearly specify Typesense embedding requirements for this hybrid mode.
+- Health monitoring requires maintenance of correct method signatures and SQL syntax to prevent false service failures.
 
 ## UI/UX Implementation Details
 - **Grid Layout**: Search results use CSS Grid with `display: contents` on list items to achieve responsive card layout (350px minimum width per card).
@@ -105,3 +126,4 @@
 - **Responsive Design**: Mobile-first approach with breakpoints at 768px for tablet/desktop adjustments.
 - **Chart Optimization**: Recharts animations disabled to prevent jank during live stat updates.
 - **Search UX**: Hybrid semantic search configured globally; search box includes icon pseudo-element for visual clarity.
+- **Service Status**: Frontend gracefully handles degraded service modes and shows appropriate warnings to users.

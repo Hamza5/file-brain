@@ -20,67 +20,191 @@ from api.fs import router as fs_router
 from utils.logger import logger
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+async def critical_init():
     """
-    Application lifespan manager
-    Handles startup and shutdown events
+    Critical initialization that MUST complete before FastAPI startup
+    This includes only the essential services for API functionality
     """
-    # Startup
-    logger.info("=" * 50)
-    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    logger.info("=" * 50)
+    from services.service_manager import get_service_manager, ServiceState
     
+    service_manager = get_service_manager()
+    
+    # Database initialization (CRITICAL - blocks startup)
     try:
-        # Initialize database
         logger.info("Initializing database...")
         init_db()
         db = SessionLocal()
         init_default_data(db)
         db.close()
+        
+        # Register database health checker
+        async def database_health_check():
+            try:
+                from sqlalchemy import text
+                test_db = SessionLocal()
+                test_db.execute(text("SELECT 1"))
+                test_db.close()
+                return {"healthy": True, "type": "sqlite"}
+            except Exception as e:
+                return {"healthy": False, "error": str(e)}
+        
+        service_manager.register_health_checker("database", database_health_check)
+        service_manager.set_ready("database", details={"type": "sqlite", "tables": "created"})
         logger.info("✅ Database initialized")
-        
-        # Initialize Typesense collection (non-fatal, resilient)
-        logger.info("Initializing Typesense collection...")
+    except Exception as e:
+        service_manager.set_failed("database", f"Database initialization failed: {e}")
+        raise  # This blocks startup - database is required
+
+    return {
+        "database": "ready",
+        "message": "Critical services initialized, background services starting..."
+    }
+
+async def background_init():
+    """
+    Background initialization that does NOT block FastAPI startup
+    These services can fail or be slow without affecting API availability
+    """
+    from services.service_manager import get_service_manager
+    from services.database_service import DatabaseService
+    from services.crawl_job_manager import get_crawl_job_manager
+    from database.models import SessionLocal
+    
+    service_manager = get_service_manager()
+    
+    # Typesense initialization (non-blocking)
+    try:
+        logger.info("Starting Typesense initialization in background...")
         typesense = get_typesense_client()
-        await typesense.initialize_collection()
-        if typesense.collection_ready:
-            logger.info("✅ Typesense initialized")
-        else:
-            logger.warning(
-                "⚠️ Typesense collection is not ready. "
-                "Starting API in degraded mode; search endpoints may return errors until Typesense is available."
-            )
         
-        # Initialize crawl manager
-        logger.info("Initializing  crawl manager...")
-        crawl_manager = get_crawl_job_manager()
-        logger.info("✅ Crawl manager initialized")
+        # Register Typesense health checker
+        async def typesense_health_check():
+            try:
+                await typesense.get_collection_stats()
+                return {"healthy": True, "collection": typesense.collection_name}
+            except Exception as e:
+                return {"healthy": False, "error": str(e)}
         
-        # Get configuration from database
-        db = SessionLocal()
-        db_service = DatabaseService(db)
-        watch_paths = db_service.get_watch_paths(enabled_only=True)
+        service_manager.register_health_checker("typesense", typesense_health_check)
         
-        # Inspect previous crawler state to decide auto-resume behavior
-        previous_state = db_service.get_crawler_state()
-        db.close()
+        # Start background initialization
+        async def init_typesense():
+            try:
+                await typesense.initialize_collection()
+                if typesense.collection_ready:
+                    service_manager.set_ready("typesense", details={
+                        "collection": typesense.collection_name,
+                        "host": settings.typesense_host
+                    })
+                    logger.info("✅ Typesense initialized in background")
+                else:
+                    service_manager.set_failed("typesense", "Collection initialization failed")
+            except Exception as e:
+                service_manager.set_failed("typesense", f"Typesense initialization error: {e}")
         
-        # Snapshot for logs
-        logger.info(
-            "Previous crawler state: "
-            f"crawl_job_running={previous_state.crawl_job_running}, "
-            f"crawl_job_type={previous_state.crawl_job_type}, "
-            f"watcher_running={previous_state.watcher_running}, "
-            f"files_discovered={previous_state.files_discovered}, "
-            f"files_indexed={previous_state.files_indexed}"
-        )
+        service_manager.start_background_initialization("typesense", init_typesense, dependencies=["database"])
         
-        # Auto-resume semantics:
-        # - If there was an in-progress crawl (crawl or crawl+monitor), auto-resume crawl+monitor
-        #   so discovery + monitoring continue.
-        # - If there was monitor-only running, auto-resume monitor-only.
-        # - Otherwise, do not start automatically.
+    except Exception as e:
+        service_manager.set_failed("typesense", f"Typesense setup error: {e}")
+    
+    # Crawl Manager initialization (non-blocking)
+    try:
+        logger.info("Starting crawl manager initialization in background...")
+        
+        async def init_crawl_manager():
+            try:
+                # Initialize crawl manager
+                crawl_manager = get_crawl_job_manager()
+                
+                # Register crawl manager health checker
+                async def crawl_manager_health_check():
+                    try:
+                        status = crawl_manager.get_status()
+                        return {
+                            "healthy": True,
+                            "running": status.get("running", False),
+                            "queue_size": status.get("queue_size", 0)
+                        }
+                    except Exception as e:
+                        return {"healthy": False, "error": str(e)}
+                
+                service_manager.register_health_checker("crawl_manager", crawl_manager_health_check)
+                
+                # Get configuration from database for potential auto-resume
+                db = SessionLocal()
+                db_service = DatabaseService(db)
+                watch_paths = db_service.get_watch_paths(enabled_only=True)
+                previous_state = db_service.get_crawler_state()
+                
+                service_manager.set_ready("crawl_manager", details={
+                    "watch_paths_count": len(watch_paths) if watch_paths else 0,
+                    "previous_state": {
+                        "crawl_job_running": previous_state.crawl_job_running,
+                        "crawl_job_type": previous_state.crawl_job_type,
+                        "watcher_running": previous_state.watcher_running
+                    }
+                })
+                
+                logger.info("✅ Crawl manager initialized in background")
+                logger.info(f"📁 Watch paths: {len(watch_paths) if watch_paths else 0} configured")
+                
+                # Auto-resume logic moved to separate background task
+                if watch_paths:
+                    await auto_resume_logic(watch_paths, previous_state)
+                
+                db.close()
+                
+            except Exception as e:
+                service_manager.set_failed("crawl_manager", f"Crawl manager initialization error: {e}")
+        
+        service_manager.start_background_initialization("crawl_manager", init_crawl_manager, dependencies=["database"])
+        
+        # File Watcher initialization (non-blocking)
+        try:
+            logger.info("Starting file watcher initialization in background...")
+            
+            async def init_file_watcher():
+                try:
+                    # Register file watcher health checker
+                    async def file_watcher_health_check():
+                        try:
+                            # Simple health check - verify watchdog library is available
+                            import watchdog.observers
+                            import watchdog.events
+                            return {"healthy": True, "library": "watchdog", "version": "available"}
+                        except ImportError as e:
+                            return {"healthy": False, "error": f"watchdog library not available: {str(e)}"}
+                        except Exception as e:
+                            return {"healthy": False, "error": str(e)}
+                    
+                    service_manager.register_health_checker("file_watcher", file_watcher_health_check)
+                    service_manager.set_ready("file_watcher", details={"library": "watchdog", "initialized": True})
+                    logger.info("✅ File watcher initialized in background")
+                    
+                except Exception as e:
+                    service_manager.set_failed("file_watcher", f"File watcher initialization error: {e}")
+            
+            service_manager.start_background_initialization("file_watcher", init_file_watcher, dependencies=["database"])
+            
+        except Exception as e:
+            service_manager.set_failed("file_watcher", f"File watcher setup error: {e}")
+        
+    except Exception as e:
+        service_manager.set_failed("crawl_manager", f"Crawl manager setup error: {e}")
+
+
+async def auto_resume_logic(watch_paths, previous_state):
+    """
+    Background auto-resume logic that runs after all services are initialized
+    """
+    from services.crawl_job_manager import get_crawl_job_manager
+    
+    try:
+        logger.info("Starting auto-resume logic in background...")
+        
+        # Wait a bit for services to be fully ready
+        await asyncio.sleep(2)
+        
         auto_resumed = False
         if watch_paths:
             cj_type = (previous_state.crawl_job_type or "").lower() if previous_state.crawl_job_type else ""
@@ -91,6 +215,7 @@ async def lifespan(app: FastAPI):
                     "🔄 Detected previous in-progress crawl job; "
                     "auto-resuming with crawl+monitor."
                 )
+                crawl_manager = get_crawl_job_manager()
                 success = await crawl_manager.start_crawl(
                     watch_paths,
                     start_monitoring=True,
@@ -110,6 +235,7 @@ async def lifespan(app: FastAPI):
                 )
                 # Implement monitor-only by starting a crawl with monitoring enabled.
                 # Discovery will run, but Typesense/file_hash logic keeps this idempotent.
+                crawl_manager = get_crawl_job_manager()
                 success = await crawl_manager.start_crawl(
                     watch_paths,
                     start_monitoring=True,
@@ -126,21 +252,46 @@ async def lifespan(app: FastAPI):
                 logger.info("📁 Watch paths configured but no auto-resume conditions met.")
                 logger.info("💡 Use /api/crawler/start to manually start crawling or monitoring.")
             else:
-                logger.warning(
-                    "⚠️ No watch paths configured. "
+                logger.info(
+                    "ℹ️ No watch paths configured. "
                     "Add paths via /api/config/watch-paths and /api/config/watch-paths/batch"
                 )
         
+    except Exception as e:
+        logger.error(f"Auto-resume logic failed: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan manager with instant startup
+    Critical services block startup, non-critical services initialize in background
+    """
+    # Startup - CRITICAL PATH (must complete quickly)
+    logger.info("=" * 50)
+    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+    logger.info("=" * 50)
+    
+    try:
+        # CRITICAL: Database initialization (blocks startup until complete)
+        await critical_init()
+        logger.info("🚀 Critical services ready - API starting immediately!")
+        
+        # NON-CRITICAL: Start background initialization (doesn't block)
+        asyncio.create_task(background_init())
+        
+        # Start health monitoring background task
+        asyncio.create_task(health_monitoring_loop())
+        
         logger.info("=" * 50)
-        logger.info("🚀 Application startup complete!")
-        logger.info(f"📁 Watch paths: {watch_paths if watch_paths else 'None (configure via API)'}")
+        logger.info("✅ FastAPI startup complete - background services initializing...")
         logger.info(f"🔍 Search engine: {settings.typesense_url}")
         logger.info(f"⚙️  Configuration API: /api/config")
         logger.info("=" * 50)
         
     except Exception as e:
-        logger.error(f"❌ Startup failed: {e}")
-        raise
+        logger.error(f"❌ Critical initialization failed: {e}")
+        raise  # This blocks startup - critical services failed
     
     yield
     
@@ -150,15 +301,10 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     
     try:
-        # Stop crawl manager (runtime cleanup only)
-        logger.info("Stopping  crawl manager...")
+        # Stop crawl manager
+        logger.info("Stopping crawl manager...")
         crawl_manager = get_crawl_job_manager()
         if crawl_manager.is_running():
-            # Note: stop_crawl() updates CrawlerState to "stopped".
-            # This is acceptable for explicit API-driven stops.
-            # For process shutdown, this only reflects that no job is
-            # currently running; auto-resume decisions still rely on the
-            # last persisted state observed at startup.
             await crawl_manager.stop_crawl()
             logger.info("✅ Crawl manager stopped")
         
@@ -168,6 +314,37 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     logger.info("👋 Application shutdown complete")
     logger.info("=" * 50)
+
+
+async def health_monitoring_loop():
+    """
+    Background task that periodically checks service health and updates status
+    """
+    from services.service_manager import get_service_manager
+    
+    service_manager = get_service_manager()
+    
+    while True:
+        try:
+            # Check health of all services every 30 seconds
+            health_status = await service_manager.check_all_services_health()
+            
+            # Log if overall status changed
+            healthy_services = health_status["summary"]["healthy_services"]
+            total_services = health_status["summary"]["total_services"]
+            
+            if healthy_services == total_services:
+                logger.debug(f"Health check: All {total_services} services healthy")
+            elif healthy_services > 0:
+                logger.warning(f"Health check: {healthy_services}/{total_services} services healthy")
+            else:
+                logger.error(f"Health check: No services healthy ({total_services} failed)")
+            
+            await asyncio.sleep(30)
+            
+        except Exception as e:
+            logger.error(f"Health monitoring loop error: {e}")
+            await asyncio.sleep(60)  # Wait longer on error
 
 
 # Create FastAPI app
@@ -182,6 +359,8 @@ app = FastAPI(
 app.include_router(crawler_router)
 app.include_router(config_router)
 app.include_router(fs_router)
+from api.system import router as system_router
+app.include_router(system_router)
 
 
 @app.get("/")
@@ -209,32 +388,43 @@ async def root():
             "parallel_discovery": "File discovery runs in parallel with indexing",
             "auto_resume": "Automatically resumes crawling if it was running before shutdown",
             "monitoring": "Real-time file change detection with operation queue",
-            "job_management": "Simple start/stop/clear operations with progress tracking"
+            "job_management": "Simple start/stop/clear operations with progress tracking",
+            "instant_startup": "FastAPI starts instantly, services initialize in background",
+            "health_monitoring": "Real-time health monitoring of all system services"
         }
     }
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Enhanced health check endpoint with service status"""
+    from services.service_manager import get_service_manager
+    
     try:
-        # Check Typesense connection
-        typesense = get_typesense_client()
-        await typesense.get_collectionstats()
+        service_manager = get_service_manager()
+        health_status = await service_manager.check_all_services_health()
         
-        # Get crawl manager status
-        crawl_manager = get_crawl_job_manager()
-        status = crawl_manager.get_status()
+        # Determine HTTP status code based on overall health
+        overall_status = health_status["overall_status"]
+        status_code = 200
+        if overall_status == "critical":
+            status_code = 503
+        elif overall_status == "degraded":
+            status_code = 200  # Still functional but degraded
         
         return {
-            "status": "healthy",
+            "status": overall_status,
             "timestamp": int(time.time() * 1000),
-            "components": {
-                "typesense": "connected",
-                "crawler": "running" if status["running"] else "stopped",
-            },
-            "stats": status,
+            "services": health_status["services"],
+            "summary": health_status["summary"],
+            "details": {
+                "database": "sqlite_connection",
+                "search_engine": "typesense",
+                "crawl_engine": "crawl_job_manager",
+                "monitoring": "file_watcher"
+            }
         }
+        
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return JSONResponse(

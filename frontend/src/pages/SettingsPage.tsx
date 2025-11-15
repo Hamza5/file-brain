@@ -25,7 +25,7 @@ type SettingsState = {
 };
 
 export function SettingsPage() {
-  const { status } = useStatus();
+  const { status, systemInitialization, canUseCrawler, isInitializationComplete } = useStatus();
   const [settings, setSettings] = useState<SettingsState | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -203,14 +203,23 @@ export function SettingsPage() {
           >
             Crawler Controls
           </h3>
+          {/* System Initialization Status */}
+          {systemInitialization && !isInitializationComplete && (
+            <Message
+              severity={systemInitialization.overall_status === "critical" ? "error" : "warn"}
+              text={`${systemInitialization.message} (${systemInitialization.initialization_progress}% complete)`}
+              style={{ marginTop: "0.5rem" }}
+            />
+          )}
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
           <Button
             label="Start Crawl"
             icon="fas fa-play"
             onClick={handleStart}
-            disabled={running || busyAction !== null}
+            disabled={running || busyAction !== null || !canUseCrawler}
             loading={busyAction === "start"}
+            tooltip={!canUseCrawler ? "Crawler services are still initializing" : undefined}
           />
           <Button
             label="Stop Crawl"
@@ -225,8 +234,9 @@ export function SettingsPage() {
             icon="fas fa-trash"
             severity="danger"
             onClick={handleClear}
-            disabled={running || busyAction !== null}
+            disabled={running || busyAction !== null || !canUseCrawler}
             loading={busyAction === "clear"}
+            tooltip={!canUseCrawler ? "Search services are still initializing" : undefined}
           />
         </div>
       </Card>

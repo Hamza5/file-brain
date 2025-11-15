@@ -4,12 +4,15 @@
 Backend is a FastAPI service coordinating filesystem discovery, content extraction, and Typesense indexing with real time monitoring. Frontend is a minimal React InstantSearch client for search and triage.
 
 Key orchestrators:
-- [lifespan()](main.py:22) initializes DB, Typesense collection, and resumes prior jobs.
+- [critical_init()](main.py:23) initializes critical services (database) that block startup.
+- [background_init()](main.py:62) initializes non-critical services (Typesense, crawl manager, file watcher) in background.
+- [ServiceManager](services/service_manager.py:39) tracks service health and initialization status.
 - [CrawlJobManager](services/crawl_job_manager.py:46) runs discovery, indexing, and optional monitoring.
 - [FileWatcher](services/watcher.py:16) converts OS events into crawl operations.
+- [health_monitoring_loop()](main.py:317) performs continuous service health monitoring.
 
 ## Core components
-- API Routers: [router](api/crawler.py:25), [router](api/configuration.py:1)
+- API Routers: [router](api/crawler.py:25), [router](api/configuration.py:1), [router](api/system.py:1)
 - Settings: [Settings(BaseSettings)](config/settings.py:12)
 - DB: [Base](database/models/base.py:9), [SessionLocal](database/models/base.py:19)
 - Models: [CrawlerState](database/models/crawler_state.py:9), [Setting](database/models/setting.py:9), [WatchPath](database/models/watch_path.py:9)
@@ -18,7 +21,7 @@ Key orchestrators:
 - Operations: [OperationType](api/models/operations.py:10), [CrawlOperation](api/models/operations.py:17)
 
 ## Lifecycle
-1. Startup: [lifespan()](main.py:22) calls DB init, Typesense init, inspects [CrawlerState](database/models/crawler_state.py:9) and may resume via [start_crawl()](services/crawl_job_manager.py:74).
+1. Startup: [critical_init()](main.py:23) initializes database synchronously, [background_init()](main.py:62) starts non-critical services asynchronously, [health_monitoring_loop()](main.py:317) begins continuous monitoring.
 2. Running: discovery and indexing run concurrently; optional watcher streams changes.
 3. Shutdown: [stop_crawl()](services/crawl_job_manager.py:131) stops tasks and watcher.
 
@@ -58,6 +61,7 @@ Key orchestrators:
 - Stop: [stop_crawler()](api/crawler.py:146)
 - Clear indexes: [clear_all_indexes()](api/crawler.py:185)
 - Settings: [get_crawler_settings()](api/crawler.py:231), [update_crawler_settings()](api/crawler.py:248)
+- System: [get_initialization_status()](api/system.py:25) for service health and initialization status
 
 ## Frontend
 - InstantSearch client in [App.tsx](frontend/src/App.tsx:1) using Typesense adapter and index files.
@@ -70,7 +74,8 @@ Key orchestrators:
 ## Failure handling
 - Extraction fallback path in [ContentExtractor._extract_basic](services/extractor.py:119).
 - Queue timeouts and retries in [OperationEventHandler._enqueue_operation](services/watcher.py:180).
-- Health endpoint checks Typesense connectivity in [health_check](main.py:164).
+- Health endpoint checks Typesense connectivity in [health_check](main.py:396).
+- Service health monitoring with automatic retry and failure tracking.
 
 ## Diagram
 ```mermaid
@@ -86,7 +91,16 @@ Extractor --> Typesense
 Typesense --> Frontend
 DB --> CrawlJobManager
 DB --> API
+ServiceManager --> AllServices
+HealthMonitoring --> ServiceManager
 ```
+
+## Service Health Management
+- [ServiceManager](services/service_manager.py:39) tracks initialization state and health of all services
+- Health checkers registered for: database, typesense, crawl_manager, file_watcher
+- Background monitoring runs every 30 seconds to verify service health
+- Failed services are automatically retried with exponential backoff
+- API endpoints expose real-time service status to frontend
 
 ## Notes and extensions
 - Embeddings configured to ts e5 small v2; model can be swapped in [get_collection_schema()](config/typesense_schema.py:7).

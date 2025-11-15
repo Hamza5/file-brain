@@ -49,6 +49,12 @@ async def start_crawler(
     prior to calling this endpoint. Use the watch path endpoints to manage paths.
     """
     try:
+        from services.service_manager import get_service_manager, require_service
+        
+        # Check service readiness before starting crawl
+        require_service("crawl_manager")  # Will raise HTTPException if not ready
+        require_service("typesense")     # Will raise HTTPException if not ready
+        
         crawl_manager = get_crawl_job_manager()
         
         # Check if already running
@@ -127,13 +133,33 @@ async def start_crawler(
 
 @router.get("/status", response_model=CrawlStatusResponse)
 async def get_crawler_status(db: Session = Depends(get_db)):
-    """Get current crawl status and progress"""
+    """Get current crawl status and progress with service initialization info"""
     try:
+        from services.service_manager import get_service_manager
+        
+        service_manager = get_service_manager()
         crawl_manager = get_crawl_job_manager()
+        
+        # Get crawl manager status
         status_dict = crawl_manager.get_status()
         
+        # Get service initialization status
+        services_health = await service_manager.check_all_services_health()
+        
+        # Create enhanced status with service info
+        enhanced_status = status_dict.copy()
+        enhanced_status["services"] = services_health["services"]
+        enhanced_status["system_health"] = services_health["overall_status"]
+        
+        # Check if critical services are ready for crawl operations
+        typesense_ready = service_manager.is_service_ready("typesense")
+        crawl_manager_ready = service_manager.is_service_ready("crawl_manager")
+        
+        enhanced_status["crawl_available"] = typesense_ready and crawl_manager_ready
+        enhanced_status["degraded_mode"] = not typesense_ready
+        
         return CrawlStatusResponse(
-            status=status_dict,
+            status=enhanced_status,
             timestamp=int(time.time() * 1000),
         )
         
