@@ -1,4 +1,4 @@
-# Architecture: Smart File Finder
+# Architecture: File Brain
 
 ## Overview
 Backend is a FastAPI service coordinating filesystem discovery, content extraction, and Typesense indexing with real time monitoring. Frontend is a minimal React InstantSearch client for search and triage.

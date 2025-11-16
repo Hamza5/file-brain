@@ -115,7 +115,7 @@ export function AppShell({ children }: AppShellProps) {
             }}
           />
           <div>
-            <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>Smart File Finder</div>
+            <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>File Brain</div>
             <div style={{ fontSize: "0.75rem", color: "var(--text-color-secondary)" }}>
               Crawler & Search Console
             </div>

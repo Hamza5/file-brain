@@ -1,4 +1,4 @@
-# Context: Smart File Finder
+# Context: File Brain
 
 ## Current focus
 - Provide a full crawler & search console UI over the existing FastAPI + Typesense backend.
@@ -101,7 +101,7 @@
 - Frontend hybrid behavior:
   - Currently configured globally via additionalSearchParameters; no per-query toggle.
 - Service Health Monitoring:
-  - Health checkers must use correct method names and SQLAlchemy syntax to avoid false failures
+  - Health checkers must use correct method names and SQL syntax to avoid false failures
   - Services without health checkers rely on initialization state rather than active monitoring
 
 ## Next steps

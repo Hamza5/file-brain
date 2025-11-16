@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 Base = declarative_base()
 
 # Database setup
-DATABASE_URL = "sqlite:///./smart_file_finder.db"
+DATABASE_URL = "sqlite:///./file_brain.db"
 
 engine = create_engine(
     DATABASE_URL,

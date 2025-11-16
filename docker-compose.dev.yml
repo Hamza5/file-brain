@@ -2,7 +2,7 @@ services:
   # Apache Tika Server (Docker-based content extraction)
   tika:
     image: apache/tika:latest-full
-    container_name: smart-file-finder-tika
+    container_name: file-brain-tika
     network_mode: "host"
     environment:
       # Tika runs on port 9998 by default
@@ -23,7 +23,7 @@ services:
   # Typesense Search Engine (with GPU support for embeddings)
   typesense:
     image: typesense/typesense:29.0
-    container_name: smart-file-finder-typesense
+    container_name: file-brain-typesense
     network_mode: "host"
     environment:
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}

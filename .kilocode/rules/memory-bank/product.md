@@ -1,7 +1,7 @@
-# Product: Smart File Finder
+# Product: File Brain
 
 ## Why this exists
-Smart File Finder enables fast, reliable search across large local file collections with intelligent content extraction and real‑time updates. It reduces time spent locating documents, supports knowledge reuse, and keeps indexes fresh automatically.
+File Brain enables fast, reliable search across large local file collections with intelligent content extraction and real‑time updates. It reduces time spent locating documents, supports knowledge reuse, and keeps indexes fresh automatically.
 
 ## Problems it solves
 - Slow or incomplete OS/file-manager search.

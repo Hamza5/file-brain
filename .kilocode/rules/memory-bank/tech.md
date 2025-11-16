@@ -1,4 +1,4 @@
-# Tech: Smart File Finder
+# Tech: File Brain
 
 ## Stack overview
 - Backend: FastAPI with lifecycle [lifespan()](main.py:22) and routers [router](api/crawler.py:25), [router](api/configuration.py:1), [router](api/system.py:1).

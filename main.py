@@ -1,5 +1,5 @@
 """
-Smart File Finder - Advanced file search engine powered by AI
+File Brain - Advanced file search engine powered by AI
 """
 import asyncio
 from datetime import datetime

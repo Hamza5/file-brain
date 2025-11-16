@@ -29,7 +29,7 @@ def get_app_info() -> tuple[str, str, str]:
                 
                 project = data.get("project", {})
                 
-                name = project.get("name", "smart-file-finder")
+                name = project.get("name", "file-brain")
                 version = project.get("version", "0.0.1")
                 description = project.get("description", "Advanced file search engine powered by AI")
                 
@@ -40,7 +40,7 @@ def get_app_info() -> tuple[str, str, str]:
                 break
     
     # Fallback values if pyproject.toml not found
-    return "smart-file-finder", "0.0.1", "Advanced file search engine powered by AI"
+    return "file-brain", "0.0.1", "Advanced file search engine powered by AI"
 
 
 def get_app_name() -> str:

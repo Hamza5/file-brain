@@ -52,4 +52,4 @@ def setup_logger(
 
 
 # Create default logger
-logger = setup_logger("smart_file_finder")
+logger = setup_logger("file_brain")
