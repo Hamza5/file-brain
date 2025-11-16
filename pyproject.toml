@@ -1,6 +1,6 @@
 [project]
 name = "file-brain"
-version = "0.0.15"
+version = "0.0.16"
 description = "Advanced file search engine powered by AI"
 authors = [
     {name = "Hamza Abbad",email = "hamza.abbad@gmail.com"}

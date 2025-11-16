@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # Crawler
     watch_paths: str = Field(default="")  # Comma-separated paths
     max_file_size_mb: int = Field(default=100)
+    
+    # Index Verification Settings
+    verify_index_on_crawl: bool = Field(default=True, description="Verify indexed files exist and are accessible during crawl")
+    verification_batch_size: int = Field(default=100, description="Number of files to process in each verification batch")
+    max_verification_files: int = Field(default=10000, description="Maximum number of files to verify in a single run")
+    cleanup_orphaned_files: bool = Field(default=True, description="Automatically clean up orphaned index entries")
 
     # Processing
     batch_size: int = Field(default=10)

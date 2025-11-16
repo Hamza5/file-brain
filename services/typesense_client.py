@@ -3,7 +3,7 @@ Typesense client for search operations
 """
 import hashlib
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import time
 
 import typesense
@@ -331,6 +331,68 @@ class TypesenseClient:
         except Exception as e:
             logger.error(f"Error clearing documents: {e}")
             raise
+    
+    async def get_all_indexed_files(self, limit: int = 1000, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Get all indexed files with pagination for verification.
+        
+        Returns list of documents with file_path, file_hash, and other metadata.
+        Used to detect orphaned index entries by comparing with filesystem.
+        """
+        try:
+            results = self.client.collections[self.collection_name].documents.search({
+                "q": "*",
+                "per_page": limit,
+                "page": (offset // limit) + 1,
+                "include_fields": "file_path,file_hash,file_name,file_size,modified_time,indexed_at",
+                "exclude_fields": "content,embedding"
+            })
+            
+            return results.get("hits", [])
+        except Exception as e:
+            logger.error(f"Error getting indexed files: {e}")
+            return []
+    
+    async def get_indexed_files_count(self) -> int:
+        """Get total count of indexed files for verification progress tracking"""
+        try:
+            results = self.client.collections[self.collection_name].documents.search({
+                "q": "*",
+                "per_page": 1
+            })
+            return results.get("found", 0)
+        except Exception as e:
+            logger.error(f"Error getting indexed files count: {e}")
+            return 0
+    
+    async def batch_remove_files(self, file_paths: List[str]) -> Dict[str, int]:
+        """
+        Remove multiple files from index efficiently.
+        
+        Returns dict with 'successful' and 'failed' counts.
+        """
+        successful = 0
+        failed = 0
+        
+        for file_path in file_paths:
+            try:
+                doc_id = self.generate_doc_id(file_path)
+                self.client.collections[self.collection_name].documents[doc_id].delete()
+                successful += 1
+                logger.debug(f"Removed orphaned index entry: {file_path}")
+            except typesense.exceptions.ObjectNotFound:
+                # File already not in index, count as successful
+                successful += 1
+                logger.debug(f"Orphaned file already removed: {file_path}")
+            except Exception as e:
+                failed += 1
+                logger.error(f"Failed to remove orphaned index entry {file_path}: {e}")
+        
+        logger.info(f"Batch cleanup completed: {successful} successful, {failed} failed")
+        return {
+            "successful": successful,
+            "failed": failed
+        }
 
 
 # Global client instance

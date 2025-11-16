@@ -8,6 +8,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from config.settings import settings
 from database.models import init_db, init_default_data, SessionLocal
@@ -407,10 +410,58 @@ app.include_router(fs_router)
 from api.system import router as system_router
 app.include_router(system_router)
 
+# Serve frontend static files
+# Mount assets directory for CSS, JS, fonts, etc.
+frontend_assets_path = os.path.join(os.path.dirname(__file__), "frontend", "dist", "assets")
+if os.path.exists(frontend_assets_path):
+    app.mount("/assets", StaticFiles(directory=frontend_assets_path), name="frontend_assets")
 
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
+# Serve icon file
+frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+if os.path.exists(frontend_dist_path):
+    @app.get("/favicon.svg")
+    async def serve_icon():
+        icon_path = os.path.join(frontend_dist_path, "favicon.svg")
+        if os.path.exists(icon_path):
+            return FileResponse(icon_path)
+        return {"error": "Icon not found"}
+
+    @app.get("/")
+    async def serve_frontend():
+        """Serve the frontend application"""
+        index_path = os.path.join(frontend_dist_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        # Fallback to API info if frontend not built
+        return {
+            "name": settings.app_name,
+            "version": settings.app_version,
+            "status": "running",
+        }
+
+    # Catch-all route for SPA routing - serve index.html for non-API routes
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve SPA routes - anything that's not an API route"""
+        # Skip API routes
+        if full_path.startswith("api/"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=404,
+                content={"error": "API endpoint not found", "path": f"/{full_path}"}
+            )
+        
+        # Serve index.html for frontend routes
+        index_path = os.path.join(frontend_dist_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        
+        return {"error": "Frontend not available"}
+
+
+@app.get("/api/info")
+async def api_info():
+    """API information endpoint (alternative to root for API clients)"""
     return {
         "name": settings.app_name,
         "version": settings.app_version,

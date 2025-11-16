@@ -456,3 +456,93 @@ async def update_crawler_settings(
         logger.error(f"Error updating crawler settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/verify-index", response_model=Dict[str, Any])
+async def verify_indexed_files(db: Session = Depends(get_db)):
+    """
+    Manually trigger index verification to detect and clean up orphaned entries.
+    
+    This will check all indexed files to see if they still exist and are accessible.
+    Orphaned entries (files that no longer exist) will be automatically cleaned up.
+    """
+    try:
+        crawl_manager = get_crawl_job_manager()
+        
+        # Don't allow verification while crawl is running
+        if crawl_manager.is_running():
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot verify index while crawl job is running. Stop the crawl first."
+            )
+        
+        logger.info("Manual index verification triggered via API...")
+        
+        # Get watch paths from database for verification
+        db_service = DatabaseService(db)
+        watch_path_models = db_service.list_watch_paths(enabled_only=True)
+        watch_paths = [wp.path for wp in watch_path_models]
+        
+        if not watch_paths:
+            raise HTTPException(
+                status_code=400,
+                detail="No watch paths configured for verification"
+            )
+        
+        # Run verification
+        verification_stats = await crawl_manager.verify_indexed_files(watch_paths)
+        
+        logger.info(f"Manual index verification completed: {verification_stats}")
+        
+        return {
+            "success": True,
+            "message": f"Index verification completed. "
+                      f"Found {verification_stats['orphaned_found']} orphaned entries out of "
+                      f"{verification_stats['total_indexed']} total indexed files.",
+            "stats": verification_stats,
+            "timestamp": int(time.time() * 1000),
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during index verification: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/verification-status")
+async def get_verification_status(db: Session = Depends(get_db)):
+    """
+    Get information about index verification settings and last verification stats.
+    """
+    try:
+        from config.settings import settings
+        
+        crawl_manager = get_crawl_job_manager()
+        
+        # Get current index count
+        typesense_client = get_typesense_client()
+        try:
+            total_indexed = await typesense_client.get_indexed_files_count()
+        except Exception as e:
+            logger.warning(f"Could not get index count: {e}")
+            total_indexed = 0
+        
+        return {
+            "verification_settings": {
+                "verify_index_on_crawl": settings.verify_index_on_crawl,
+                "verification_batch_size": settings.verification_batch_size,
+                "max_verification_files": settings.max_verification_files,
+                "cleanup_orphaned_files": settings.cleanup_orphaned_files,
+            },
+            "index_stats": {
+                "total_indexed_files": total_indexed,
+            },
+            "crawler_status": {
+                "is_running": crawl_manager.is_running(),
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting verification status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

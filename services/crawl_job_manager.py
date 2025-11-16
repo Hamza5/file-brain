@@ -1,5 +1,5 @@
 """
-CrawlJobManager with File Monitoring Integration
+CrawlJobManager with File Monitoring Integration and Index Verification
 """
 import os
 import hashlib
@@ -8,7 +8,7 @@ import asyncio
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Callable
+from typing import List, Optional, Dict, Any, Callable, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
@@ -371,24 +371,41 @@ class CrawlJobManager:
                 logger.error(f"Error stopping file monitoring: {e}")
     
     async def _run_crawl_job(self, watch_paths: List['WatchPath']) -> None:
-        """Main crawl job coordinator - runs parallel discovery and indexing"""
+        """Main crawl job coordinator - runs index verification, parallel discovery and indexing"""
         try:
-            logger.info("Starting parallel file discovery and indexing...")
+            # Convert WatchPath objects to strings for verification
+            path_strs = [wp.path for wp in watch_paths]
+            
+            logger.info("Starting crawl job with index verification and parallel processing...")
 
-            # Start parallel discovery and indexing
-            self._discovery_task = asyncio.create_task(self._discover_files(watch_paths))
-            self._indexing_task = asyncio.create_task(self._index_files())
+            # Step 1: Verify indexed files and clean up orphaned entries
+            if not self._stop_event.is_set():
+                logger.info("Step 1: Verifying existing index for orphaned entries...")
+                verification_stats = await self.verify_indexed_files(path_strs)
+                
+                if verification_stats["orphaned_found"] > 0:
+                    logger.info(f"Cleaned up {verification_stats['orphaned_found']} orphaned index entries")
+                
+                if verification_stats["total_indexed"] > 0:
+                    verification_pct = (verification_stats["verified_accessible"] / verification_stats["total_indexed"]) * 100
+                    logger.info(f"Index verification: {verification_pct:.1f}% of {verification_stats['total_indexed']} files are still accessible")
 
-            # Wait for both to complete or be cancelled
-            await asyncio.gather(
-                self._discovery_task,
-                self._indexing_task,
-                return_exceptions=True,
-            )
+            # Step 2: Start parallel discovery and indexing (only if not stopped)
+            if not self._stop_event.is_set():
+                logger.info("Step 2: Starting parallel file discovery and indexing...")
+                self._discovery_task = asyncio.create_task(self._discover_files(watch_paths))
+                self._indexing_task = asyncio.create_task(self._index_files())
+
+                # Wait for both to complete or be cancelled
+                await asyncio.gather(
+                    self._discovery_task,
+                    self._indexing_task,
+                    return_exceptions=True,
+                )
 
             if not self._stop_event.is_set():
                 # Normal completion
-                logger.info("Crawl job completed")
+                logger.info("Crawl job completed successfully")
             else:
                 logger.info("Crawl job cancelled via stop request")
         except Exception as e:
@@ -683,9 +700,21 @@ class CrawlJobManager:
             logger.info(f"Stop requested before processing {file_path}; skipping.")
             return False
 
-        # Check if file still exists
-        if not os.path.exists(file_path):
-            logger.warning(f"File no longer exists: {file_path}")
+        # Comprehensive file accessibility check
+        is_accessible, accessibility_reason = self._check_file_accessibility(file_path)
+        if not is_accessible:
+            logger.warning(f"File not accessible: {file_path} - {accessibility_reason}")
+            
+            # If file is inaccessible but was previously indexed, try to remove from index
+            try:
+                existing_doc = await self.typesense.get_doc_by_path(file_path)
+                if existing_doc:
+                    logger.info(f"Removing inaccessible file from index: {file_path}")
+                    await self.typesense.remove_from_index(file_path)
+                    return True  # Consider this successful cleanup
+            except Exception as e:
+                logger.error(f"Failed to remove inaccessible file from index {file_path}: {e}")
+            
             return False
 
         # Check file size
@@ -804,6 +833,199 @@ class CrawlJobManager:
                 return ""
 
         return await self._run_in_executor(_hash)
+    
+    def _check_file_accessibility(self, file_path: str) -> Tuple[bool, str]:
+        """
+        Comprehensive file accessibility check.
+        
+        Returns:
+            Tuple of (is_accessible, reason_if_not_accessible)
+        """
+        try:
+            # Basic existence check
+            if not os.path.exists(file_path):
+                return False, "File does not exist"
+            
+            # Check if it's a file (not directory)
+            if not os.path.isfile(file_path):
+                return False, "Path is not a file"
+            
+            # Check for broken symlinks
+            if os.path.islink(file_path):
+                try:
+                    os.stat(file_path)
+                except OSError:
+                    return False, "Broken symbolic link"
+            
+            # Check read permissions
+            if not os.access(file_path, os.R_OK):
+                return False, "File is not readable"
+            
+            # Check if file size is accessible (try to get stats)
+            try:
+                stats = os.stat(file_path)
+                if stats.st_size == 0:
+                    return False, "File is empty"
+            except OSError:
+                return False, "Cannot access file stats"
+            
+            return True, "File is accessible"
+            
+        except Exception as e:
+            return False, f"File accessibility check failed: {e}"
+    
+    async def verify_indexed_files(self, watch_paths: List[str]) -> Dict[str, int]:
+        """
+        Verify all indexed files still exist and are accessible.
+        
+        Returns dictionary with verification statistics:
+        - total_indexed: Total files in index
+        - verified_accessible: Files that are still accessible
+        - orphaned_found: Files that no longer exist or are inaccessible
+        - verification_errors: Errors during verification process
+        """
+        from config.settings import settings
+        
+        # Check if verification is enabled
+        if not settings.verify_index_on_crawl:
+            logger.info("Index verification is disabled in settings")
+            return {"total_indexed": 0, "verified_accessible": 0, "orphaned_found": 0, "verification_errors": 0}
+        
+        logger.info("Starting index verification to detect orphaned entries...")
+        
+        stats = {
+            "total_indexed": 0,
+            "verified_accessible": 0,
+            "orphaned_found": 0,
+            "verification_errors": 0
+        }
+        
+        orphaned_files = []
+        
+        try:
+            # Get total count of indexed files
+            stats["total_indexed"] = await self.typesense.get_indexed_files_count()
+            
+            if stats["total_indexed"] == 0:
+                logger.info("No indexed files to verify")
+                return stats
+            
+            # Limit verification to max files setting
+            if stats["total_indexed"] > settings.max_verification_files:
+                logger.warning(f"Too many files to verify ({stats['total_indexed']}). Limiting to {settings.max_verification_files}")
+                stats["total_indexed"] = settings.max_verification_files
+            
+            logger.info(f"Verifying {stats['total_indexed']} indexed files...")
+            
+            # Process files in batches to avoid memory issues
+            batch_size = settings.verification_batch_size
+            processed = 0
+            
+            while processed < stats["total_indexed"]:
+                if self._stop_event.is_set():
+                    logger.info("Verification cancelled due to stop event")
+                    break
+                
+                # Get batch of indexed files
+                indexed_files = await self.typesense.get_all_indexed_files(
+                    limit=batch_size,
+                    offset=processed
+                )
+                
+                if not indexed_files:
+                    break
+                
+                logger.debug(f"Verifying batch {processed//batch_size + 1}: {len(indexed_files)} files")
+                
+                # Check accessibility of each file
+                for indexed_doc in indexed_files:
+                    if self._stop_event.is_set():
+                        break
+                    
+                    file_path = indexed_doc.get("document", {}).get("file_path")
+                    if not file_path:
+                        stats["verification_errors"] += 1
+                        continue
+                    
+                    # Skip files outside watch paths (they might be moved)
+                    if not any(file_path.startswith(watch_path) for watch_path in watch_paths):
+                        logger.debug(f"Skipping file outside watch paths: {file_path}")
+                        continue
+                    
+                    is_accessible, reason = self._check_file_accessibility(file_path)
+                    
+                    if is_accessible:
+                        stats["verified_accessible"] += 1
+                        logger.debug(f"Verified accessible: {file_path}")
+                    else:
+                        stats["orphaned_found"] += 1
+                        orphaned_files.append(file_path)
+                        logger.warning(f"Found orphaned index entry: {file_path} - {reason}")
+                
+                processed += len(indexed_files)
+                
+                # Log progress every 1000 files
+                if processed % 1000 == 0:
+                    progress_pct = (processed / stats["total_indexed"]) * 100
+                    logger.info(f"Verification progress: {processed}/{stats['total_indexed']} ({progress_pct:.1f}%)")
+            
+            # Clean up orphaned files if any found and cleanup is enabled
+            if orphaned_files and not self._stop_event.is_set() and settings.cleanup_orphaned_files:
+                logger.info(f"Cleaning up {len(orphaned_files)} orphaned index entries...")
+                cleanup_result = await self._run_orphaned_cleanup(orphaned_files)
+                
+                if cleanup_result > 0:
+                    logger.info(f"Successfully cleaned up {cleanup_result} orphaned index entries")
+                    # Update the orphaned count to reflect actual cleanup
+                    stats["orphaned_found"] = cleanup_result
+            elif orphaned_files and not settings.cleanup_orphaned_files:
+                logger.info(f"Found {len(orphaned_files)} orphaned index entries, but cleanup is disabled")
+            
+        except Exception as e:
+            logger.error(f"Error during index verification: {e}")
+            stats["verification_errors"] += 1
+        
+        logger.info(f"Index verification completed: {stats}")
+        return stats
+    
+    async def _run_orphaned_cleanup(self, orphaned_files: List[str]) -> int:
+        """
+        Clean up orphaned index entries in batches.
+        
+        Returns number of successfully cleaned up files.
+        """
+        if not orphaned_files:
+            return 0
+        
+        batch_size = 50  # Process in smaller batches for better performance
+        
+        total_cleaned = 0
+        total_failed = 0
+        
+        for i in range(0, len(orphaned_files), batch_size):
+            if self._stop_event.is_set():
+                logger.info("Orphaned cleanup cancelled due to stop event")
+                break
+            
+            batch = orphaned_files[i:i + batch_size]
+            
+            try:
+                result = await self.typesense.batch_remove_files(batch)
+                total_cleaned += result["successful"]
+                total_failed += result["failed"]
+                
+                logger.debug(f"Cleaned up batch {i//batch_size + 1}: {result}")
+                
+            except Exception as e:
+                logger.error(f"Error cleaning up orphaned batch {i//batch_size + 1}: {e}")
+                total_failed += len(batch)
+        
+        if total_failed == 0:
+            logger.info(f"Successfully cleaned up all {total_cleaned} orphaned index entries")
+        else:
+            logger.warning(f"Cleaned up {total_cleaned} orphaned entries, {total_failed} failed")
+        
+        return total_cleaned
 
 
 # Global crawl job manager instance
