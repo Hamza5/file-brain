@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 import chardet
 
 from api.models.file_event import DocumentContent
+from config.settings import settings
 from utils.logger import logger
 
 # Import Tika
@@ -19,6 +20,13 @@ from tika import parser
 
 class ContentExtractor:
     """Document content extractor using Apache Tika"""
+    
+    def __init__(self):
+        """Initialize the content extractor with Tika configuration"""
+        # Configure tika-python for client-only mode when Docker Tika is enabled
+        if settings.tika_enabled and settings.tika_client_only:
+            os.environ['TIKA_CLIENT_ONLY'] = 'True'
+            logger.info(f"Configured Tika client-only mode for endpoint: {settings.tika_url}")
     
     def extract(self, file_path: str) -> DocumentContent:
         """
@@ -37,6 +45,11 @@ class ContentExtractor:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         
+        # Check if Tika is enabled
+        if not settings.tika_enabled:
+            logger.info("Tika extraction disabled, using basic extraction")
+            return self._extract_basic(file_path)
+        
         # Try Tika extraction
         try:
             return self._extract_with_tika(file_path)
@@ -52,8 +65,15 @@ class ContentExtractor:
         logger.info(f"Extracting with Tika: {file_path}")
         
         try:
+            # Configure Tika endpoint
+            tika_endpoint = settings.tika_url if settings.tika_client_only else None
+            
             # Parse the file using Tika
-            parsed = parser.from_file(file_path)
+            if tika_endpoint:
+                logger.debug(f"Using Tika endpoint: {tika_endpoint}")
+                parsed = parser.from_file(file_path, tika_endpoint)
+            else:
+                parsed = parser.from_file(file_path)
             
             if not parsed or 'content' not in parsed:
                 logger.warning(f"Tika returned empty result for {file_path}")
@@ -71,12 +91,24 @@ class ContentExtractor:
             raw_metadata = parsed.get('metadata', {})
             metadata = self._process_tika_metadata(raw_metadata)
             
+            # Add Tika endpoint information to metadata
+            if tika_endpoint:
+                metadata['tika_endpoint'] = tika_endpoint
+            
             logger.info(f"Successfully extracted {len(content)} characters from {file_path}")
             
             return DocumentContent(content=content, metadata=metadata)
             
+        except ConnectionError as e:
+            logger.error(f"Connection error to Tika server {settings.tika_url}: {e}")
+            logger.info("Ensure Tika Docker container is running on the configured port")
+            raise
         except Exception as e:
             logger.error(f"Error during Tika extraction of {file_path}: {e}")
+            # Enhanced error handling for Docker connectivity
+            if "Connection refused" in str(e) or "Failed to connect" in str(e):
+                logger.error(f"Cannot connect to Tika server at {settings.tika_url}")
+                logger.error("Please ensure the Tika Docker container is running: docker run -p 9998:9998 apache/tika:latest-full")
             raise
     
     def _process_tika_metadata(self, raw_metadata: Dict[str, Any]) -> Dict[str, Any]:

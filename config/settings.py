@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     typesense_host: str = Field(default="localhost")
     typesense_port: int = Field(default=8108)
     typesense_protocol: str = Field(default="http")
-    typesense_api_key: str = Field(default="xyz")
+    typesense_api_key: str = Field(default="xyz-typesense-key")
     typesense_collection_name: str = Field(default="files")
 
     # Crawler
@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # Processing
     batch_size: int = Field(default=10)
     worker_queue_size: int = Field(default=1000)
+    
+    # Tika Server (Docker-based)
+    tika_host: str = Field(default="localhost")
+    tika_port: int = Field(default=9998)
+    tika_protocol: str = Field(default="http")
+    tika_enabled: bool = Field(default=True)
+    tika_client_only: bool = Field(default=True)
     
     # Initial scan (removed - now uses auto-resume based on previous state)
     
@@ -59,6 +66,11 @@ class Settings(BaseSettings):
     def typesense_url(self) -> str:
         """Get full Typesense URL"""
         return f"{self.typesense_protocol}://{self.typesense_host}:{self.typesense_port}"
+
+    @property
+    def tika_url(self) -> str:
+        """Get full Tika Server URL"""
+        return f"{self.tika_protocol}://{self.tika_host}:{self.tika_port}"
 
 
 # Global settings instance

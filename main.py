@@ -107,6 +107,50 @@ async def background_init():
     except Exception as e:
         service_manager.set_failed("typesense", f"Typesense setup error: {e}")
     
+    # Tika initialization (non-blocking)
+    if settings.tika_enabled:
+        try:
+            logger.info("Starting Tika initialization in background...")
+            
+            # Register Tika health checker
+            async def tika_health_check():
+                try:
+                    import aiohttp
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"{settings.tika_url}/tika", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                            if response.status == 200:
+                                return {"healthy": True, "endpoint": settings.tika_url, "client_only": settings.tika_client_only}
+                            else:
+                                return {"healthy": False, "error": f"Tika server returned status {response.status}"}
+                except asyncio.TimeoutError:
+                    return {"healthy": False, "error": "Tika server timeout"}
+                except Exception as e:
+                    return {"healthy": False, "error": str(e)}
+            
+            service_manager.register_health_checker("tika", tika_health_check)
+            
+            # Start background initialization
+            async def init_tika():
+                try:
+                    # Just mark as ready since Tika runs in separate container
+                    service_manager.set_ready("tika", details={
+                        "endpoint": settings.tika_url,
+                        "client_only": settings.tika_client_only,
+                        "enabled": settings.tika_enabled
+                    })
+                    logger.info("✅ Tika initialized in background")
+                    
+                except Exception as e:
+                    service_manager.set_failed("tika", f"Tika initialization error: {e}")
+            
+            service_manager.start_background_initialization("tika", init_tika, dependencies=["database"])
+            
+        except Exception as e:
+            service_manager.set_failed("tika", f"Tika setup error: {e}")
+    else:
+        logger.info("Tika extraction disabled via configuration")
+        service_manager.set_disabled("tika", "Tika extraction disabled in settings")
+    
     # Crawl Manager initialization (non-blocking)
     try:
         logger.info("Starting crawl manager initialization in background...")
@@ -286,6 +330,7 @@ async def lifespan(app: FastAPI):
         logger.info("=" * 50)
         logger.info("✅ FastAPI startup complete - background services initializing...")
         logger.info(f"🔍 Search engine: {settings.typesense_url}")
+        logger.info(f"⚙️  Content extraction: Tika Docker ({settings.tika_url})")
         logger.info(f"⚙️  Configuration API: /api/config")
         logger.info("=" * 50)
         
@@ -390,7 +435,8 @@ async def root():
             "monitoring": "Real-time file change detection with operation queue",
             "job_management": "Simple start/stop/clear operations with progress tracking",
             "instant_startup": "FastAPI starts instantly, services initialize in background",
-            "health_monitoring": "Real-time health monitoring of all system services"
+            "health_monitoring": "Real-time health monitoring of all system services",
+            "docker_tika": "Apache Tika content extraction via Docker container"
         }
     }
 
@@ -420,6 +466,7 @@ async def health_check():
             "details": {
                 "database": "sqlite_connection",
                 "search_engine": "typesense",
+                "content_extraction": "tika_docker" if settings.tika_enabled else "disabled",
                 "crawl_engine": "crawl_job_manager",
                 "monitoring": "file_watcher"
             }

@@ -1,0 +1,59 @@
+services:
+  # Apache Tika Server (Docker-based content extraction)
+  tika:
+    image: apache/tika:latest-full
+    container_name: smart-file-finder-tika
+    network_mode: "host"
+    environment:
+      # Tika runs on port 9998 by default
+      TIKA_PORT: 9998
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9998/tika"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Typesense Search Engine (with GPU support for embeddings)
+  typesense:
+    image: typesense/typesense:29.0
+    container_name: smart-file-finder-typesense
+    network_mode: "host"
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}
+      TYPESENSE_DATA_DIR: /data
+    volumes:
+      - typesense-data:/data
+    command: >
+      --data-dir /data
+      --api-key=${TYPESENSE_API_KEY:-xyz-typesense-key}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8108/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named volumes for data persistence
+volumes:
+  typesense-data:
+    driver: local

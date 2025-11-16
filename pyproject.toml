@@ -1,6 +1,6 @@
 [project]
 name = "smart-file-finder"
-version = "0.0.13"
+version = "0.0.14"
 description = "Advanced file search engine powered by AI"
 authors = [
     {name = "Hamza Abbad",email = "hamza.abbad@gmail.com"}
@@ -16,7 +16,8 @@ dependencies = [
     "fastapi[standard-no-fastapi-cloud-cli] (>=0.121.0,<0.122.0)",
     "sqlalchemy (>=2.0.44,<3.0.0)",
     "tika (>=3.1.0,<4.0.0)",
-    "chardet (>=5.2.0,<6.0.0)"
+    "chardet (>=5.2.0,<6.0.0)",
+    "aiohttp (>=3.13.2,<4.0.0)"
 ]
 
 

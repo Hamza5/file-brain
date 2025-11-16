@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 import threading
 
+from config.settings import settings
 from utils.logger import logger
 
 
@@ -50,7 +51,11 @@ class ServiceManager:
             ),
             "typesense": ServiceStatus(
                 dependencies=["database"],
-                details={"host": "localhost", "port": 8108, "protocol": "http"}
+                details={"host": settings.typesense_host, "port": settings.typesense_port, "protocol": settings.typesense_protocol}
+            ),
+            "tika": ServiceStatus(
+                dependencies=["database"],
+                details={"host": settings.tika_host, "port": settings.tika_port, "protocol": settings.tika_protocol, "enabled": settings.tika_enabled}
             ),
             "crawl_manager": ServiceStatus(
                 dependencies=["database"],
