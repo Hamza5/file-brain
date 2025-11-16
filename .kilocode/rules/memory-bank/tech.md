@@ -1,7 +1,7 @@
 # Tech: File Brain
 
 ## Stack overview
-- Backend: FastAPI with lifecycle [lifespan()](main.py:22) and routers [router](api/crawler.py:25), [router](api/configuration.py:1), [router](api/system.py:1).
+- Backend: FastAPI with lifecycle [lifespan()](main.py:22) and routers [router](api/crawler.py:25), [router](api/configuration.py:1), [router](api/system.py:1), [router](api/files.py:1).
 - Persistence: SQLAlchemy + SQLite at [DATABASE_URL](database/models/base.py:12) and session [SessionLocal](database/models/base.py:19).
 - Search: Typesense via [TypesenseClient](services/typesense_client.py:14) and schema [get_collection_schema()](config/typesense_schema.py:7).
 - Extraction: Apache Tika via [ContentExtractor](services/extractor.py:23) with fallback [ContentExtractor._extract_basic](services/extractor.py:119).
@@ -9,6 +9,8 @@
 - Orchestration: [CrawlJobManager](services/crawl_job_manager.py:46) with status [get_status()](services/crawl_job_manager.py:182).
 - Service Management: [ServiceManager](services/service_manager.py:39) for centralized health monitoring and initialization tracking.
 - Frontend: React + Vite InstantSearch in [App.tsx](frontend/src/App.tsx:1).
+- **New**: File operations API with [files_router](api/files.py:1) for interactive file management.
+- **New**: Frontend file operations service [fileOperations.ts](frontend/src/services/fileOperations.ts:1) for handling file management operations.
 
 ## Dependencies and versions
 - Python 3.11
@@ -21,6 +23,8 @@
 - typesense >=1.1.1,<2 ([pyproject.toml](pyproject.toml:15))
 - python-magic >=0.4.27,<0.5 ([pyproject.toml](pyproject.toml:16))
 - Frontend libs: typesense-instantsearch-adapter (see [App.tsx](frontend/src/App.tsx:1), [package.json](frontend/package.json:1))
+
+**Current Version**: 0.0.17 (see [pyproject.toml](pyproject.toml:3))
 
 ## Local services
 - Typesense server required; defaults from [settings.typesense_*](config/settings.py:29).
@@ -81,6 +85,19 @@ npm run dev
 - Health endpoint [health_check](main.py:396).
 - Logging configured in [logger](utils/logger.py:55).
 
+## File Operations API
+- **Router**: [router](api/files.py:1) provides REST endpoints for file management operations
+- **Supported Operations**: 
+  - Open files (system default application)
+  - Delete files (with confirmation)
+  - Move files to new locations
+  - Copy files with destination selection
+  - Rename files with validation
+  - File property inspection
+- **Frontend Integration**: [fileOperations.ts](frontend/src/services/fileOperations.ts:1) service handles API communication
+- **State Management**: [FileSelectionContext](frontend/src/context/FileSelectionContext.tsx:1) for selection state
+- **User Feedback**: Integration with [NotificationContext](frontend/src/context/NotificationContext.tsx:1) for operation status
+
 ## Service Management and Health Monitoring
 - **Critical vs Background Initialization**: Database initialization blocks startup, while Typesense, crawl manager, and file watcher initialize in background
 - **Service Health Tracking**: [ServiceManager](services/service_manager.py:39) tracks 4 core services with health checkers running every 30 seconds
@@ -95,8 +112,19 @@ npm run dev
   - `/health` - Comprehensive health check with service status
   - `/api/crawler/status` - Enhanced with service availability information
 
+## Frontend Architecture
+- **Interactive Search**: [SearchPage.tsx](frontend/src/pages/SearchPage.tsx:1) with file selection and operations
+- **File Selection**: [FileSelectionContext](frontend/src/context/FileSelectionContext.tsx:1) for centralized state management
+- **Interactive Hit Cards**: [FileInteractionHit](frontend/src/components/FileInteractionHit.tsx:1) for enhanced search result interaction
+- **Context Menus**: [FileContextMenu](frontend/src/components/FileContextMenu.tsx:1) for right-click file operations
+- **Provider Pattern**: FileSelectionProvider wraps SearchPage for state management
+- **Keyboard Shortcuts**: Escape to clear selection, Ctrl+A for select all
+- **Click-outside**: Automatic selection clearing when clicking outside search results
+
 ## Security
 - Frontend uses a search-only Typesense key at [App.tsx](frontend/src/App.tsx:6). Server uses admin key from [settings](config/settings.py:32). Do not expose admin key to the browser.
+- File operations require proper validation and sanitization to prevent system security issues.
+- File path validation and sandboxing for file operations to prevent directory traversal attacks.
 
 ## Testing
 - pytest available ([pyproject.toml](pyproject.toml:26)).
@@ -108,6 +136,14 @@ pytest -q
 - Include/exclude subdirectories via [get_crawler_settings](services/database_service.py:20).
 - Adjust thread pool and queue sizes in [CrawlJobManager](services/crawl_job_manager.py:67) and [services/crawl_job_manager.py](services/crawl_job_manager.py:69).
 - Embedding model configured in [get_collection_schema()](config/typesense_schema.py:54).
+
+## Recent Changes (2025-11-16)
+- **Interactive File Selection & Operations**: 
+  - Added comprehensive file management capabilities with selection, context menus, and operations
+  - New API router for file operations with proper error handling and validation
+  - Enhanced frontend with interactive hit cards, selection context, and file operations service
+  - Keyboard shortcuts and click-outside-to-clear functionality for improved UX
+  - Version updated to 0.0.17 with new features and improvements
 
 ## Recent Fixes (2025-11-15)
 - **Health Check Timeout Issue**: Services marked as READY during initialization now maintain healthy status even without active health checkers

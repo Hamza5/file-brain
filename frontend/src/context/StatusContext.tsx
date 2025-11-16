@@ -139,6 +139,8 @@ export function StatusProvider({ children }: { children: ReactNode }) {
             if (!pollTimer) {
               startPolling();
             }
+            // Only log the error once per connection attempt to reduce spam
+            console.debug("SSE stream disconnected, falling back to polling");
           }
         );
       } catch (e) {

@@ -19,6 +19,7 @@ from services.typesense_client import get_typesense_client
 from services.crawl_job_manager import get_crawl_job_manager
 from api.crawler import router as crawler_router
 from api.configuration import router as config_router
+from api.files import router as files_router
 from api.fs import router as fs_router
 from utils.logger import logger
 
@@ -407,6 +408,7 @@ app = FastAPI(
 app.include_router(crawler_router)
 app.include_router(config_router)
 app.include_router(fs_router)
+app.include_router(files_router)
 from api.system import router as system_router
 app.include_router(system_router)
 
@@ -419,9 +421,9 @@ if os.path.exists(frontend_assets_path):
 # Serve icon file
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 if os.path.exists(frontend_dist_path):
-    @app.get("/favicon.svg")
+    @app.get("/icon.svg")
     async def serve_icon():
-        icon_path = os.path.join(frontend_dist_path, "favicon.svg")
+        icon_path = os.path.join(frontend_dist_path, "icon.svg")
         if os.path.exists(icon_path):
             return FileResponse(icon_path)
         return {"error": "Icon not found"}
