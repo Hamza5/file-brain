@@ -2,6 +2,7 @@
 
 ## Current focus
 - Interactive file selection and operations feature is now **COMPLETE** and production-ready.
+- Archive extraction functionality is **COMPLETE** and production-ready.
 - Backend orchestrated by [lifespan()](main.py:22) with crawl control via [CrawlJobManager](services/crawl_job_manager.py:46).
 - Real-time monitoring enabled through [FileWatcher](services/watcher.py:16).
 - Typesense collection auto-init via [initialize_collection()](services/typesense_client.py:29) with schema [get_collection_schema()](config/typesense_schema.py:7) including embeddings.
@@ -12,6 +13,15 @@
   - SettingsPage with crawler controls, crawler options, and Watch Paths manager.
 
 ## Recent changes
+- **Archive Extraction Functionality - COMPLETED (2025-11-17)**:
+  - Added comprehensive archive handling capabilities supporting ZIP, TAR, 7Z, RAR, GZIP, BZ2, XZ formats
+  - Created [ArchiveExtractor](services/archive_extractor.py:1) module with recursive extraction and Tika integration
+  - Integrated archive detection into [ContentExtractor](services/extractor.py:1) with automatic archive detection
+  - Archive files are now extracted in-memory, each file is parsed separately with Tika, and content is concatenated
+  - Supports nested archives up to 5 levels deep with configurable file size limits
+  - Graceful fallback to basic text extraction when Tika is not available
+  - Archive content is formatted with clear file separations and metadata
+
 - **Interactive File Selection & Operations - COMPLETED (2025-11-17)**:
   - Added new API router [files_router](api/files.py:1) for file operations (open, delete, move, copy, etc.)
   - Implemented [FileSelectionContext](frontend/src/context/FileSelectionContext.tsx:1) for centralized file selection state management
@@ -101,7 +111,8 @@
   - **NEW**: File selection state managed via React context
 
 - **Extraction path**:
-  - Preferred: [ContentExtractor](services/extractor.py:23) using Apache Tika.
+  - **Archive extraction**: [ArchiveExtractor](services/archive_extractor.py:1) with comprehensive format support
+  - Preferred: [ContentExtractor](services/extractor.py:23) using Apache Tika with archive integration.
   - Fallback: [ContentExtractor._extract_basic](services/extractor.py:119).
 
 - **Indexing**:
@@ -124,9 +135,18 @@
   - Failed services automatically retry with exponential backoff (up to 3 attempts)
 
 ## New Features & Enhancements
+- **Archive Extraction Support**:
+  - Automatic detection of archive files by extension (.zip, .tar, .7z, .rar, .gz, .bz2, .xz)
+  - In-memory extraction of all supported archive formats
+  - Recursive parsing of nested archives up to 5 levels deep
+  - Individual file parsing with Apache Tika integration
+  - Concatenated content with clear file separators and metadata
+  - Graceful fallback to basic text extraction when Tika is unavailable
+  - Comprehensive metadata including file count, sizes, and MIME types
+
 - **Interactive File Selection**:
   - Click to select/deselect individual files
-  - Keyboard shortcuts (Escape to clear, Ctrl+A to select all)
+  - Keyboard shortcuts (Escape to clear, Ctrl+A for select all)
   - Visual feedback for selected files
   - Click-outside-to-clear functionality
 
@@ -155,12 +175,14 @@
   - Services without health checkers rely on initialization state rather than active monitoring
 
 ## Next steps
-- **File operations feature is complete and production-ready**
+- **Archive extraction and file operations features are complete and production-ready**
 - Consider future enhancements:
   - File preview capabilities directly in the search interface
   - Drag-and-drop file operations for more intuitive interaction
   - Bulk file operations with progress indicators
   - File sharing and collaboration features for team environments
+  - Support for password-protected archives
+  - Archive format detection improvements (beyond file extensions)
 - UI is production-ready with professional PrimeReact styling, responsive layouts, and interactive file management capabilities.
 - Service health monitoring system is robust and handles service failures gracefully.
 - Confirm Typesense deployment:
@@ -174,6 +196,8 @@
 - If server or collection is not correctly configured for embeddings, vector_query calls will error.
 - Need to ensure operational docs clearly specify Typesense embedding requirements for this hybrid mode.
 - Health monitoring requires maintenance of correct method signatures and SQL syntax to prevent false service failures.
+- Large archive files may consume significant memory during in-memory extraction
+- RAR format support requires unrar tool installation on the system
 
 ## UI/UX Implementation Details
 - **Grid Layout**: Search results use CSS Grid with `display: contents` on list items to achieve responsive card layout (350px minimum width per card).
@@ -184,3 +208,4 @@
 - **Search UX**: Hybrid semantic search configured globally; search box includes icon pseudo-element for visual clarity.
 - **Service Status**: Frontend gracefully handles degraded service modes and shows appropriate warnings to users.
 - **Interactive Elements**: New file selection, context menus, and keyboard shortcuts enhance user interaction with search results.
+- **Archive Search**: Archive files are indexed as single documents with concatenated content from all extracted files, making content searchable across the entire archive.

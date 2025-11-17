@@ -325,7 +325,7 @@ class TypesenseClient:
         try:
             # Use filter_by with a condition that's always true to delete all documents
             self.client.collections[self.collection_name].documents.delete(
-                filter_by="id:!=null"  # This will match all documents
+                dict(filter_by="id:!=null")  # This will match all documents
             )
             logger.info("All documents cleared from Typesense collection")
         except Exception as e:

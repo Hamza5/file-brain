@@ -1,5 +1,6 @@
 """
 Document content extraction using Apache Tika with comprehensive format support
+including archive handling
 """
 import os
 import mimetypes
@@ -13,6 +14,10 @@ import chardet
 from api.models.file_event import DocumentContent
 from config.settings import settings
 from utils.logger import logger
+from services.archive_extractor import (
+    is_likely_archive,
+    extract_and_parse_archive
+)
 
 # Import Tika
 from tika import parser
@@ -45,6 +50,11 @@ class ContentExtractor:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         
+        # Check if it's likely an archive file
+        if is_likely_archive(file_path):
+            logger.info(f"Processing as archive: {file_path}")
+            return self._extract_archive(file_path)
+        
         # Check if Tika is enabled
         if not settings.tika_enabled:
             logger.info("Tika extraction disabled, using basic extraction")
@@ -59,6 +69,50 @@ class ContentExtractor:
         
         # Fallback to basic extraction
         return self._extract_basic(file_path)
+    
+    def _extract_archive(self, file_path: str) -> DocumentContent:
+        """
+        Extract content from archive files using recursive parsing
+        """
+        logger.info(f"Extracting archive content: {file_path}")
+        
+        try:
+            # Configure Tika endpoint
+            tika_endpoint = settings.tika_url if settings.tika_client_only else None
+            
+            # Extract and parse the archive
+            result = extract_and_parse_archive(
+                file_path=file_path,
+                max_depth=5,
+                max_file_size=100 * 1024 * 1024,  # 100 MB
+                tika_endpoint=tika_endpoint
+            )
+            
+            if result is None:
+                logger.warning(f"Failed to extract archive content: {file_path}")
+                return self._extract_basic(file_path)
+            
+            # Process the archive metadata and update with file info
+            metadata = result["metadata"]
+            content = result["content"]
+            
+            # Add file-specific metadata
+            file_stats = os.stat(file_path)
+            metadata.update({
+                "extraction_method": "archive_parsing",
+                "file_size": file_stats.st_size,
+                "file_mtime": file_stats.st_mtime,
+                "is_archive": True,
+            })
+            
+            logger.info(f"Successfully extracted archive: {file_path} ({metadata.get('files_extracted', 0)} files)")
+            
+            return DocumentContent(content=content, metadata=metadata)
+            
+        except Exception as e:
+            logger.error(f"Error during archive extraction of {file_path}: {e}")
+            # Fall back to basic extraction
+            return self._extract_basic(file_path)
     
     def _extract_with_tika(self, file_path: str) -> DocumentContent:
         """Extract using Apache Tika"""
