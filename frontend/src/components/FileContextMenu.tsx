@@ -51,7 +51,7 @@ export function FileContextMenu({
 
   if (!isOpen) return null;
 
-  const handleFileOperation = (operation: 'file' | 'folder') => {
+  const handleFileOperation = (operation: 'file' | 'folder' | 'delete' | 'forget') => {
     onFileOperation({ file_path: filePath, operation });
     onClose();
   };
@@ -59,7 +59,7 @@ export function FileContextMenu({
   // Ensure menu doesn't go off-screen
   const adjustedPosition = {
     x: Math.min(position.x, window.innerWidth - 200), // Assuming menu width around 200px
-    y: Math.min(position.y, window.innerHeight - 120) // Assuming menu height around 120px
+    y: Math.min(position.y, window.innerHeight - 240) // Assuming menu height around 240px (4 items)
   };
 
   return (
@@ -134,6 +134,71 @@ export function FileContextMenu({
           }} 
         />
         <span>Open Folder</span>
+      </div>
+
+      {/* Divider */}
+      <div style={{
+        height: '1px',
+        backgroundColor: 'var(--surface-border)',
+        margin: '4px 8px'
+      }} />
+      
+      {/* Delete File */}
+      <div
+        style={{
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          color: 'var(--text-color)',
+          transition: 'background-color 0.15s ease'
+        }}
+        onClick={() => handleFileOperation('delete')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <i
+          className="fas fa-trash"
+          style={{
+            width: '16px',
+            color: '#dc3545' // Red for delete operation
+          }}
+        />
+        <span>Delete File</span>
+      </div>
+      
+      {/* Forget from Index */}
+      <div
+        style={{
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          color: 'var(--text-color)',
+          transition: 'background-color 0.15s ease'
+        }}
+        onClick={() => handleFileOperation('forget')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <i
+          className="fas fa-eraser"
+          style={{
+            width: '16px',
+            color: '#6c757d' // Gray for forget operation
+          }}
+        />
+        <span>Forget from Index</span>
       </div>
     </div>
   );

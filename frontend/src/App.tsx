@@ -7,6 +7,7 @@ import { StatsPage } from "./pages/StatsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StatusProvider } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
+import { ConfirmDialog } from "primereact/confirmdialog";
 
 // Configure Typesense InstantSearch adapter
 const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
@@ -56,6 +57,8 @@ export default function App() {
               </Routes>
             </AppShell>
           </InstantSearch>
+          {/* Global Confirm Dialog - Single instance for all delete operations */}
+          <ConfirmDialog />
         </NotificationProvider>
       </StatusProvider>
     </BrowserRouter>

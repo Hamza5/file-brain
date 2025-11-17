@@ -3,6 +3,8 @@
  */
 import React, { useState } from 'react';
 import { Card } from 'primereact/card';
+import { confirmDialog } from "primereact/confirmdialog";
+import { useInstantSearch } from 'react-instantsearch';
 import { FileContextMenu } from './FileContextMenu';
 import { fileOperationsService } from '../services/fileOperations';
 import { useFileSelection } from '../context/FileSelectionContext';
@@ -34,8 +36,9 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, showInfo } = useNotification();
   const { isFileSelected, selectFile, toggleFileSelection } = useFileSelection();
+  const { refresh } = useInstantSearch();
 
   // Helper to get actual file path (handles both field names)
   const getFilePath = (): string | null => {
@@ -104,20 +107,103 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
     setShowContextMenu(false);
   };
 
-  const handleFileOperation = async (request: { file_path: string; operation: 'file' | 'folder' }) => {
+  const handleFileOperation = async (request: { file_path: string; operation: 'file' | 'folder' | 'delete' | 'forget' }) => {
     try {
       let result;
-      if (request.operation === 'file') {
-        result = await fileOperationsService.openFile(request.file_path);
-      } else {
-        result = await fileOperationsService.openFolder(request.file_path);
+      
+      switch (request.operation) {
+        case 'file':
+          result = await fileOperationsService.openFile(request.file_path);
+          break;
+        case 'folder':
+          result = await fileOperationsService.openFolder(request.file_path);
+          break;
+        case 'delete':
+          // Confirm before deletion using PrimeReact ConfirmDialog
+          confirmDialog({
+            message: `Are you sure you want to permanently delete "${hit.file_name}"? This action cannot be undone.`,
+            header: 'Confirm Deletion',
+            icon: 'pi pi-exclamation-triangle',
+            acceptClassName: 'p-button-danger',
+            accept: async () => {
+              try {
+                // Show immediate feedback
+                showInfo('Processing...', 'Deleting file from filesystem and search index');
+                
+                const result = await fileOperationsService.deleteFile(request.file_path);
+                
+                if (result.success) {
+                  showSuccess('Success', 'File permanently deleted from filesystem');
+                  // Optimistic update: refresh search results immediately
+                  refresh();
+                } else {
+                  showError('Error', result.error || 'Failed to delete file');
+                }
+              } catch {
+                showError('Error', 'Operation failed');
+              }
+            },
+            reject: () => {
+              // User cancelled - do nothing
+            }
+          });
+          return; // Exit early since we handle the result in the accept callback
+        case 'forget':
+          // Confirm before removing from index using PrimeReact ConfirmDialog
+          confirmDialog({
+            message: `Are you sure you want to remove "${hit.file_name}" from the search index? The file will remain on disk but won't appear in search results.`,
+            header: 'Remove from Search Index',
+            icon: 'pi pi-info-circle',
+            acceptClassName: 'p-button-warning',
+            accept: async () => {
+              try {
+                // Show immediate feedback
+                showInfo('Processing...', 'Removing file from search index');
+                
+                const result = await fileOperationsService.forgetFile(request.file_path);
+                
+                if (result.success) {
+                  showSuccess('Success', 'File removed from search index');
+                  // Optimistic update: refresh search results immediately
+                  refresh();
+                } else {
+                  showError('Error', result.error || 'Failed to remove file from search index');
+                }
+              } catch {
+                showError('Error', 'Operation failed');
+              }
+            },
+            reject: () => {
+              // User cancelled - do nothing
+            }
+          });
+          return; // Exit early since we handle the result in the accept callback
+        default:
+          showError('Error', `Unknown operation: ${request.operation}`);
+          return;
       }
       
-      if (result.success) {
-        showSuccess('Success', `Successfully opened ${request.operation === 'file' ? 'file' : 'folder'}`);
-      } else {
-        showError('Error', result.error || `Failed to open ${request.operation}`);
+      if (result && result.success) {
+        let successMessage = '';
+        switch (request.operation as string) {
+          case 'file':
+            successMessage = 'Successfully opened file';
+            break;
+          case 'folder':
+            successMessage = 'Successfully opened folder';
+            break;
+          case 'delete':
+            successMessage = 'File permanently deleted from filesystem';
+            break;
+          case 'forget':
+            successMessage = 'File removed from search index';
+            break;
+        }
+        showSuccess('Success', successMessage);
+      } else if (result) {
+        showError('Error', result.error || `Failed to ${request.operation} file`);
       }
+
     } catch {
       showError('Error', 'Operation failed');
     }

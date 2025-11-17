@@ -1,7 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { Hits, SearchBox, Pagination, Configure, useInstantSearch } from "react-instantsearch";
 import { Card } from "primereact/card";
-import { useClickOutside } from 'primereact/hooks';
 import { FileInteractionHit } from '../components/FileInteractionHit';
 import { FileSelectionProvider, useFileSelection } from '../context/FileSelectionContext';
 import { useNotification } from '../context/NotificationContext';
@@ -63,16 +62,34 @@ function InteractiveHit({ hit }: { hit: HitType }) {
 
 // Main search page content with selection handling
 function SearchPageContent() {
-  const { clearSelection } = useFileSelection();
+  const { clearSelection, hasSelection } = useFileSelection();
   const { showInfo } = useNotification();
   
   // Ref for the search results container
   const searchResultsRef = useRef<HTMLDivElement>(null);
+  const clickOutsideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle click outside to clear selection (debounced to prevent multiple calls)
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (clickOutsideTimeoutRef.current) {
+      clearTimeout(clickOutsideTimeoutRef.current);
+    }
+    
+    clickOutsideTimeoutRef.current = setTimeout(() => {
+      // Only clear if clicking outside search results and not on UI controls
+      if (searchResultsRef.current &&
+          !searchResultsRef.current.contains(e.target as Node) &&
+          hasSelection()) {
+        clearSelection();
+        showInfo('Selection Cleared', 'Click outside search results to clear selection');
+      }
+    }, 100); // Small delay to prevent cascading calls
+  }, [clearSelection, hasSelection, showInfo]);
 
   // Handle keyboard shortcuts
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && hasSelection()) {
         clearSelection();
         showInfo('Selection Cleared', 'All file selections have been cleared');
       }
@@ -84,12 +101,18 @@ function SearchPageContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection, showInfo]);
+  }, [clearSelection, showInfo, hasSelection]);
 
-  // Use PrimeReact useClickOutside hook to clear selection
-  useClickOutside(searchResultsRef as React.RefObject<Element>, () => {
-    clearSelection();
-  });
+  // Set up click outside handler
+  useEffect(() => {
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      if (clickOutsideTimeoutRef.current) {
+        clearTimeout(clickOutsideTimeoutRef.current);
+      }
+    };
+  }, [handleClickOutside]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -129,7 +152,11 @@ function SearchPageContent() {
               submit: "hidden",
               reset: "hidden",
             }}
-            onSubmit={() => clearSelection()} // Clear selection on new search
+            onSubmit={() => {
+              if (hasSelection()) {
+                clearSelection(); // Clear selection on new search
+              }
+            }}
           />
         </div>
       </Card>
@@ -162,7 +189,11 @@ function SearchPageContent() {
             disabledItem: "p-px-2 p-py-1",
             link: "",
           }}
-          onChange={() => clearSelection()} // Clear selection on page change
+          onChange={() => {
+            if (hasSelection()) {
+              clearSelection(); // Clear selection on page change
+            }
+          }}
         />
       </div>
     </div>

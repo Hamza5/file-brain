@@ -83,21 +83,35 @@ class CrawlEventHandler(FileSystemEventHandler):
         if event.is_directory:
             return  # Skip directory creation for now
         
-        self._handle_file_event(FileCreatedEvent(event.src_path))
+        self._handle_file_event(FileDiscoveredEvent(
+            file_path=event.src_path,
+            timestamp=int(time.time() * 1000),
+            file_size=0,  # Will be filled by OperationEventHandler
+            modified_time=0,  # Will be filled by OperationEventHandler
+            created_time=int(time.time() * 1000)
+        ))
     
     def on_modified(self, event):
         """Handle file modification events"""
         if event.is_directory:
             return  # Skip directory modification
         
-        self._handle_file_event(FileModifiedEvent(event.src_path))
+        self._handle_file_event(FileChangedEvent(
+            file_path=event.src_path,
+            timestamp=int(time.time() * 1000),
+            file_size=0,  # Will be filled by OperationEventHandler
+            modified_time=int(time.time() * 1000)
+        ))
     
     def on_deleted(self, event):
         """Handle file/folder deletion events"""
         if event.is_directory:
             return  # Skip directory deletion for now
         
-        self._handle_file_event(FileDeletedEvent(event.src_path))
+        self._handle_file_event(FileDeletedEvent(
+            file_path=event.src_path,
+            timestamp=int(time.time() * 1000)
+        ))
     
     def _handle_file_event(self, event):
         """
@@ -109,7 +123,7 @@ class CrawlEventHandler(FileSystemEventHandler):
         try:
             self.on_file_event(event)
         except Exception as e:
-            logger.error(f"Error handling file event for {event.src_path}: {e}")
+            logger.error(f"Error handling file event for {getattr(event, 'file_path', getattr(event, 'src_path', 'unknown'))}: {e}")
 
 
 class OperationEventHandler:
@@ -170,6 +184,11 @@ class OperationEventHandler:
                     logger.debug(f"✏️ File modified (watch): {file_path}")
                 
             elif isinstance(event, FileDeletedEvent):
+                # Skip if file still exists (race condition with API deletion)
+                if os.path.exists(file_path):
+                    logger.debug(f"Skipping delete event for existing file: {file_path}")
+                    return
+                    
                 operation = CrawlOperation(
                     operation=OperationType.DELETE,
                     file_path=file_path,
@@ -177,7 +196,6 @@ class OperationEventHandler:
                 )
                 await self._enqueue_operation(operation)
                 logger.debug(f"🗑️ File deleted (watch): {file_path}")
-                
         except Exception as e:
             logger.error(f"Error handling file event for {file_path}: {e}")
         finally:

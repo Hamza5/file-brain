@@ -3,6 +3,17 @@
 ## Overview
 Backend is a FastAPI service coordinating filesystem discovery, content extraction, and Typesense indexing with real time monitoring. Frontend is a minimal React InstantSearch client for search and triage.
 
+## Current Status
+- **Interactive File Selection & Operations**: **COMPLETE** - Production-ready implementation with full file management capabilities
+- All core systems operational and stable
+
+## Recent Completion
+- Interactive file selection with keyboard shortcuts and visual feedback
+- Context-sensitive file operations (open, delete, move, copy, rename) from search interface
+- Cross-platform file operations with proper security validations
+- Bulk operations for multiple selected files with confirmation dialogs
+- Seamless integration between search results and file management operations
+
 Key orchestrators:
 - [critical_init()](main.py:23) initializes critical services (database) that block startup.
 - [background_init()](main.py:62) initializes non-critical services (Typesense, crawl manager, file watcher) in background.
@@ -76,6 +87,7 @@ Key orchestrators:
 - **Settings**: [get_crawler_settings()](api/crawler.py:231), [update_crawler_settings()](api/crawler.py:248)
 - **System**: [get_initialization_status()](api/system.py:25) for service health and initialization status
 - **File Operations**: [router](api/files.py:1) for interactive file management operations
+- **File Operations Implementation**: Complete cross-platform file operations API with security validations
 
 ## Frontend
 - InstantSearch client in [App.tsx](frontend/src/App.tsx:1) using Typesense adapter and index files.

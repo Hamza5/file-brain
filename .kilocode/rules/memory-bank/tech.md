@@ -9,8 +9,8 @@
 - Orchestration: [CrawlJobManager](services/crawl_job_manager.py:46) with status [get_status()](services/crawl_job_manager.py:182).
 - Service Management: [ServiceManager](services/service_manager.py:39) for centralized health monitoring and initialization tracking.
 - Frontend: React + Vite InstantSearch in [App.tsx](frontend/src/App.tsx:1).
-- **New**: File operations API with [files_router](api/files.py:1) for interactive file management.
-- **New**: Frontend file operations service [fileOperations.ts](frontend/src/services/fileOperations.ts:1) for handling file management operations.
+- **File Operations**: Complete file operations API with [files_router](api/files.py:1) for interactive file management.
+- **Frontend**: File operations service [fileOperations.ts](frontend/src/services/fileOperations.ts:1) with selection context and interactive components.
 
 ## Dependencies and versions
 - Python 3.11
@@ -24,7 +24,7 @@
 - python-magic >=0.4.27,<0.5 ([pyproject.toml](pyproject.toml:16))
 - Frontend libs: typesense-instantsearch-adapter (see [App.tsx](frontend/src/App.tsx:1), [package.json](frontend/package.json:1))
 
-**Current Version**: 0.0.17 (see [pyproject.toml](pyproject.toml:3))
+**Current Version**: 0.0.18 (see [pyproject.toml](pyproject.toml:3))
 
 ## Local services
 - Typesense server required; defaults from [settings.typesense_*](config/settings.py:29).
@@ -137,13 +137,15 @@ pytest -q
 - Adjust thread pool and queue sizes in [CrawlJobManager](services/crawl_job_manager.py:67) and [services/crawl_job_manager.py](services/crawl_job_manager.py:69).
 - Embedding model configured in [get_collection_schema()](config/typesense_schema.py:54).
 
-## Recent Changes (2025-11-16)
-- **Interactive File Selection & Operations**: 
-  - Added comprehensive file management capabilities with selection, context menus, and operations
-  - New API router for file operations with proper error handling and validation
-  - Enhanced frontend with interactive hit cards, selection context, and file operations service
-  - Keyboard shortcuts and click-outside-to-clear functionality for improved UX
-  - Version updated to 0.0.17 with new features and improvements
+## Recent Changes (2025-11-17)
+- **Interactive File Selection & Operations - COMPLETED**:
+  - Fully functional cross-platform file operations (open, delete, forget from index)
+  - Complete API router with security validations and proper error handling
+  - Enhanced frontend with interactive hit cards, context menus, and file operations service
+  - File selection context with keyboard shortcuts (Escape to clear, Ctrl+A for select all)
+  - Click-outside-to-clear selection functionality with visual feedback
+  - Integration with NotificationContext for user feedback and confirmations
+  - Version updated to 0.0.18 with complete feature implementation
 
 ## Recent Fixes (2025-11-15)
 - **Health Check Timeout Issue**: Services marked as READY during initialization now maintain healthy status even without active health checkers

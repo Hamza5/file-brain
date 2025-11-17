@@ -30,7 +30,7 @@ async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
 
 export interface FileOperationRequest {
   file_path: string;
-  operation: 'file' | 'folder';
+  operation: 'file' | 'folder' | 'delete' | 'forget';
 }
 
 export interface FileOperationResponse {
@@ -43,7 +43,7 @@ export interface FileOperationResponse {
 
 export interface MultipleFileOperationRequest {
   file_paths: string[];
-  operation: 'file' | 'folder';
+  operation: 'file' | 'folder' | 'delete' | 'forget';
 }
 
 export interface MultipleFileOperationResponse {
@@ -133,6 +133,82 @@ export async function getSystemInfo(): Promise<SystemInfoResponse> {
   }
 }
 
+export async function deleteFile(filePath: string): Promise<FileOperationResponse> {
+  try {
+    return await requestJSON<FileOperationResponse>("/api/files/delete", {
+      method: "POST",
+      body: JSON.stringify({
+        file_path: filePath,
+        operation: 'delete'
+      }),
+    });
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    return {
+      success: false,
+      error: 'Failed to delete file. Please check if the file exists and you have the necessary permissions.'
+    };
+  }
+}
+
+export async function forgetFile(filePath: string): Promise<FileOperationResponse> {
+  try {
+    return await requestJSON<FileOperationResponse>("/api/files/forget", {
+      method: "POST",
+      body: JSON.stringify({
+        file_path: filePath,
+        operation: 'forget'
+      }),
+    });
+  } catch (error) {
+    console.error('Error forgetting file:', error);
+    return {
+      success: false,
+      error: 'Failed to remove file from search index.'
+    };
+  }
+}
+
+export async function deleteMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
+  try {
+    return await requestJSON<MultipleFileOperationResponse>("/api/files/delete-multiple", {
+      method: "POST",
+      body: JSON.stringify({
+        file_paths: filePaths,
+        operation: 'delete'
+      }),
+    });
+  } catch (error) {
+    console.error('Error deleting multiple files:', error);
+    return {
+      success: false,
+      processed: 0,
+      total_requested: filePaths.length,
+      errors: ['Failed to delete files']
+    };
+  }
+}
+
+export async function forgetMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
+  try {
+    return await requestJSON<MultipleFileOperationResponse>("/api/files/forget-multiple", {
+      method: "POST",
+      body: JSON.stringify({
+        file_paths: filePaths,
+        operation: 'forget'
+      }),
+    });
+  } catch (error) {
+    console.error('Error forgetting multiple files:', error);
+    return {
+      success: false,
+      processed: 0,
+      total_requested: filePaths.length,
+      errors: ['Failed to remove files from search index']
+    };
+  }
+}
+
 // Utility functions
 export function isValidFilePath(filePath: string): boolean {
   if (!filePath || typeof filePath !== 'string') {
@@ -159,7 +235,6 @@ export function getDirectory(filePath: string): string {
   const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
   return lastSlash > -1 ? filePath.substring(0, lastSlash) : '';
 }
-
 // Backwards compatibility class for any existing code
 class FileOperationsService {
   async openFile(filePath: string): Promise<FileOperationResponse> {
@@ -172,6 +247,22 @@ class FileOperationsService {
 
   async openMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
     return openMultipleFiles(filePaths);
+  }
+
+  async deleteFile(filePath: string): Promise<FileOperationResponse> {
+    return deleteFile(filePath);
+  }
+
+  async forgetFile(filePath: string): Promise<FileOperationResponse> {
+    return forgetFile(filePath);
+  }
+
+  async deleteMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
+    return deleteMultipleFiles(filePaths);
+  }
+
+  async forgetMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
+    return forgetMultipleFiles(filePaths);
   }
 
   async getSystemInfo(): Promise<SystemInfoResponse> {
@@ -190,5 +281,6 @@ class FileOperationsService {
     return getDirectory(filePath);
   }
 }
+
 
 export const fileOperationsService = new FileOperationsService();
