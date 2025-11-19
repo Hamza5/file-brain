@@ -55,17 +55,17 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     if (!filePath) {
       console.warn('No file path available for:', hit.file_name);
       return;
     }
-    
+
     console.log(`Click on file: ${hit.file_name} (path: ${filePath})`);
-    
+
     // Single click handling:
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-    
+
     if (isCtrlOrCmd) {
       console.log('Toggling selection (Ctrl/Cmd held)');
       toggleFileSelection(filePath);
@@ -78,12 +78,12 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   const handleDoubleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!filePath) {
       showError('Error', `Cannot open ${hit.file_name} - missing file path`);
       return;
     }
-    
+
     try {
       const result = await fileOperationsService.openFile(filePath);
       if (result.success) {
@@ -110,7 +110,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   const handleFileOperation = async (request: { file_path: string; operation: 'file' | 'folder' | 'delete' | 'forget' }) => {
     try {
       let result;
-      
+
       switch (request.operation) {
         case 'file':
           result = await fileOperationsService.openFile(request.file_path);
@@ -123,15 +123,15 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
           confirmDialog({
             message: `Are you sure you want to permanently delete "${hit.file_name}"? This action cannot be undone.`,
             header: 'Confirm Deletion',
-            icon: 'pi pi-exclamation-triangle',
+            icon: 'fa fa-info-circle',
             acceptClassName: 'p-button-danger',
             accept: async () => {
               try {
                 // Show immediate feedback
                 showInfo('Processing...', 'Deleting file from filesystem and search index');
-                
+
                 const result = await fileOperationsService.deleteFile(request.file_path);
-                
+
                 if (result.success) {
                   showSuccess('Success', 'File permanently deleted from filesystem');
                   // Optimistic update: refresh search results immediately
@@ -153,15 +153,15 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
           confirmDialog({
             message: `Are you sure you want to remove "${hit.file_name}" from the search index? The file will remain on disk but won't appear in search results.`,
             header: 'Remove from Search Index',
-            icon: 'pi pi-info-circle',
+            icon: 'fa fa-exclamation-triangle',
             acceptClassName: 'p-button-warning',
             accept: async () => {
               try {
                 // Show immediate feedback
                 showInfo('Processing...', 'Removing file from search index');
-                
+
                 const result = await fileOperationsService.forgetFile(request.file_path);
-                
+
                 if (result.success) {
                   showSuccess('Success', 'File removed from search index');
                   // Optimistic update: refresh search results immediately
@@ -182,7 +182,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
           showError('Error', `Unknown operation: ${request.operation}`);
           return;
       }
-      
+
       if (result && result.success) {
         let successMessage = '';
         switch (request.operation as string) {
@@ -220,20 +220,20 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   };
 
   const cardStyle = {
-    border: isSelected 
-      ? '2px solid var(--primary-color)' 
-      : isHovered 
+    border: isSelected
+      ? '2px solid var(--primary-color)'
+      : isHovered
         ? '1px solid var(--primary-color-light)'
         : '1px solid var(--surface-border)',
-    backgroundColor: isSelected 
-      ? 'var(--primary-color-lightest)' 
-      : isHovered 
+    backgroundColor: isSelected
+      ? 'var(--primary-color-lightest)'
+      : isHovered
         ? 'var(--surface-hover)'
         : 'var(--surface-card)',
     transform: isHovered ? 'translateY(-2px)' : 'none',
-    boxShadow: isHovered 
-      ? '0 4px 12px rgba(0,0,0,0.15)' 
-      : isSelected 
+    boxShadow: isHovered
+      ? '0 4px 12px rgba(0,0,0,0.15)'
+      : isSelected
         ? '0 2px 8px rgba(0,0,0,0.1)'
         : 'none',
     transition: 'all 0.2s ease',
@@ -289,7 +289,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
           >
             <i className={pickIconClass(hit)} aria-hidden="true" />
           </div>
-          
+
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
             {/* File name and badges */}
             <div
@@ -315,7 +315,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
               >
                 {hit.file_name}
               </div>
-              
+
               {hit.file_extension && (
                 <span
                   style={{
@@ -366,7 +366,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                 {shortSnippet}
               </div>
             )}
-            
+
             {/* Enhanced metadata from Tika */}
             {(hit.title || hit.author || hit.subject || hit.language || hit.keywords) && (
               <div
@@ -404,7 +404,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                     <span style={{ color: "var(--text-color)" }}>
                       {hit.subject}
                     </span>
-                    </div>
+                  </div>
                 )}
                 {hit.keywords && hit.keywords.length > 0 && (
                   <div>
@@ -425,7 +425,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                 )}
               </div>
             )}
-            
+
             {/* Footer with file info */}
             <div
               style={{
@@ -487,7 +487,10 @@ function formatSize(bytes?: number): string {
 function formatDate(ts?: number): string {
   if (!ts) return "—";
   try {
-    return new Date(ts).toLocaleString();
+    // If timestamp is in seconds (< 10 billion), convert to milliseconds
+    // Otherwise, it's already in milliseconds
+    const milliseconds = ts < 10000000000 ? ts * 1000 : ts;
+    return new Date(milliseconds).toLocaleString();
   } catch {
     return "—";
   }

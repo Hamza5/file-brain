@@ -25,11 +25,19 @@ export function FolderSelectModal({
 
   const [currentPath, setCurrentPath] = useState<string>("");
   const [entries, setEntries] = useState<FsEntry[]>([]);
+  const [filter, setFilter] = useState<string>("");
 
   const [selectedPath, setSelectedPath] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Filter entries based on the filter text
+  const filteredEntries = filter.trim() === ""
+    ? entries
+    : entries.filter(entry =>
+      entry.name.toLowerCase().includes(filter.toLowerCase())
+    );
 
   // Reset when closed
   useEffect(() => {
@@ -37,12 +45,18 @@ export function FolderSelectModal({
       setActiveRoot(null);
       setCurrentPath("");
       setEntries([]);
+      setFilter("");
       setSelectedPath("");
       setLoading(false);
       setInitializing(false);
       setError(null);
     }
   }, [isOpen]);
+
+  // Reset filter when navigation location changes
+  useEffect(() => {
+    setFilter("");
+  }, [currentPath]);
 
   // Initialize roots and default view when opened
   useEffect(() => {
@@ -349,6 +363,87 @@ export function FolderSelectModal({
               <Message severity="error" text={error} style={{ margin: 0 }} />
             )}
 
+            {/* Filter Input */}
+            <div
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <i
+                className="fas fa-filter"
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: "0.75rem",
+                  fontSize: "0.9rem",
+                  color: "var(--text-color-secondary)",
+                  pointerEvents: "none",
+                }}
+              />
+              <input
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Filter folders in current location..."
+                style={{
+                  width: "100%",
+                  padding: "0.65rem 2.5rem 0.65rem 2.5rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--surface-border)",
+                  backgroundColor: "var(--surface-card)",
+                  color: "var(--text-color)",
+                  fontSize: "0.85rem",
+                  outline: "none",
+                  transition: "all 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "var(--primary-color)";
+                  e.target.style.boxShadow = "0 0 0 2px var(--primary-color-emphasis)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "var(--surface-border)";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+              {filter && (
+                <button
+                  type="button"
+                  onClick={() => setFilter("")}
+                  style={{
+                    position: "absolute",
+                    right: "0.5rem",
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    padding: "0.25rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "4px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--surface-100)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+                  }}
+                >
+                  <i
+                    className="fas fa-times"
+                    aria-hidden="true"
+                    style={{
+                      fontSize: "0.9rem",
+                      color: "var(--text-color-secondary)",
+                    }}
+                  />
+                </button>
+              )}
+            </div>
+
+
             {loading && (
               <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
                 Loading folders…
@@ -361,6 +456,12 @@ export function FolderSelectModal({
               </div>
             )}
 
+            {!loading && !error && entries.length > 0 && filteredEntries.length === 0 && (
+              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+                No folders match the filter "{filter}".
+              </div>
+            )}
+
             <div
               style={{
                 flex: 1,
@@ -370,7 +471,7 @@ export function FolderSelectModal({
                 gap: "0.5rem",
               }}
             >
-              {entries.map((entry) => {
+              {filteredEntries.map((entry) => {
                 const isSelected = selectedPath === entry.path;
                 return (
                   <div

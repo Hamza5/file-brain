@@ -346,7 +346,7 @@ export function SettingsPage() {
                     });
                     if (!res.ok) throw new Error(await res.text());
                     const added = (await res.json()).added[0];
-                    
+
                     setWatchPaths((prev) => [...prev, added]);
                     setNewPath("");
                     setActionMessage("Watch path added.");
@@ -438,7 +438,7 @@ export function SettingsPage() {
                             setWatchPaths((prev) => prev.map(p => p.id === wp.id ? updated : p));
                           }}
                         />
-                         <label htmlFor={`enabled-${wp.id}`} style={{ cursor: "pointer", fontSize: "0.85rem" }}>
+                        <label htmlFor={`enabled-${wp.id}`} style={{ cursor: "pointer", fontSize: "0.85rem" }}>
                           Enabled
                         </label>
                       </div>
@@ -449,7 +449,7 @@ export function SettingsPage() {
                           confirmDialog({
                             message: `Are you sure you want to remove this watch path?`,
                             header: `Remove: ${wp.path}`,
-                            icon: 'pi pi-exclamation-triangle',
+                            icon: 'fa fa-exclamation-triangle',
                             accept: async () => {
                               try {
                                 await deleteWatchPath(wp.id);

@@ -18,6 +18,10 @@ body {
   color: var(--text-color);
 }
 
+:root {
+  --surface-hover: var(--surface-100);
+}
+
 /* InstantSearch inputs align with PrimeReact look */
 .ais-SearchBox-input {
   border-radius: var(--border-radius);
@@ -86,6 +90,8 @@ body {
 
 .ais-Pagination-item--selected .ais-Pagination-link {
   border-color: var(--primary-color);
+  background-color: var(--primary-color);
+  color: var(--primary-color-text);
 }
 
 .ais-Pagination-item--disabled .ais-Pagination-link {
@@ -96,8 +102,8 @@ body {
 /* InstantSearch Hits grid layout */
 .ais-Hits-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -107,117 +113,6 @@ body {
   display: contents;
 }
 
-
-
-/* Page card styling */
-.page-card {
-  background: var(--surface-card);
-  border-radius: var(--border-radius);
-  padding: 1rem;
-  border: 1px solid var(--surface-border);
-}
-
-/* PrimeReact Card overrides for consistency */
-.p-card {
-  background-color: var(--surface-card);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--border-radius);
-}
-
-.p-card .p-card-body {
-  padding: 1.25rem;
-}
-
-.p-card .p-card-header {
-  padding: 1.25rem;
-  border-bottom: 1px solid var(--surface-border);
-}
-
-/* PrimeReact Button improvements */
-.p-button {
-  border-radius: var(--border-radius);
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.p-button:not(.p-button-text):not(.p-button-outlined) {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.p-button:hover:not(:disabled) {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-/* PrimeReact InputText improvements */
-.p-inputtext {
-  border-radius: var(--border-radius);
-  font-size: 0.95rem;
-}
-
-.p-inputtext:focus {
-  box-shadow: 0 0 0 0.2rem var(--primary-color-emphasis);
-}
-
-/* PrimeReact Checkbox improvements */
-.p-checkbox .p-checkbox-box {
-  border-radius: 4px;
-}
-
-.p-checkbox .p-checkbox-box.p-highlight {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
-}
-
-/* PrimeReact Tag styling */
-.p-tag {
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  padding: 0.35rem 0.65rem;
-}
-
-/* PrimeReact Message styling */
-.p-message {
-  border-radius: var(--border-radius);
-  border: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.p-message-success {
-  background-color: var(--green-50);
-  color: var(--green-700);
-}
-
-.p-message-error {
-  background-color: var(--red-50);
-  color: var(--red-700);
-}
-
-.p-message-warning {
-  background-color: var(--orange-50);
-  color: var(--orange-700);
-}
-
-/* PrimeReact Sidebar improvements */
-.p-sidebar {
-  background-color: var(--surface-card);
-  border-right: 1px solid var(--surface-border);
-}
-
-.p-sidebar .p-sidebar-header {
-  border-bottom: 1px solid var(--surface-border);
-  padding: 1rem;
-}
-
-.p-sidebar .p-sidebar-close {
-  color: var(--text-color);
-}
-
-/* Chart.js styling */
-.p-chart {
-  width: 100%;
-}
-
 /* Utility classes for common patterns */
 .text-primary {
   color: var(--primary-color);
@@ -225,94 +120,6 @@ body {
 
 .text-secondary {
   color: var(--text-color-secondary);
-}
-
-.text-success {
-  color: var(--green-500);
-}
-
-.text-danger {
-  color: var(--red-500);
-}
-
-.text-warning {
-  color: var(--orange-500);
-}
-
-.bg-surface-card {
-  background-color: var(--surface-card);
-}
-
-.bg-surface-ground {
-  background-color: var(--surface-ground);
-}
-
-.border-surface {
-  border: 1px solid var(--surface-border);
-}
-
-.rounded {
-  border-radius: var(--border-radius);
-}
-
-.gap-1 {
-  gap: 0.5rem;
-}
-
-.gap-2 {
-  gap: 1rem;
-}
-
-.gap-3 {
-  gap: 1.5rem;
-}
-
-.p-1 {
-  padding: 0.5rem;
-}
-
-.p-2 {
-  padding: 1rem;
-}
-
-.p-3 {
-  padding: 1.5rem;
-}
-
-.m-0 {
-  margin: 0;
-}
-
-.mt-1 {
-  margin-top: 0.5rem;
-}
-
-.mt-2 {
-  margin-top: 1rem;
-}
-
-.mb-1 {
-  margin-bottom: 0.5rem;
-}
-
-.mb-2 {
-  margin-bottom: 1rem;
-}
-
-/* Responsive improvements */
-@media (max-width: 768px) {
-  body {
-    font-size: 0.95rem;
-  }
-
-  .p-card .p-card-body {
-    padding: 1rem;
-  }
-
-  .p-button {
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-  }
 }
 
 /* Scrollbar styling */

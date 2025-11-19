@@ -128,6 +128,8 @@ export interface WatchPath {
 
 export interface BatchWatchPathsRequest {
   paths: string[];
+  include_subdirectories?: boolean;
+  enabled?: boolean;
 }
 
 export interface BatchWatchPathsResponse {
@@ -152,9 +154,9 @@ export async function listWatchPaths(enabledOnly = false): Promise<WatchPath[]> 
   return requestJSON(`/api/config/watch-paths${qs}`);
 }
 
-export async function addWatchPath(path: string): Promise<WatchPath> {
+export async function addWatchPath(path: string, includeSubdirectories: boolean = true): Promise<WatchPath> {
   // Prefer batch API to leverage existing validation
-  const body: BatchWatchPathsRequest = { paths: [path] };
+  const body: BatchWatchPathsRequest = { paths: [path], include_subdirectories: includeSubdirectories };
   const res = await requestJSON<BatchWatchPathsResponse>(
     "/api/config/watch-paths/batch",
     {

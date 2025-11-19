@@ -82,10 +82,9 @@ class CrawlJobManager:
         Start the crawl job with parallel discovery, indexing, and monitoring.
 
         Responsiveness notes:
-        - All heavy work (hashing, extraction, Typesense calls) is executed in a
-          bounded ThreadPoolExecutor via _run_in_executor().
-        - This keeps the asyncio event loop free so /status and /stop endpoints
-          remain responsive even under heavy load.
+        - Returns immediately after creating the background task
+        - All heavy work (verification, discovery, indexing) happens asynchronously
+        - This keeps the API endpoint responsive regardless of file count
 
         Args:
             watch_paths: List of paths to crawl (fetched from database)
@@ -123,12 +122,11 @@ class CrawlJobManager:
         finally:
             db.close()
         
-        # Start file monitoring if requested
-        if start_monitoring:
-            await self._start_file_monitoring(path_strs)
-        
-        # Start the main crawl task
-        self._crawl_task = asyncio.create_task(self._run_crawl_job(watch_paths))
+        # Start the main crawl task (runs in background)
+        # File monitoring will be started within the task to avoid blocking here
+        self._crawl_task = asyncio.create_task(
+            self._run_crawl_job_with_monitoring(watch_paths, start_monitoring, path_strs)
+        )
         
         return True
     
@@ -369,6 +367,31 @@ class CrawlJobManager:
                 logger.info("File monitoring stopped")
             except Exception as e:
                 logger.error(f"Error stopping file monitoring: {e}")
+    
+    async def _run_crawl_job_with_monitoring(
+        self, 
+        watch_paths: List['WatchPath'], 
+        start_monitoring: bool, 
+        path_strs: List[str]
+    ) -> None:
+        """
+        Wrapper that starts file monitoring and then runs the main crawl job.
+        This allows start_crawl to return immediately while monitoring starts in background.
+        """
+        try:
+            # Start file monitoring if requested (non-blocking)
+            if start_monitoring:
+                await self._start_file_monitoring(path_strs)
+            
+            # Run the main crawl job
+            await self._run_crawl_job(watch_paths)
+            
+        except Exception as e:
+            logger.error(f"Error in crawl job with monitoring: {e}")
+        finally:
+            # Ensure monitoring is stopped on completion
+            if start_monitoring:
+                await self._stop_file_monitoring()
     
     async def _run_crawl_job(self, watch_paths: List['WatchPath']) -> None:
         """Main crawl job coordinator - runs index verification, parallel discovery and indexing"""
