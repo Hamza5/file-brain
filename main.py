@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from flaskwebgui import FlaskUI
+
 import os
 
 from config.settings import settings
@@ -538,13 +540,4 @@ async def health_check():
 
 
 if __name__ == "__main__":
-    import uvicorn
-    import asyncio
-    
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.debug,
-        log_level="info",
-    )
+    FlaskUI(app=app, server="fastapi").run()

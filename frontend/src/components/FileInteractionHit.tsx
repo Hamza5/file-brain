@@ -499,19 +499,47 @@ function formatDate(ts?: number): string {
 function pickIconClass(hit: HitType): string {
   const ext = (hit.file_extension || "").toLowerCase();
   const mime = (hit.mime_type || "").toLowerCase();
+  const fileName = (hit.file_name || "").toLowerCase();
 
+  // 1. Specific Filenames
+  if (fileName === "dockerfile") return "fab fa-docker";
+  if (fileName === ".gitignore" || fileName === ".gitattributes") return "fab fa-git-alt";
+  if (fileName === "package.json" || fileName === "package-lock.json") return "fab fa-npm";
+
+  // 2. Code & Scripts
+  if ([".py", ".pyc", ".pyd", ".pyo"].includes(ext)) return "fab fa-python";
+  if ([".js", ".jsx", ".mjs", ".cjs"].includes(ext)) return "fab fa-js";
+  if ([".ts", ".tsx"].includes(ext)) return "fab fa-js"; // FontAwesome doesn't have a specific TS icon in free set usually, JS is close enough or use code
+  if ([".java", ".jar", ".class"].includes(ext)) return "fab fa-java";
+  if ([".html", ".htm", ".xhtml"].includes(ext)) return "fab fa-html5";
+  if ([".css", ".scss", ".sass", ".less"].includes(ext)) return "fab fa-css3-alt";
+  if ([".php", ".phtml"].includes(ext)) return "fab fa-php";
+  if ([".c", ".cpp", ".h", ".hpp", ".cc"].includes(ext)) return "fas fa-code"; // No specific C++ icon in free
+  if ([".go"].includes(ext)) return "fab fa-golang";
+  if ([".rs"].includes(ext)) return "fab fa-rust";
+  if ([".sh", ".bash", ".zsh", ".fish"].includes(ext)) return "fas fa-terminal";
+  if ([".sql", ".db", ".sqlite", ".sqlite3"].includes(ext)) return "fas fa-database";
+  if ([".md", ".markdown"].includes(ext)) return "fab fa-markdown";
+  if ([".json", ".xml", ".yaml", ".yml", ".toml", ".ini", ".conf", ".env"].includes(ext)) return "fas fa-cogs";
+
+  // 3. Documents
   if (ext === ".pdf" || mime.includes("pdf")) return "far fa-file-pdf";
-  if ([".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext))
+  if ([".doc", ".docx", ".odt", ".rtf"].includes(ext)) return "far fa-file-word";
+  if ([".xls", ".xlsx", ".csv", ".ods"].includes(ext)) return "far fa-file-excel";
+  if ([".ppt", ".pptx", ".odp"].includes(ext)) return "far fa-file-powerpoint";
+  if ([".txt", ".log"].includes(ext) || mime.startsWith("text/")) return "far fa-file-alt";
+
+  // 4. Media
+  if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".bmp", ".tiff"].includes(ext) || mime.startsWith("image/"))
     return "far fa-file-image";
-  if (mime.startsWith("image/")) return "far fa-file-image";
-  if (
-    [".ts", ".tsx", ".js", ".jsx", ".py", ".java", ".go", ".rs", ".cs"].includes(
-      ext
-    )
-  )
-    return "far fa-file-code";
-  if (mime.startsWith("text/")) return "far fa-file-alt";
-  if (mime.startsWith("video/")) return "far fa-file-video";
-  if (mime.startsWith("audio/")) return "far fa-file-audio";
+  if ([".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv"].includes(ext) || mime.startsWith("video/"))
+    return "far fa-file-video";
+  if ([".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a"].includes(ext) || mime.startsWith("audio/"))
+    return "far fa-file-audio";
+
+  // 5. Archives
+  if ([".zip", ".tar", ".gz", ".rar", ".7z", ".bz2", ".xz"].includes(ext)) return "far fa-file-archive";
+
+  // 6. Default
   return "far fa-file";
 }

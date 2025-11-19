@@ -739,6 +739,21 @@ standard = ["fastapi-cloud-cli (>=0.1.1)", "uvicorn[standard] (>=0.15.0)"]
 standard-no-fastapi-cloud-cli = ["uvicorn[standard] (>=0.15.0)"]
 
 [[package]]
+name = "flaskwebgui"
+version = "1.1.8"
+description = "Create desktop applications with Flask/Django/FastAPI!"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "flaskwebgui-1.1.8-py3-none-any.whl", hash = "sha256:4364985444d16c98b9ff9891fbe90f5d65213fc338508d10ec8d8bd2da9e397f"},
+    {file = "flaskwebgui-1.1.8.tar.gz", hash = "sha256:24b0a1bad3e263ba17a9fd947566cf193a5bd9e37d5427e73412af80d5dad55b"},
+]
+
+[package.dependencies]
+psutil = ">=7.0,<8.0"
+
+[[package]]
 name = "frozenlist"
 version = "1.8.0"
 description = "A list-like structure which implements collections.abc.MutableSequence"
@@ -1647,7 +1662,6 @@ description = "Cross-platform lib for process and system monitoring."
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
-markers = "sys_platform != \"cygwin\""
 files = [
     {file = "psutil-7.1.3-cp313-cp313t-macosx_10_13_x86_64.whl", hash = "sha256:0005da714eee687b4b8decd3d6cc7c6db36215c9e74e5ad2264b90c3df7d92dc"},
     {file = "psutil-7.1.3-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:19644c85dcb987e35eeeaefdc3915d059dac7bd1167cdcdbf27e0ce2df0c08c0"},
@@ -3171,4 +3185,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "9509060a27135f896b60f13fb5135591cb4e94f048a1dae14d46adb2f1338de0"
+content-hash = "408cd6b0ba15e16fa91637a8f2e629bae778e0ac432a0d55a45d8580a57d1f68"

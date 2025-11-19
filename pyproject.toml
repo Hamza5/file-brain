@@ -1,6 +1,6 @@
 [project]
 name = "file-brain"
-version = "0.0.21"
+version = "0.0.22"
 description = "Advanced file search engine powered by AI"
 authors = [
     {name = "Hamza Abbad",email = "hamza.abbad@gmail.com"}
@@ -19,7 +19,8 @@ dependencies = [
     "chardet (>=5.2.0,<6.0.0)",
     "aiohttp (>=3.13.2,<4.0.0)",
     "py7zr (>=1.0.0,<2.0.0)",
-    "rarfile (>=4.2,<5.0)"
+    "rarfile (>=4.2,<5.0)",
+    "flaskwebgui (>=1.1.8,<2.0.0)",
 ]
 
 
