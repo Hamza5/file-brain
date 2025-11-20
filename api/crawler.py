@@ -326,16 +326,34 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
 @router.get("/stream")
 async def stream_crawler_status(db: Session = Depends(get_db)):
     """
-    Server-Sent Events (SSE) stream that pushes crawl status + stats using Typesense as source of truth.
+    Server-Sent Events (SSE) stream that pushes crawl status + stats ONLY when state changes.
 
     - Emits a JSON payload compatible with frontend StreamPayload:
       { "status": { ... }, "stats": { ... }, "timestamp": ms }
-    - Stats are derived from Typesense (num_documents, file_types) + CrawlJobManager (running flag).
+    - Uses change detection to only send events when state actually changes
+    - Sends heartbeat comments every 30s to keep connection alive
+    - Checks state every 10s when crawler is active, 30s when idle
     """
 
     async def event_generator():
         from fastapi.encoders import jsonable_encoder
         from services.typesense_client import get_typesense_client
+        import json as _json
+
+        previous_payload = None
+        last_heartbeat = time.time()
+        heartbeat_interval = 30  # Send heartbeat every 30 seconds
+
+        def payloads_equal(p1: dict | None, p2: dict | None) -> bool:
+            """Compare two payloads to detect changes, ignoring timestamp"""
+            if p1 is None or p2 is None:
+                return False
+            
+            # Create copies without timestamp for comparison
+            p1_copy = {k: v for k, v in p1.items() if k != 'timestamp'}
+            p2_copy = {k: v for k, v in p2.items() if k != 'timestamp'}
+            
+            return p1_copy == p2_copy
 
         while True:
             try:
@@ -360,6 +378,25 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                     logger.warning(f"Failed to get file type distribution in SSE: {e}")
                     file_types = {}
                 
+                # Get watch paths from database
+                try:
+                    db_service = DatabaseService(db)
+                    watch_path_models = db_service.list_watch_paths(enabled_only=False)
+                    watch_paths = [
+                        {
+                            "id": wp.id,
+                            "path": wp.path,
+                            "enabled": wp.enabled,
+                            "include_subdirectories": wp.include_subdirectories,
+                            "created_at": wp.created_at.isoformat() if wp.created_at else None,
+                            "updated_at": wp.updated_at.isoformat() if wp.updated_at else None,
+                        }
+                        for wp in watch_path_models
+                    ]
+                except Exception as e:
+                    logger.warning(f"Failed to get watch paths in SSE: {e}")
+                    watch_paths = []
+                
                 # Discovered from runtime status, Indexed from Typesense.
                 discovered = int(status_dict.get("files_discovered", 0))
                 indexed = int(total_indexed)
@@ -383,17 +420,28 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                         },
                         "healthy": healthy,
                     },
+                    "watch_paths": watch_paths,
                     "timestamp": int(time.time() * 1000),
                 }
 
                 # Ensure strict JSON in SSE payload (no Python literals)
                 data = jsonable_encoder(payload)
-                import json as _json
 
-                yield f"data: {_json.dumps(data)}\n\n"
+                # Only send if state has changed
+                if not payloads_equal(data, previous_payload):
+                    yield f"data: {_json.dumps(data)}\n\n"
+                    previous_payload = data
+                    last_heartbeat = time.time()
+                    logger.debug("SSE: State changed, sent update")
+                elif time.time() - last_heartbeat > heartbeat_interval:
+                    # Send heartbeat comment to keep connection alive
+                    yield ":heartbeat\n\n"
+                    last_heartbeat = time.time()
+                    logger.debug("SSE: Sent heartbeat")
 
-                # Dynamic interval: faster when running, slower when idle.
-                await asyncio.sleep(1.0 if status_dict.get("running") else 5.0)
+                # Conservative polling intervals: 10s when active, 30s when idle
+                # This significantly reduces performance impact while maintaining responsiveness
+                await asyncio.sleep(10.0 if status_dict.get("running") else 30.0)
             except Exception as e:
                 logger.error(f"Error in crawler SSE stream: {e}")
                 break
@@ -409,6 +457,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
             "Connection": "keep-alive",
         },
     )
+
 
 
 # Crawler Settings Management

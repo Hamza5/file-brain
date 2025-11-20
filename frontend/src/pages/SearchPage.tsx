@@ -45,13 +45,13 @@ function HybridSemanticConfigure() {
 // Interactive Hit component that uses file interaction features
 function InteractiveHit({ hit }: { hit: HitType }) {
   const { setHoverFile } = useFileSelection();
-  
+
   // Transform hit to include 'path' property for FileInteractionHit compatibility
   const transformedHit = {
     ...hit,
     path: hit.file_path  // Map file_path to path for compatibility
   };
-  
+
   return (
     <FileInteractionHit
       hit={transformedHit}
@@ -63,23 +63,45 @@ function InteractiveHit({ hit }: { hit: HitType }) {
 // Main search page content with selection handling
 function SearchPageContent() {
   const { clearSelection, hasSelection } = useFileSelection();
-  const { showInfo } = useNotification();
-  
+  const { showInfo, showError } = useNotification();
+  const { uiState, error, status } = useInstantSearch();
+
   // Ref for the search results container
   const searchResultsRef = useRef<HTMLDivElement>(null);
   const clickOutsideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get current query and loading state
+  const indexState = uiState.files || {};
+  const query = (indexState.query as string | undefined) || "";
+  const hasQuery = query.trim().length > 0;
+  const isSearching = status === 'loading' || status === 'stalled';
+
+  // Show error notification on search timeout or error
+  React.useEffect(() => {
+    if (error) {
+      const errorMessage = error.message || String(error);
+      if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+        showError(
+          'Search Timeout',
+          'The search took too long to complete. Please try a more specific query or try again later.'
+        );
+      } else {
+        showError('Search Error', 'An error occurred while searching. Please try again.');
+      }
+    }
+  }, [error, showError]);
 
   // Handle click outside to clear selection (debounced to prevent multiple calls)
   const handleClickOutside = useCallback((e: MouseEvent) => {
     if (clickOutsideTimeoutRef.current) {
       clearTimeout(clickOutsideTimeoutRef.current);
     }
-    
+
     clickOutsideTimeoutRef.current = setTimeout(() => {
       // Only clear if clicking outside search results and not on UI controls
       if (searchResultsRef.current &&
-          !searchResultsRef.current.contains(e.target as Node) &&
-          hasSelection()) {
+        !searchResultsRef.current.contains(e.target as Node) &&
+        hasSelection()) {
         clearSelection();
         showInfo('Selection Cleared', 'Click outside search results to clear selection');
       }
@@ -169,7 +191,59 @@ function SearchPageContent() {
         ref={searchResultsRef}
         style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
       >
-        <Hits<HitType> hitComponent={InteractiveHit} />
+        {/* Hide results during loading to prevent showing initial * query results */}
+        {isSearching ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '4rem 2rem',
+            gap: '0.75rem'
+          }}>
+            <i className="fa fa-spinner fa-spin" style={{
+              fontSize: '2rem',
+              color: 'var(--primary-color)'
+            }} />
+            <span style={{
+              fontSize: '1.1rem',
+              color: 'var(--text-color-secondary)',
+              fontWeight: 500
+            }}>
+              Searching...
+            </span>
+          </div>
+        ) : hasQuery ? (
+          <Hits<HitType> hitComponent={InteractiveHit} />
+        ) : (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '4rem 2rem',
+            textAlign: 'center'
+          }}>
+            <i className="fa-solid fa-magnifying-glass" style={{
+              fontSize: '3rem',
+              color: 'var(--text-color-secondary)',
+              marginBottom: '1rem',
+              opacity: 0.5
+            }} />
+            <h3 style={{
+              fontSize: '1.25rem',
+              color: 'var(--text-color)',
+              marginBottom: '0.5rem',
+              fontWeight: 600
+            }}>Start Searching</h3>
+            <p style={{
+              color: 'var(--text-color-secondary)',
+              fontSize: '0.95rem',
+              maxWidth: '400px'
+            }}>
+              Enter a search query above to find files by name, path, or content.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}

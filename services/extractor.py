@@ -292,53 +292,23 @@ class ContentExtractor:
     def _extract_basic(self, file_path: str) -> DocumentContent:
         """
         Fallback basic extraction for unsupported files
+        DISABLED: Returns empty content immediately for performance
         """
-        logger.info(f"Basic extraction: {file_path}")
+        logger.info(f"Basic extraction disabled for: {file_path}")
         
         try:
-            # First try smart text extraction for any file type
-            smart_text = self._extract_smart_text(file_path)
-            if smart_text:
-                file_name = Path(file_path).name
-                smart_content = f"# {file_name}\n\n{smart_text}"
-                return DocumentContent(
-                    content=smart_content,
-                    metadata={
-                        "extraction_method": "smart_text",
-                        "mime_type": mimetypes.guess_type(file_path)[0],
-                        "text_length": len(smart_text)
-                    }
-                )
-            
             # Get MIME type
             mime_type, _ = mimetypes.guess_type(file_path)
-            
-            # Try to read as text
-            if mime_type and mime_type.startswith("text"):
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        content = f.read().strip()
-                    if content:
-                        return DocumentContent(
-                            content=content,
-                            metadata={
-                                "extraction_method": "basic_text",
-                                "mime_type": mime_type
-                            }
-                        )
-                except UnicodeDecodeError:
-                    pass  # Fall through to no content case
-            
-            # Return empty content for all other cases
             file_stats = os.stat(file_path)
             
+            # Return empty content immediately (basic extraction disabled)
             return DocumentContent(
                 content="",
                 metadata={
-                    "extraction_method": "no_content",
+                    "extraction_method": "disabled",
                     "mime_type": mime_type,
                     "file_size": file_stats.st_size,
-                    "reason": "Unsupported file type or empty content"
+                    "reason": "Basic extraction disabled for performance"
                 }
             )
             

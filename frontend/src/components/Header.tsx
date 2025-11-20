@@ -23,22 +23,30 @@ export const Header: React.FC<HeaderProps> = ({
     hasFoldersConfigured = false
 }) => {
     const { query, refine } = useSearchBox();
-    const [searchValue, setSearchValue] = useState(query);
+    const [searchValue, setSearchValue] = useState('');
 
-    // Debounce search
+    // Sync local state with instant search query when it changes externally
     React.useEffect(() => {
-        const timer = setTimeout(() => {
-            if (query !== searchValue) {
-                refine(searchValue);
-            }
-        }, 300);
+        if (query !== searchValue && query === '') {
+            setSearchValue('');
+        }
+    }, [query]);
 
-        return () => clearTimeout(timer);
-    }, [searchValue, refine, query]);
+    const handleSearch = () => {
+        if (hasIndexedFiles) {
+            refine(searchValue);
+        }
+    };
 
     const handleClear = () => {
         setSearchValue('');
         refine('');
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
     };
 
     // Determine the appropriate message based on state
@@ -98,13 +106,18 @@ export const Header: React.FC<HeaderProps> = ({
                     />
                     <InputText
                         value={searchValue}
-                        onChange={(e) => hasIndexedFiles && setSearchValue(e.target.value)}
+                        onChange={(e) => {
+                            if (hasIndexedFiles) {
+                                setSearchValue(e.target.value);
+                            }
+                        }}
+                        onKeyPress={handleKeyPress}
                         placeholder={getPlaceholder()}
                         disabled={!hasIndexedFiles}
                         style={{
                             width: '100%',
                             paddingLeft: '2.5rem',
-                            paddingRight: '2.5rem',
+                            paddingRight: searchValue && hasIndexedFiles ? '5.5rem' : '3rem',
                             cursor: hasIndexedFiles ? 'text' : 'not-allowed',
                             opacity: hasIndexedFiles ? 1 : 0.6
                         }}
@@ -114,6 +127,42 @@ export const Header: React.FC<HeaderProps> = ({
                             showDelay: 300
                         }}
                     />
+                    {hasIndexedFiles && (
+                        <Button
+                            icon="fa-solid fa-search"
+                            rounded
+                            onClick={handleSearch}
+                            className="p-button-text"
+                            style={{
+                                position: 'absolute',
+                                right: searchValue ? '2.5rem' : '0.25rem',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                width: '2rem',
+                                height: '2rem',
+                                minWidth: '2rem',
+                                padding: 0,
+                                color: 'var(--primary-color)',
+                                backgroundColor: 'transparent',
+                                transition: 'all 0.2s ease',
+                                zIndex: 1
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = 'var(--primary-color-text)';
+                                e.currentTarget.style.backgroundColor = 'var(--primary-color)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = 'var(--primary-color)';
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                            aria-label="Search"
+                            tooltip="Search (or press Enter)"
+                            tooltipOptions={{
+                                position: 'bottom',
+                                showDelay: 500
+                            }}
+                        />
+                    )}
                     {searchValue && hasIndexedFiles && (
                         <Button
                             icon="fa-solid fa-times"

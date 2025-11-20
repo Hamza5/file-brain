@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from flaskwebgui import FlaskUI
+# from flaskwebgui import FlaskUI
 
 import os
 
@@ -539,5 +539,5 @@ async def health_check():
         )
 
 
-if __name__ == "__main__":
-    FlaskUI(app=app, server="fastapi").run()
+# if __name__ == "__main__":
+#     FlaskUI(app=app, server="fastapi").run()

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useHits, useInstantSearch } from 'react-instantsearch';
 import { FileContextMenu } from './FileContextMenu';
 import { fileOperationsService, type FileOperationRequest } from '../services/fileOperations';
@@ -11,8 +11,9 @@ interface ResultsGridProps {
 }
 
 export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawlerActive = false }) => {
-    const { hits, results } = useHits();
-    const { refresh } = useInstantSearch();
+    const { results } = useHits();
+    const { refresh, status } = useInstantSearch();
+    const isSearching = status === 'loading' || status === 'stalled';
     const [contextMenu, setContextMenu] = useState<{
         isOpen: boolean;
         position: { x: number; y: number };
@@ -24,17 +25,6 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         filePath: '',
         file: null
     });
-
-    // Auto-refresh search results when crawler is active
-    useEffect(() => {
-        if (!isCrawlerActive) return;
-
-        const interval = setInterval(() => {
-            refresh();
-        }, 3000); // Refresh every 3 seconds
-
-        return () => clearInterval(interval);
-    }, [isCrawlerActive, refresh]);
 
     const handleContextMenu = (e: React.MouseEvent, hit: any) => {
         e.preventDefault();
@@ -92,7 +82,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         }
     };
 
-    if (hits.length === 0) {
+    if (results?.nbHits === 0) {
         return (
             <div style={{
                 display: 'flex',
@@ -120,143 +110,163 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                     maxWidth: '400px'
                 }}>
                     {isCrawlerActive
-                        ? 'No matches yet. The crawler is indexing files - results will appear automatically as they\'re processed.'
+                        ? 'No matches yet. The crawler is indexing files.'
                         : 'Try adjusting your search terms or start the crawler to index more files.'}
                 </p>
             </div>
         );
     }
 
-    const totalResults = results?.nbHits || hits.length;
+    const totalResults = results?.nbHits || 0;
 
     return (
         <>
-            {/* Result Count Header */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '1rem',
-                padding: '0.75rem 0.5rem',
-                borderBottom: '1px solid var(--surface-border)'
-            }}>
+            {/* Loading Indicator */}
+            {isSearching && (
                 <div style={{
-                    fontSize: '0.95rem',
-                    color: 'var(--text-color-secondary)',
-                    fontWeight: 500
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2rem',
+                    gap: '0.75rem'
                 }}>
-                    {totalResults.toLocaleString()} {totalResults === 1 ? 'result' : 'results'} found
+                    <i className="fa fa-spinner fa-spin" style={{
+                        fontSize: '1.5rem',
+                        color: 'var(--primary-color)'
+                    }} />
+                    <span style={{
+                        fontSize: '1rem',
+                        color: 'var(--text-color-secondary)',
+                        fontWeight: 500
+                    }}>
+                        Searching...
+                    </span>
                 </div>
-                {isCrawlerActive && (
+            )}
+
+            {/* Result Count Header */}
+            {
+                !isSearching && (
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.85rem',
-                        color: 'var(--primary-color)',
-                        fontWeight: 500
+                        justifyContent: 'space-between',
+                        marginBottom: '1rem',
+                        padding: '0.75rem 0.5rem',
+                        borderBottom: '1px solid var(--surface-border)'
                     }}>
-                        <i className="fa fa-spinner fa-spin" style={{ fontSize: '0.85rem' }} />
-                        Auto-refreshing
+                        <div style={{
+                            fontSize: '0.95rem',
+                            color: 'var(--text-color-secondary)',
+                            fontWeight: 500
+                        }}>
+                            {totalResults.toLocaleString()} {totalResults === 1 ? 'result' : 'results'} found
+                        </div>
                     </div>
-                )}
-            </div>
+                )
+            }
 
             {/* Results Grid */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: '0.75rem'
-            }}>
-                {hits.map((hit: any) => {
-                    const iconClass = pickIconClass(hit.file_type, hit.mime_type, hit.file_extension);
-                    const extension = hit.file_extension ? hit.file_extension.replace('.', '').toUpperCase() : (hit.file_type || 'FILE');
+            {
+                !isSearching && (
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                        gap: '0.75rem'
+                    }}>
+                        {
+                            results?.hits.map((hit: any) => {
+                                const iconClass = pickIconClass(hit.file_type, hit.mime_type, hit.file_extension);
+                                const extension = hit.file_extension ? hit.file_extension.replace('.', '').toUpperCase() : (hit.file_type || 'FILE');
 
-                    return (
-                        <div key={hit.objectID} style={{ padding: '0.5rem' }}>
-                            <div
-                                style={{
-                                    backgroundColor: 'var(--surface-card)',
-                                    border: '1px solid var(--surface-border)',
-                                    borderRadius: '12px',
-                                    padding: '0.75rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.75rem',
-                                    height: '100%',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
-                                }}
-                                onClick={() => onResultClick(hit)}
-                                onContextMenu={(e) => handleContextMenu(e, hit)}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
-                                    e.currentTarget.style.transform = 'translateY(-4px)';
-                                    e.currentTarget.style.borderColor = 'var(--primary-color)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.borderColor = 'var(--surface-border)';
-                                }}
-                            >
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: 'var(--surface-50)',
-                                    borderRadius: '8px',
-                                    height: '140px'
-                                }}>
-                                    <i className={iconClass} style={{ fontSize: '3rem', color: 'var(--primary-color)' }} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    <div style={{
-                                        fontWeight: 600,
-                                        color: 'var(--text-color)',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
-                                    }} title={hit.file_name}>
-                                        {hit.file_name || 'Unknown File'}
+                                return (
+                                    <div key={hit.objectID} style={{ padding: '0.5rem' }}>
+                                        <div
+                                            style={{
+                                                backgroundColor: 'var(--surface-card)',
+                                                border: '1px solid var(--surface-border)',
+                                                borderRadius: '12px',
+                                                padding: '0.75rem',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '0.75rem',
+                                                height: '100%',
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                                            }}
+                                            onClick={() => onResultClick(hit)}
+                                            onContextMenu={(e) => handleContextMenu(e, hit)}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
+                                                e.currentTarget.style.transform = 'translateY(-4px)';
+                                                e.currentTarget.style.borderColor = 'var(--primary-color)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                e.currentTarget.style.borderColor = 'var(--surface-border)';
+                                            }}
+                                        >
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: 'var(--surface-50)',
+                                                borderRadius: '8px',
+                                                height: '140px'
+                                            }}>
+                                                <i className={iconClass} style={{ fontSize: '3rem', color: 'var(--primary-color)' }} />
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                <div style={{
+                                                    fontWeight: 600,
+                                                    color: 'var(--text-color)',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }} title={hit.file_name}>
+                                                    {hit.file_name || 'Unknown File'}
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '0.75rem',
+                                                    color: 'var(--text-color-secondary)',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }} title={hit.file_path}>
+                                                    {hit.file_path}
+                                                </div>
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    marginTop: 'auto',
+                                                    paddingTop: '0.5rem'
+                                                }}>
+                                                    <span style={{
+                                                        fontSize: '0.75rem',
+                                                        backgroundColor: 'var(--primary-50)',
+                                                        color: 'var(--primary-700)',
+                                                        padding: '0.25rem 0.5rem',
+                                                        borderRadius: '4px',
+                                                        fontWeight: 500
+                                                    }}>
+                                                        {extension}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-color-secondary)' }}>
+                                                        {formatDate(hit.modified_time)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{
-                                        fontSize: '0.75rem',
-                                        color: 'var(--text-color-secondary)',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
-                                    }} title={hit.file_path}>
-                                        {hit.file_path}
-                                    </div>
-                                    <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        marginTop: 'auto',
-                                        paddingTop: '0.5rem'
-                                    }}>
-                                        <span style={{
-                                            fontSize: '0.75rem',
-                                            backgroundColor: 'var(--primary-50)',
-                                            color: 'var(--primary-700)',
-                                            padding: '0.25rem 0.5rem',
-                                            borderRadius: '4px',
-                                            fontWeight: 500
-                                        }}>
-                                            {extension}
-                                        </span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-color-secondary)' }}>
-                                            {formatDate(hit.modified_time)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                                );
+                            })
+                        }
+                    </div >
+                )
+            }
 
             <FileContextMenu
                 isOpen={contextMenu.isOpen}

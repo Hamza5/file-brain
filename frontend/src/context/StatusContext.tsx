@@ -11,16 +11,19 @@ import {
   type CrawlStats,
   type CrawlStatus,
   type SystemInitialization,
+  type WatchPath,
   connectStatusStream,
   getCrawlerStats,
   getCrawlerStatus,
   getSystemInitialization,
+  listWatchPaths,
 } from "../api/client";
 
 interface StatusContextValue {
   status: CrawlStatus["status"] | null;
   stats: CrawlStats | null;
   systemInitialization: SystemInitialization | null;
+  watchPaths: WatchPath[];
   lastUpdate: number | null;
   isLive: boolean; // true when SSE connected
   isLoading: boolean;
@@ -38,18 +41,22 @@ export function StatusProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<CrawlStatus["status"] | null>(null);
   const [stats, setStats] = useState<CrawlStats | null>(null);
   const [systemInitialization, setSystemInitialization] = useState<SystemInitialization | null>(null);
+  const [watchPaths, setWatchPaths] = useState<WatchPath[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [isLive, setIsLive] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const applySnapshot = useCallback(
-    (nextStatus: CrawlStatus["status"] | null, nextStats: CrawlStats | null, nextSystemInit?: SystemInitialization | null) => {
+    (nextStatus: CrawlStatus["status"] | null, nextStats: CrawlStats | null, nextWatchPaths?: WatchPath[], nextSystemInit?: SystemInitialization | null) => {
       if (nextStatus) {
         setStatus(nextStatus);
       }
       if (nextStats) {
         setStats(nextStats);
+      }
+      if (nextWatchPaths !== undefined) {
+        setWatchPaths(nextWatchPaths);
       }
       if (nextSystemInit !== undefined) {
         setSystemInitialization(nextSystemInit);
@@ -67,9 +74,10 @@ export function StatusProvider({ children }: { children: ReactNode }) {
 
     async function loadInitial() {
       try {
-        const [statusRes, statsRes, systemInitRes] = await Promise.allSettled([
+        const [statusRes, statsRes, watchPathsRes, systemInitRes] = await Promise.allSettled([
           getCrawlerStatus(),
           getCrawlerStats(),
+          listWatchPaths(false),
           getSystemInitialization(),
         ]);
 
@@ -77,10 +85,12 @@ export function StatusProvider({ children }: { children: ReactNode }) {
           statusRes.status === "fulfilled" ? statusRes.value.status : null;
         const initialStats =
           statsRes.status === "fulfilled" ? statsRes.value : null;
+        const initialWatchPaths =
+          watchPathsRes.status === "fulfilled" ? watchPathsRes.value : [];
         const initialSystemInit =
           systemInitRes.status === "fulfilled" ? systemInitRes.value : null;
 
-        applySnapshot(initialStatus, initialStats, initialSystemInit);
+        applySnapshot(initialStatus, initialStats, initialWatchPaths, initialSystemInit);
       } catch (e) {
         console.error("Failed to load initial crawler state", e);
         setError(
@@ -96,9 +106,10 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       const intervalMs = 5000;
       pollTimer = window.setInterval(async () => {
         try {
-          const [statusRes, statsRes, systemInitRes] = await Promise.allSettled([
+          const [statusRes, statsRes, watchPathsRes, systemInitRes] = await Promise.allSettled([
             getCrawlerStatus(),
             getCrawlerStats(),
+            listWatchPaths(false),
             getSystemInitialization(),
           ]);
 
@@ -106,10 +117,12 @@ export function StatusProvider({ children }: { children: ReactNode }) {
             statusRes.status === "fulfilled" ? statusRes.value.status : null;
           const nextStats =
             statsRes.status === "fulfilled" ? statsRes.value : null;
+          const nextWatchPaths =
+            watchPathsRes.status === "fulfilled" ? watchPathsRes.value : [];
           const nextSystemInit =
             systemInitRes.status === "fulfilled" ? systemInitRes.value : null;
 
-          applySnapshot(nextStatus, nextStats, nextSystemInit);
+          applySnapshot(nextStatus, nextStats, nextWatchPaths, nextSystemInit);
         } catch (e) {
           console.error("Polling error", e);
           setError(
@@ -129,9 +142,9 @@ export function StatusProvider({ children }: { children: ReactNode }) {
     function startStream() {
       try {
         stopStream = connectStatusStream(
-          (payload: { status: CrawlStatus["status"]; stats?: CrawlStats | undefined; timestamp: number }) => {
+          (payload: { status: CrawlStatus["status"]; stats?: CrawlStats | undefined; watch_paths?: WatchPath[]; timestamp: number }) => {
             setIsLive(true);
-            applySnapshot(payload.status, payload.stats ?? null, undefined);
+            applySnapshot(payload.status, payload.stats ?? null, payload.watch_paths, undefined);
           },
           () => {
             // SSE error; mark as not live and use polling
@@ -188,6 +201,7 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       status,
       stats,
       systemInitialization,
+      watchPaths,
       lastUpdate,
       isLive,
       isLoading,
@@ -197,7 +211,7 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       canUseSearch,
       canUseCrawler,
     }),
-    [status, stats, systemInitialization, lastUpdate, isLive, isLoading, error, isInitializationComplete, isSystemHealthy, canUseSearch, canUseCrawler]
+    [status, stats, systemInitialization, watchPaths, lastUpdate, isLive, isLoading, error, isInitializationComplete, isSystemHealthy, canUseSearch, canUseCrawler]
   );
 
   return (

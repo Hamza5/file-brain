@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import TypesenseInstantSearchAdapter from "typesense-instantsearch-adapter";
 import { InstantSearch, Configure } from "react-instantsearch";
-import { StatusProvider } from "./context/StatusContext";
+import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { Header } from "./components/Header";
 import { MainContent } from "./components/MainContent";
 import { PreviewSidebar } from "./components/PreviewSidebar";
 import { SettingsDialog } from "./components/SettingsDialog";
-import { connectStatusStream, startCrawler, stopCrawler, getCrawlerStats, listWatchPaths } from "./api/client";
+import { connectStatusStream, startCrawler, stopCrawler } from "./api/client";
 
 // Configure Typesense InstantSearch adapter
 const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
@@ -24,6 +24,7 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
       },
     ],
     cacheSearchResultsForSeconds: 0,
+    connectionTimeoutSeconds: 30, // Extended timeout for slower queries
   },
   additionalSearchParameters: {
     // Hybrid search defaults:
@@ -39,14 +40,13 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
 
 const searchClient = typesenseInstantsearchAdapter.searchClient;
 
-export default function App() {
+function AppContent() {
+  const { stats, watchPaths } = useStatus();
   const [isCrawlerActive, setIsCrawlerActive] = useState(false);
   const [crawlerStatus, setCrawlerStatus] = useState<any>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
-  const [indexedCount, setIndexedCount] = useState<number>(0);
-  const [hasFoldersConfigured, setHasFoldersConfigured] = useState<boolean>(false);
 
   // Connect to crawler status stream
   React.useEffect(() => {
@@ -56,27 +56,6 @@ export default function App() {
     });
     return () => disconnect();
   }, []);
-
-  // Fetch stats to check if we have indexed files
-  const fetchStats = React.useCallback(async () => {
-    try {
-      const [stats, watchPaths] = await Promise.all([
-        getCrawlerStats(),
-        listWatchPaths(false)
-      ]);
-      setIndexedCount(stats.totals.indexed);
-      setHasFoldersConfigured(watchPaths.length > 0);
-    } catch (error) {
-      console.error("Failed to fetch stats:", error);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchStats();
-    // Poll every 5 seconds
-    const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
-  }, [fetchStats]);
 
   const handleToggleCrawler = async (value: boolean) => {
     try {
@@ -98,49 +77,59 @@ export default function App() {
     setPreviewVisible(true);
   };
 
+  // Derive state from StatusContext
+  const indexedCount = stats?.totals.indexed ?? 0;
+  const hasFoldersConfigured = watchPaths.length > 0;
   const hasIndexedFiles = indexedCount > 0;
 
+
+  return (
+    <InstantSearch
+      indexName="files"
+      searchClient={searchClient}
+      future={{ preserveSharedStateOnUnmount: true }}
+    >
+      <Configure hitsPerPage={24} />
+
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        overflow: 'hidden',
+        backgroundColor: 'var(--surface-ground)'
+      }}>
+        <Header
+          onSettingsClick={() => setSettingsVisible(true)}
+          isCrawlerActive={isCrawlerActive}
+          onToggleCrawler={handleToggleCrawler}
+          crawlerStatus={crawlerStatus}
+          hasIndexedFiles={hasIndexedFiles}
+          hasFoldersConfigured={hasFoldersConfigured}
+        />
+
+        <MainContent onResultClick={handleResultClick} isCrawlerActive={isCrawlerActive} />
+
+        <PreviewSidebar
+          visible={previewVisible}
+          onHide={() => setPreviewVisible(false)}
+          file={selectedFile}
+        />
+
+        <SettingsDialog
+          visible={settingsVisible}
+          onHide={() => setSettingsVisible(false)}
+          onRefreshStats={() => { }}
+        />
+      </div>
+    </InstantSearch>
+  );
+}
+
+export default function App() {
   return (
     <StatusProvider>
       <NotificationProvider>
-        <InstantSearch
-          indexName="files"
-          searchClient={searchClient}
-          future={{ preserveSharedStateOnUnmount: true }}
-        >
-          <Configure hitsPerPage={24} />
-
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100vh',
-            overflow: 'hidden',
-            backgroundColor: 'var(--surface-ground)'
-          }}>
-            <Header
-              onSettingsClick={() => setSettingsVisible(true)}
-              isCrawlerActive={isCrawlerActive}
-              onToggleCrawler={handleToggleCrawler}
-              crawlerStatus={crawlerStatus}
-              hasIndexedFiles={hasIndexedFiles}
-              hasFoldersConfigured={hasFoldersConfigured}
-            />
-
-            <MainContent onResultClick={handleResultClick} isCrawlerActive={isCrawlerActive} />
-
-            <PreviewSidebar
-              visible={previewVisible}
-              onHide={() => setPreviewVisible(false)}
-              file={selectedFile}
-            />
-
-            <SettingsDialog
-              visible={settingsVisible}
-              onHide={() => setSettingsVisible(false)}
-              onRefreshStats={fetchStats}
-            />
-          </div>
-        </InstantSearch>
+        <AppContent />
 
         {/* Global Confirm Dialog - Single instance for all delete operations */}
         <ConfirmDialog />

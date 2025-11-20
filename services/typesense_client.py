@@ -27,7 +27,7 @@ class TypesenseClient:
                 "protocol": settings.typesense_protocol,
             }],
             "api_key": settings.typesense_api_key,
-            "connection_timeout_seconds": 5,
+            "connection_timeout_seconds": 10,
         })
         self.collection_name = settings.typesense_collection_name
         # Flag to indicate whether the collection is confirmed ready.
@@ -302,6 +302,7 @@ class TypesenseClient:
             results = self.client.collections[self.collection_name].documents.search({
                 "q": "*",
                 "facet_by": "file_extension",
+                "max_facet_values": 100,
                 "per_page": 0,  # We only want facet counts, not documents
             })
             

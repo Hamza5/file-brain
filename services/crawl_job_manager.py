@@ -812,6 +812,10 @@ class CrawlJobManager:
             await _index()
 
             logger.debug(f"Successfully indexed (or updated): {file_path}")
+            
+            # Add delay between file processing for performance
+            await asyncio.sleep(5)
+            
             return True
 
         except Exception as e:
