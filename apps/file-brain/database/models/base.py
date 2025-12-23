@@ -8,8 +8,15 @@ from sqlalchemy.orm import sessionmaker
 
 Base = declarative_base()
 
+import os
+
 # Database setup
-DATABASE_URL = "sqlite:///./file_brain.db"
+# Get the directory of this file
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+# Navigate up to the app root (apps/file-brain)
+_app_root = os.path.abspath(os.path.join(_current_dir, "..", ".."))
+DATABASE_PATH = os.path.join(_app_root, "file_brain.db")
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 engine = create_engine(
     DATABASE_URL,

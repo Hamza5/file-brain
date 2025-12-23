@@ -10,9 +10,9 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-# from flaskwebgui import FlaskUI
 
 import os
+import sys
 
 from config.settings import settings
 from database.models import init_db, init_default_data, SessionLocal
@@ -539,5 +539,12 @@ async def health_check():
         )
 
 
-# if __name__ == "__main__":
-#     FlaskUI(app=app, server="fastapi").run()
+if __name__ == "__main__":
+    from flaskwebgui import FlaskUI
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
+    FlaskUI(app=app, server="fastapi").run()
+    # import uvicorn
+    # uvicorn.run(app, host="0.0.0.0", port=8000)

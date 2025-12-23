@@ -1,0 +1,18 @@
+{
+  "name": "file-brain-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/website",
+    "apps/file-brain/frontend"
+  ],
+  "scripts": {
+    "dev:website": "npm run dev --workspace=@file-brain/website",
+    "build:website": "npm run build --workspace=@file-brain/website",
+    "start:website": "npm run start --workspace=@file-brain/website",
+    "dev:app": "cd apps/file-brain && poetry run python main.py",
+    "install:app": "cd apps/file-brain && poetry install",
+    "build:app-frontend": "npm run build --workspace=@file-brain/app",
+    "docker:up": "cd apps/file-brain && docker compose up -d",
+    "docker:down": "cd apps/file-brain && docker compose down"
+  }
+}

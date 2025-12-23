@@ -27,9 +27,21 @@ dist-ssr
 .*
 !.gitignore
 !.kilocode/
+!.env.example
 
-# Python cache files
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.env
+
+# Next.js
+.next/
+out/
 
 # Database files
 *.db
