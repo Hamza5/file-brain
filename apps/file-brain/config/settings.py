@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     app_version: str = get_app_version()
     app_description: str = get_app_description()
     debug: bool = False
+    app_port: int = Field(default=8274, description="Default application port")
+
 
     # Typesense
     typesense_host: str = Field(default="localhost")
@@ -52,8 +54,6 @@ class Settings(BaseSettings):
     tika_protocol: str = Field(default="http")
     tika_enabled: bool = Field(default=True)
     tika_client_only: bool = Field(default=True)
-    
-    # Initial scan (removed - now uses auto-resume based on previous state)
     
 
     @property

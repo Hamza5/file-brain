@@ -539,12 +539,31 @@ async def health_check():
         )
 
 
+def get_available_port(start_port: int, max_attempts: int = 100) -> int:
+    """Find an available port starting from start_port"""
+    import socket
+    port = start_port
+    while port < start_port + max_attempts:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("0.0.0.0", port))
+                return port
+            except OSError:
+                port += 1
+    return start_port
+
+
 if __name__ == "__main__":
-    from flaskwebgui import FlaskUI
     if sys.stdout is None:
         sys.stdout = open(os.devnull, "w")
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w")
-    FlaskUI(app=app, server="fastapi").run()
-    # import uvicorn
-    # uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = get_available_port(settings.app_port)
+    logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
+    
+    if not settings.debug:
+        from flaskwebgui import FlaskUI
+        FlaskUI(app=app, server="fastapi", port=port).run()
+    else:
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=port)
