@@ -28,13 +28,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm install
-
-      - name: Build shared package
-        run: |
-          cd packages/shared
-          npm install
-          # No build step needed for TS-only package currently
+        run: npm ci
 
       - name: Build website
         run: |
