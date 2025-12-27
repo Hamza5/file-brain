@@ -3,6 +3,12 @@ name: Deploy Website to GitHub Pages
 on:
   push:
     branches: ["main"]
+    paths:
+      - "apps/website/**"
+      - "packages/shared/**"
+      - ".github/workflows/deploy-website.yml"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 permissions:
