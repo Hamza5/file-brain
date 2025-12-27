@@ -23,11 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
-# Hidden files
+# Hidden files except some
 .*
 !.gitignore
 !.kilocode/
 !.env.example
+!.github/
 
 # Python
 __pycache__/
