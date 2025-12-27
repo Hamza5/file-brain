@@ -1,5 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
+import logo from '@/app/icon.svg';
 
 export const Footer: React.FC = () => {
     return (
@@ -7,7 +8,7 @@ export const Footer: React.FC = () => {
             <div className="landing-container">
                 <div className="flex flex-column md:flex-row justify-content-between align-items-center gap-4">
                     <div className="flex align-items-center gap-3">
-                        <Image src="/icon.svg" alt="Logo" width={32} height={32} />
+                        <Image src={logo} alt="Logo" width={32} height={32} />
                         <span className="font-bold text-xl text-900">File Brain</span>
                     </div>
                     

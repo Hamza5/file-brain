@@ -6,6 +6,7 @@ import { InputSwitch } from 'primereact/inputswitch';
 import { Badge } from 'primereact/badge';
 import { Chart } from 'primereact/chart';
 import Image from 'next/image';
+import logo from '@/app/icon.svg';
 
 const centerTextPlugin = {
     id: 'centerText',
@@ -82,7 +83,7 @@ export const AppMockup: React.FC = () => {
                             {/* App Header */}
                             <header className="flex align-items-center justify-content-between px-4 py-3 border-bottom-1 border-200 bg-white">
                                 <div className="flex align-items-center gap-2">
-                                    <Image src="/icon.svg" alt="Logo" width={32} height={32} />
+                                    <Image src={logo} alt="Logo" width={32} height={32} />
                                     <span className="font-bold text-xl text-900">File Brain</span>
                                 </div>
                                 <div className="flex-1 flex justify-content-center px-4">
