@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "apps/website",
-    "apps/file-brain/frontend"
+    "apps/file-brain/frontend",
+    "packages/shared"
   ],
   "scripts": {
     "dev:website": "npm run dev --workspace=@file-brain/website",
@@ -14,5 +15,8 @@
     "build:app-frontend": "npm run build --workspace=@file-brain/app",
     "docker:up": "cd apps/file-brain && docker compose up -d",
     "docker:down": "cd apps/file-brain && docker compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.0"
   }
 }

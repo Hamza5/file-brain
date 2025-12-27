@@ -11,7 +11,12 @@
   "dependencies": {
     "next": "16.1.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "primereact": "^10.9.7",
+    "primeflex": "^4.0.0",
+    "@fortawesome/fontawesome-free": "^7.1.0",
+    "chart.js": "^4.5.1",
+    "@file-brain/shared": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
