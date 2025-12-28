@@ -439,9 +439,19 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                     last_heartbeat = time.time()
                     logger.debug("SSE: Sent heartbeat")
 
-                # Conservative polling intervals: 10s when active, 30s when idle
-                # This significantly reduces performance impact while maintaining responsiveness
-                await asyncio.sleep(10.0 if status_dict.get("running") else 30.0)
+                # Dynamic polling intervals based on current phase for optimal responsiveness
+                # - verifying/discovering: 2s (rapid changes expected)
+                # - indexing: 5s (moderate progress updates)
+                # - monitoring/idle: 15s (infrequent changes)
+                current_phase = status_dict.get("current_phase", "idle")
+                if current_phase in ("verifying", "discovering"):
+                    poll_interval = 2.0
+                elif current_phase == "indexing":
+                    poll_interval = 5.0
+                else:
+                    poll_interval = 15.0
+                
+                await asyncio.sleep(poll_interval)
             except Exception as e:
                 logger.error(f"Error in crawler SSE stream: {e}")
                 break

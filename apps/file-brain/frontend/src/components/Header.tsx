@@ -24,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
     const { query, refine } = useSearchBox();
     const [searchValue, setSearchValue] = useState('');
+    const [isTogglingCrawler, setIsTogglingCrawler] = useState(false);
 
     // Sync local state with instant search query when it changes externally
     React.useEffect(() => {
@@ -203,20 +204,38 @@ export const Header: React.FC<HeaderProps> = ({
                     <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Crawler</span>
                     <InputSwitch
                         checked={isCrawlerActive}
-                        onChange={(e) => onToggleCrawler(e.value)}
-                        tooltip={isCrawlerActive ? "Stop Crawler" : "Start Crawler"}
+                        onChange={async (e) => {
+                            // Optimistic update: immediately update UI
+                            setIsTogglingCrawler(true);
+                            try {
+                                await onToggleCrawler(e.value);
+                            } finally {
+                                setIsTogglingCrawler(false);
+                            }
+                        }}
+                        disabled={isTogglingCrawler}
+                        tooltip={
+                            isTogglingCrawler
+                                ? "Processing..."
+                                : (isCrawlerActive ? "Stop Crawler" : "Start Crawler")
+                        }
                     />
+                    {isTogglingCrawler && (
+                        <i className="pi pi-spin pi-spinner" style={{ fontSize: '0.875rem', color: 'var(--primary-color)' }} />
+                    )}
                     <Badge
                         value={
-                            isCrawlerActive
-                                ? (crawlerStatus?.files_discovered === 0
-                                    ? "Discovering..."
-                                    : (crawlerStatus?.discovery_progress < 100
-                                        ? "Discovering..."
-                                        : "Indexing..."))
-                                : "Stopped"
+                            isTogglingCrawler
+                                ? "Processing..."
+                                : (isCrawlerActive
+                                    ? getCrawlerPhaseLabel(crawlerStatus)
+                                    : "Stopped")
                         }
-                        severity={isCrawlerActive ? "warning" : "danger"}
+                        severity={
+                            isTogglingCrawler
+                                ? "info"
+                                : (isCrawlerActive ? "warning" : "danger")
+                        }
                     />
                 </div>
 
@@ -249,3 +268,24 @@ export const Header: React.FC<HeaderProps> = ({
         </header>
     );
 };
+
+// Helper function to get crawler phase label
+function getCrawlerPhaseLabel(crawlerStatus?: any): string {
+    if (!crawlerStatus) return "Active";
+    
+    const phase = crawlerStatus.current_phase;
+    switch (phase) {
+        case 'verifying':
+            return "Verifying...";
+        case 'discovering':
+            return "Discovering...";
+        case 'indexing':
+            return "Indexing...";
+        case 'monitoring':
+            return "Monitoring";
+        case 'idle':
+            return "Idle";
+        default:
+            return "Active";
+    }
+}

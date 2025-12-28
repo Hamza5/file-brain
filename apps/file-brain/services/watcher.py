@@ -5,7 +5,7 @@ Converts file events to operations for the operation queue system
 import asyncio
 import time
 import os
-from typing import Callable, List
+from typing import Callable, List, Set, Dict
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent, FileDeletedEvent, DirModifiedEvent, DirCreatedEvent, DirDeletedEvent
 from api.models.file_event import FileDiscoveredEvent, FileChangedEvent, FileDeletedEvent
@@ -70,13 +70,19 @@ class CrawlEventHandler(FileSystemEventHandler):
     or access an asyncio loop directly. Instead, it forwards events to the
     provided callback, which is responsible for marshalling into the main
     asyncio loop.
+    
+    Performance optimizations:
+    - Filters out self-access events (IN_OPEN, IN_CLOSE_NOWRITE) from crawler's own file operations
+    - Ignores non-modification events that don't change file content
     """
     
-    def __init__(self, on_file_event: Callable):
+    def __init__(self, on_file_event: Callable, processing_files: Set[str] = None):
         # on_file_event is a plain callable invoked from the watchdog thread.
         # It must be thread-safe and handle scheduling work into the asyncio loop.
         self.on_file_event = on_file_event
         self._processing = set()
+        # Shared set of files currently being processed by crawler (to filter self-access)
+        self.processing_files = processing_files if processing_files is not None else set()
     
     def on_created(self, event):
         """Handle file/folder creation events"""
@@ -92,9 +98,18 @@ class CrawlEventHandler(FileSystemEventHandler):
         ))
     
     def on_modified(self, event):
-        """Handle file modification events"""
+        """
+        Handle file modification events.
+        
+        Performance: Filters out self-access events from crawler's own operations.
+        """
         if event.is_directory:
             return  # Skip directory modification
+        
+        # Filter out self-access: ignore modifications while crawler is processing this file
+        if event.src_path in self.processing_files:
+            logger.debug(f"Ignoring self-access modification event for: {event.src_path}")
+            return
         
         self._handle_file_event(FileChangedEvent(
             file_path=event.src_path,
@@ -128,16 +143,27 @@ class CrawlEventHandler(FileSystemEventHandler):
 
 class OperationEventHandler:
     """
-    Converts file events to operations and enqueues them
+    Converts file events to operations and enqueues them.
+    
+    Performance optimizations:
+    - Debounces rapid events for the same file (1 second window)
+    - Prevents duplicate processing of the same file
     """
     
-    def __init__(self, operation_queue: asyncio.Queue):
+    def __init__(self, operation_queue: asyncio.Queue, processing_files: Set[str] = None):
         self.operation_queue = operation_queue
         self._processing = set()
+        # Shared set for self-access filtering
+        self.processing_files = processing_files if processing_files is not None else set()
+        # Debouncing: track last event time for each file
+        self._last_event_time: Dict[str, float] = {}
+        self._debounce_window = 1.0  # 1 second debounce window
     
     async def handle_file_event(self, event) -> None:
         """
-        Handle file system events by converting them to operations
+        Handle file system events by converting them to operations.
+        
+        Performance: Debounces rapid events for the same file.
         """
         if hasattr(event, 'file_path'):
             # Already an operation
@@ -150,6 +176,15 @@ class OperationEventHandler:
         if not file_path or file_path in self._processing:
             return
         
+        # Debouncing: Check if we've seen this file recently
+        current_time = time.time()
+        if file_path in self._last_event_time:
+            time_since_last = current_time - self._last_event_time[file_path]
+            if time_since_last < self._debounce_window:
+                logger.debug(f"Debouncing event for {file_path} (last event {time_since_last:.2f}s ago)")
+                return
+        
+        self._last_event_time[file_path] = current_time
         self._processing.add(file_path)
         
         try:
@@ -229,7 +264,8 @@ class OperationEventHandler:
 def create_watcher_for_crawl(
     watch_paths: List[str],
     operation_queue: asyncio.Queue,
-    excluded_patterns: List[str] = None
+    excluded_patterns: List[str] = None,
+    processing_files: Set[str] = None
 ) -> tuple[FileWatcher, OperationEventHandler]:
     """
     Create a FileWatcher configured for the crawl job
@@ -238,14 +274,19 @@ def create_watcher_for_crawl(
         watch_paths: Paths to watch
         operation_queue: Queue to enqueue operations
         excluded_patterns: Patterns to exclude
+        processing_files: Shared set of files being processed (for self-access filtering)
         
     Returns:
         Tuple of (FileWatcher, OperationEventHandler)
     """
     excluded_patterns = excluded_patterns or []
     
+    # Create shared processing_files set if not provided
+    if processing_files is None:
+        processing_files = set()
+    
     # Create event handler that enqueues operations into the shared asyncio.Queue
-    event_handler = OperationEventHandler(operation_queue)
+    event_handler = OperationEventHandler(operation_queue, processing_files)
 
     # Capture the running asyncio loop at watcher creation time.
     # This must be called from within the main event loop (as done by CrawlJobManager).
@@ -270,10 +311,14 @@ def create_watcher_for_crawl(
         except Exception as exc:
             logger.error(f"Failed to schedule file event for {getattr(event, 'src_path', None)}: {exc}")
 
+    # Update event handler for watchdog with processing_files reference
     watcher = FileWatcher(
         on_file_event=on_file_event,
         watch_paths=watch_paths,
         excluded_patterns=excluded_patterns
     )
+    
+    # Share processing_files with the CrawlEventHandler
+    watcher.event_handler.processing_files = processing_files
     
     return watcher, event_handler

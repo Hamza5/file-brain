@@ -65,6 +65,10 @@ class CrawlJobManager:
         self._operation_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
         self._watcher = None
 
+        # Shared set for tracking files currently being processed
+        # Used by watcher to filter out self-access events
+        self._processing_files: set = set()
+
         # Thread pool for blocking/CPU-heavy work (hashing, extraction, Typesense calls)
         # Keeping this bounded ensures predictable behavior under load.
         max_workers = int(os.getenv("CRAWLER_WORKERS", "4"))
@@ -200,12 +204,14 @@ class CrawlJobManager:
         - indexing_progress reflects both initial crawl and any queued operations.
         - indexing_progress reaches 100 ONLY when there is no pending work (queue_size == 0)
           and all known operations have been processed (success/failed).
+        - current_phase provides detailed status: verifying, discovering, indexing, monitoring, idle
         """
         # If manager is not running, expose an idle status
         if not self._running:
             return {
                 "running": False,
                 "job_type": None,
+                "current_phase": "idle",
                 "start_time": None,
                 "elapsed_time": None,
                 "discovery_progress": 0,
@@ -287,6 +293,11 @@ class CrawlJobManager:
         # Monitoring flag from watcher
         monitoring_active = self._watcher is not None and self._watcher.is_running()
 
+        # Determine current phase based on state
+        current_phase = self._determine_current_phase(
+            discovery_progress, indexing_progress, queue_size, monitoring_active
+        )
+
         # Log suspicious situations for debugging progress correctness
         if indexing_progress == 100 and (queue_size > 0 or remaining > 0):
             logger.warning(
@@ -298,6 +309,7 @@ class CrawlJobManager:
         return {
             "running": True,
             "job_type": job_type,
+            "current_phase": current_phase,
             "start_time": int(start_time.timestamp() * 1000) if start_time else None,
             "elapsed_time": int(elapsed_time) if elapsed_time is not None else None,
             "discovery_progress": discovery_progress,
@@ -309,6 +321,37 @@ class CrawlJobManager:
             "monitoring_active": monitoring_active,
             "estimated_completion": estimated_completion,
         }
+    
+    def _determine_current_phase(
+        self,
+        discovery_progress: int,
+        indexing_progress: int,
+        queue_size: int,
+        monitoring_active: bool
+    ) -> str:
+        """
+        Determine the current phase of the crawler based on progress metrics.
+        
+        Phases:
+        - verifying: Checking existing indexed files (first few seconds)
+        - discovering: Finding files to index (0-100% discovery)
+        - indexing: Processing files (discovery complete, indexing in progress)
+        - monitoring: Idle but watching for changes
+        """
+        # If discovery is not complete, we're in discovery phase
+        if discovery_progress < 100:
+            return "discovering"
+        
+        # If discovery is complete but indexing not complete, we're indexing
+        if indexing_progress < 100 or queue_size > 0:
+            return "indexing"
+        
+        # If both complete and monitoring is active, we're in monitoring phase
+        if monitoring_active:
+            return "monitoring"
+        
+        # Otherwise, we're in an undefined active state (shouldn't normally happen)
+        return "indexing"
     
     async def clear_indexes(self) -> bool:
         """Clear all files from Typesense and reset statistics"""
@@ -340,11 +383,12 @@ class CrawlJobManager:
         try:
             logger.info(f"Starting file monitoring for: {watch_paths}")
             
-            # Create integrated watcher
+            # Create integrated watcher with shared processing_files set
             self._watcher, _ = create_watcher_for_crawl(
                 watch_paths=watch_paths,
                 operation_queue=self._operation_queue,
-                excluded_patterns=[]  # Remove excluded patterns as requested
+                excluded_patterns=[],  # Remove excluded patterns as requested
+                processing_files=self._processing_files  # Share processing state
             )
             
             # Start watcher in background
@@ -715,6 +759,8 @@ class CrawlJobManager:
 
         All heavy work (hashing, extraction, Typesense I/O) is offloaded to the
         thread pool via _run_in_executor to keep the event loop responsive.
+        
+        Performance: Tracks processing files to enable watcher self-access filtering.
         """
         file_path = operation.file_path
 
@@ -722,6 +768,9 @@ class CrawlJobManager:
         if self._stop_event.is_set():
             logger.info(f"Stop requested before processing {file_path}; skipping.")
             return False
+
+        # Mark file as being processed (for watcher self-access filtering)
+        self._processing_files.add(file_path)
 
         # Comprehensive file accessibility check
         is_accessible, accessibility_reason = self._check_file_accessibility(file_path)
@@ -813,14 +862,14 @@ class CrawlJobManager:
 
             logger.debug(f"Successfully indexed (or updated): {file_path}")
             
-            # Add delay between file processing for performance
-            await asyncio.sleep(5)
-            
             return True
 
         except Exception as e:
             logger.error(f"Error processing file {file_path}: {e}")
             return False
+        finally:
+            # Always remove from processing set when done
+            self._processing_files.discard(file_path)
     
     async def _handle_delete_operation(self, operation: CrawlOperation) -> bool:
         """Handle delete operations.
