@@ -120,6 +120,24 @@ async def retry_service_initialization(service_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+@router.get("/services/{service_name}/logs")
+async def get_service_logs(service_name: str, limit: int = 100):
+    """Get initialization logs for a specific service"""
+    try:
+        service_manager = get_service_manager()
+        logs = service_manager.get_service_logs(service_name, limit)
+        
+        return {
+            "service": service_name,
+            "logs": logs,
+            "timestamp": int(time.time() * 1000)
+        }
+    except Exception as e:
+        logger.error(f"Error getting service logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def _get_status_message(overall_status: str, progress: float) -> str:
     """Generate appropriate status message based on overall status and progress"""
     if overall_status == "healthy" and progress == 100.0:

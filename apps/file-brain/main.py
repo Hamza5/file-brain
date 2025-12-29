@@ -123,7 +123,7 @@ async def background_init():
                 try:
                     import aiohttp
                     async with aiohttp.ClientSession() as session:
-                        async with session.get(f"{settings.tika_url}/tika", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                        async with session.get(f"{settings.tika_url}/version", timeout=aiohttp.ClientTimeout(total=5)) as response:
                             if response.status == 200:
                                 return {"healthy": True, "endpoint": settings.tika_url, "client_only": settings.tika_client_only}
                             else:
@@ -362,6 +362,8 @@ app.include_router(fs_router)
 app.include_router(files_router)
 from api.system import router as system_router
 app.include_router(system_router)
+from api.system_stream import router as system_stream_router
+app.include_router(system_stream_router)
 
 # Serve frontend static files
 # Mount assets directory for CSS, JS, fonts, etc.

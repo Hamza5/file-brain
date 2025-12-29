@@ -17,14 +17,34 @@ export interface CrawlStatus {
   timestamp: number;
 }
 
+export interface ServicePhase {
+  name: string;
+  progress: number;
+  message: string;
+}
+
+export interface ServiceInitStatus {
+  name: string;
+  user_friendly_name: string;
+  state: 'not_started' | 'initializing' | 'ready' | 'failed' | 'disabled';
+  current_phase?: ServicePhase;
+  error?: string;
+  logs: string[];
+}
+
+export interface InitializationStatus {
+  services: Record<string, ServiceInitStatus>;
+  overall_progress: number;
+  timestamp: number;
+}
+
 // Generic JSON fetch helper
-const API_BASE =
+const API_BASE_URL = "";
   // In production behind the same origin, keep this empty and proxy /api to FastAPI.
   // During Vite dev, configure server.proxy in vite.config.ts so that ^/api goes to FastAPI.
-  "";
 
 async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
-  const url = input.startsWith("http") ? input : `${API_BASE}${input}`;
+  const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
   const res = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
@@ -332,4 +352,29 @@ export async function getServicesStatus(): Promise<ServiceStatus> {
 
 export async function retryService(serviceName: string): Promise<{ message: string; timestamp: number }> {
   return requestJSON(`/api/system/services/${serviceName}/retry`, { method: "POST" });
+}
+
+export function connectInitializationStream(
+  onUpdate: (status: InitializationStatus) => void,
+  onError?: () => void
+): () => void {
+  const eventSource = new EventSource('/api/system/initialization/stream');
+  
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data && typeof data === 'object') {
+        onUpdate(data);
+      }
+    } catch (e) {
+      console.error("Failed to parse init stream event", e);
+    }
+  };
+  
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError();
+  };
+  
+  return () => eventSource.close();
 }

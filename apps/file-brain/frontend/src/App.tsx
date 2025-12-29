@@ -8,6 +8,8 @@ import { Header } from "./components/Header";
 import { MainContent } from "./components/MainContent";
 import { PreviewSidebar } from "./components/PreviewSidebar";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { InitializationOverlay } from "./components/InitializationOverlay";
+import { InitializationStatusBar } from "./components/InitializationStatusBar";
 import { connectStatusStream, startCrawler, stopCrawler } from "./api/client";
 
 // Configure Typesense InstantSearch adapter
@@ -133,6 +135,8 @@ export default function App() {
 
         {/* Global Confirm Dialog - Single instance for all delete operations */}
         <ConfirmDialog />
+        <InitializationOverlay />
+        <InitializationStatusBar />
       </NotificationProvider>
     </StatusProvider>
   );

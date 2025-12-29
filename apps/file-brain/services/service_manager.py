@@ -24,6 +24,15 @@ class ServiceState(Enum):
 
 
 @dataclass
+class ServicePhase:
+    """Detailed service initialization phase"""
+    phase_name: str
+    progress_percent: float = 0.0
+    message: str = ""
+    started_at: float = field(default_factory=time.time)
+
+
+@dataclass
 class ServiceStatus:
     """Individual service status information"""
     state: ServiceState = ServiceState.NOT_STARTED
@@ -35,6 +44,11 @@ class ServiceStatus:
     next_retry: Optional[float] = None
     dependencies: List[str] = field(default_factory=list)
     details: Dict[str, Any] = field(default_factory=dict)
+    
+    # Enhanced initialization tracking
+    user_friendly_name: str = ""
+    current_phase: Optional[ServicePhase] = None
+    initialization_log: List[str] = field(default_factory=list)
 
 
 class ServiceManager:
@@ -46,18 +60,22 @@ class ServiceManager:
     def __init__(self):
         self._services: Dict[str, ServiceStatus] = {
             "database": ServiceStatus(
+                user_friendly_name="Local Database",
                 dependencies=[],
                 details={"type": "sqlite", "connection_timeout": 5}
             ),
             "typesense": ServiceStatus(
+                user_friendly_name="Search Engine",
                 dependencies=["database"],
                 details={"host": settings.typesense_host, "port": settings.typesense_port, "protocol": settings.typesense_protocol}
             ),
             "tika": ServiceStatus(
+                user_friendly_name="Content Extraction",
                 dependencies=["database"],
                 details={"host": settings.tika_host, "port": settings.tika_port, "protocol": settings.tika_protocol, "enabled": settings.tika_enabled}
             ),
             "crawl_manager": ServiceStatus(
+                user_friendly_name="File Indexer",
                 dependencies=["database"],
                 details={"components": ["discovery", "indexing"]}
             )
@@ -70,7 +88,7 @@ class ServiceManager:
         """Register a health check function for a service"""
         with self._lock:
             if service_name not in self._services:
-                self._services[service_name] = ServiceStatus()
+                self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
             self._health_checkers[service_name] = checker
     
     def get_service_status(self, service_name: str) -> Optional[ServiceStatus]:
@@ -83,12 +101,51 @@ class ServiceManager:
         with self._lock:
             return {name: status for name, status in self._services.items()}
     
+    def set_service_phase(self, service_name: str, phase_name: str, 
+                         progress_percent: float, message: str):
+        """Update the current initialization phase for a service"""
+        with self._lock:
+            if service_name not in self._services:
+                self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
+            
+            status = self._services[service_name]
+            status.current_phase = ServicePhase(
+                phase_name=phase_name,
+                progress_percent=progress_percent,
+                message=message
+            )
+            
+            # Auto-update state to initializing if not already
+            if status.state == ServiceState.NOT_STARTED:
+                status.state = ServiceState.INITIALIZING
+                
+            self.append_service_log(service_name, f"Phase changed to '{phase_name}': {message}")
+    
+    def append_service_log(self, service_name: str, message: str):
+        """Append a log message to the service's initialization log"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_entry = f"[{timestamp}] {message}"
+        
+        with self._lock:
+            if service_name in self._services:
+                # Keep last 100 logs
+                self._services[service_name].initialization_log.append(log_entry)
+                if len(self._services[service_name].initialization_log) > 100:
+                    self._services[service_name].initialization_log.pop(0)
+    
+    def get_service_logs(self, service_name: str, limit: int = 50) -> List[str]:
+        """Get recent logs for a service"""
+        with self._lock:
+            if service_name in self._services:
+                return self._services[service_name].initialization_log[-limit:]
+            return []
+
     def update_service_state(self, service_name: str, state: ServiceState,
                            error_message: Optional[str] = None, details: Optional[Dict] = None):
         """Update service state with timestamp"""
         with self._lock:
             if service_name not in self._services:
-                self._services[service_name] = ServiceStatus()
+                self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
             
             status = self._services[service_name]
             status.state = state
@@ -99,6 +156,13 @@ class ServiceManager:
                 status.retry_count = 0
                 status.next_retry = None
                 status.error_message = None
+                # Clear phase info when ready
+                status.current_phase = ServicePhase(
+                    phase_name="Ready",
+                    progress_percent=100.0,
+                    message="Service is fully operational"
+                )
+                self.append_service_log(service_name, "Service is ready")
                 logger.debug(f"Service {service_name} marked as ready at {status.last_success}")
             
             elif state == ServiceState.FAILED:
@@ -108,12 +172,15 @@ class ServiceManager:
                     # Exponential backoff for retries
                     backoff_seconds = min(2 ** status.retry_count, 300)  # Max 5 minutes
                     status.next_retry = time.time() + backoff_seconds
+                    self.append_service_log(service_name, f"Failed (attempt {status.retry_count}): {error_message}")
                     logger.warning(f"Service {service_name} failed (attempt {status.retry_count}): {error_message}")
                 else:
                     status.next_retry = None  # Max retries reached
+                    self.append_service_log(service_name, f"Permanently failed: {error_message}")
                     logger.error(f"Service {service_name} failed permanently after {status.max_retries} attempts: {error_message}")
             
             elif state == ServiceState.INITIALIZING:
+                self.append_service_log(service_name, "Initialization started")
                 logger.info(f"Service {service_name} started initialization")
             
             if details:
@@ -286,7 +353,7 @@ class ServiceManager:
         if dependencies:
             with self._lock:
                 if service_name not in self._services:
-                    self._services[service_name] = ServiceStatus()
+                    self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
                 self._services[service_name].dependencies = dependencies
         
         # Create and store the initialization task
@@ -300,12 +367,25 @@ class ServiceManager:
             logger.info(f"Starting background initialization for {service_name}")
             self.set_initializing(service_name)
             
+            self.set_service_phase(service_name, "Waiting for Dependencies", 0, "Wait for dependencies to be ready")
+            
             # Check dependencies first
             dep_status = self.get_dependency_status(service_name)
             if not dep_status["ready"]:
-                missing_deps = [dep for dep, status in dep_status["dependencies"].items() if not status["ready"]]
-                raise Exception(f"Dependencies not ready: {missing_deps}")
+                # Wait for dependencies with timeout
+                start_wait = time.time()
+                while time.time() - start_wait < 60:  # 60s timeout for dependencies
+                    await asyncio.sleep(1)
+                    dep_status = self.get_dependency_status(service_name)
+                    if dep_status["ready"]:
+                        break
+                
+                if not dep_status["ready"]:
+                    missing_deps = [dep for dep, status in dep_status["dependencies"].items() if not status["ready"]]
+                    raise Exception(f"Dependencies timed out: {missing_deps}")
             
+            self.set_service_phase(service_name, "Initializing", 10, "Starting initialization sequence")
+
             # Run the initialization function
             if asyncio.iscoroutinefunction(init_func):
                 result = await init_func()

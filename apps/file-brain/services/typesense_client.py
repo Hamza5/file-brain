@@ -48,32 +48,74 @@ class TypesenseClient:
         - On persistent failure -> log error and let the API start in degraded mode,
           leaving collection_ready = False so callers can react appropriately.
         """
+        from services.service_manager import get_service_manager
+        service_manager = get_service_manager()
+        service_name = "typesense"
+        
         attempt = 0
         backoff = initial_backoff_seconds
+
+        service_manager.append_service_log(service_name, f"Starting initialization (max attempts: {max_attempts})")
 
         while attempt < max_attempts:
             attempt += 1
             try:
-                # 1. Fast path: collection exists
+                # 1. Connecting phase
+                service_manager.set_service_phase(
+                    service_name, 
+                    "Connecting to Search Engine", 
+                    20 + (attempt * 5), 
+                    f"Connecting to {settings.typesense_host}:{settings.typesense_port}"
+                )
+                
+                # 2. Fast path: checking if collection exists
+                service_manager.set_service_phase(
+                    service_name, 
+                    "Verifying Collection", 
+                    40, 
+                    "Checking if search collection exists"
+                )
+                
                 self.client.collections[self.collection_name].retrieve()
+                
+                service_manager.append_service_log(service_name, f"Collection '{self.collection_name}' already exists")
                 logger.info(
                     f"Collection '{self.collection_name}' already exists (attempt {attempt}/{max_attempts})"
                 )
                 self.collection_ready = True
                 return
             except typesense.exceptions.ObjectNotFound:
-                # 2. Not found -> try to create it
+                # 3. Not found -> try to create it (Downloading models phase)
                 try:
+                    service_manager.set_service_phase(
+                        service_name, 
+                        "Downloading Embedding Models", 
+                        60, 
+                        "This may take several minutes on first run..."
+                    )
+                    service_manager.append_service_log(service_name, "Creating collection (may trigger model download)")
+                    
                     schema = get_collection_schema(self.collection_name)
                     self.client.collections.create(schema)
+                    
+                    service_manager.append_service_log(service_name, f"Collection '{self.collection_name}' created successfully")
                     logger.info(
                         f"Collection '{self.collection_name}' created successfully "
                         f"(attempt {attempt}/{max_attempts})"
+                    )
+                    
+                    # 4. Finalizing
+                    service_manager.set_service_phase(
+                        service_name, 
+                        "Finalizing Schema", 
+                        90, 
+                        "Verifying created collection"
                     )
                     self.collection_ready = True
                     return
                 except typesense.exceptions.ObjectAlreadyExists:
                     # Race condition: someone else created it between our 404 and create.
+                    service_manager.append_service_log(service_name, "Collection created by another process")
                     logger.info(
                         f"Collection '{self.collection_name}' already exists after race "
                         f"(attempt {attempt}/{max_attempts})"
@@ -82,12 +124,16 @@ class TypesenseClient:
                     return
                 except Exception as e:
                     # Network/timeout/other error while creating. Retry.
+                    error_msg = f"Creation failed: {str(e)}"
+                    service_manager.append_service_log(service_name, error_msg)
                     logger.warning(
                         f"Attempt {attempt}/{max_attempts} to create Typesense collection "
                         f"'{self.collection_name}' failed: {e}"
                     )
             except Exception as e:
                 # 3. Retrieval failed for transient reasons (Typesense starting up, timeouts, etc.)
+                error_msg = f"Connection/Verification failed: {str(e)}"
+                service_manager.append_service_log(service_name, error_msg)
                 logger.warning(
                     f"Attempt {attempt}/{max_attempts} to verify Typesense collection "
                     f"'{self.collection_name}' failed: {e}"
@@ -95,11 +141,21 @@ class TypesenseClient:
 
             # Backoff before next attempt
             if attempt < max_attempts:
+                wait_msg = f"Retrying in {backoff} seconds..."
+                service_manager.append_service_log(service_name, wait_msg)
+                service_manager.set_service_phase(
+                    service_name, 
+                    "Retrying Connection", 
+                    10, 
+                    wait_msg
+                )
                 await asyncio.sleep(backoff)
                 backoff *= 2
 
         # If we reach here, all attempts failed.
         # Do NOT raise to avoid crashing FastAPI startup.
+        fail_msg = f"Failed after {max_attempts} attempts. Starting in degraded mode."
+        service_manager.append_service_log(service_name, fail_msg)
         logger.error(
             f"Failed to initialize Typesense collection '{self.collection_name}' "
             f"after {max_attempts} attempts. Continuing in degraded mode."

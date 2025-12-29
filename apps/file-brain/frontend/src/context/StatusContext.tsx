@@ -12,7 +12,9 @@ import {
   type CrawlStatus,
   type SystemInitialization,
   type WatchPath,
+  type InitializationStatus,
   connectStatusStream,
+  connectInitializationStream,
   getCrawlerStats,
   getCrawlerStatus,
   getSystemInitialization,
@@ -70,6 +72,7 @@ export function StatusProvider({ children }: { children: ReactNode }) {
   // Initial snapshot + SSE subscription with polling fallback
   useEffect(() => {
     let stopStream: (() => void) | null = null;
+    let stopInitStream: (() => void) | null = null;
     let pollTimer: number | null = null;
 
     async function loadInitial() {
@@ -141,23 +144,69 @@ export function StatusProvider({ children }: { children: ReactNode }) {
 
     function startStream() {
       try {
+        // Connect to crawler status stream
         stopStream = connectStatusStream(
           (payload: { status: CrawlStatus["status"]; stats?: CrawlStats | undefined; watch_paths?: WatchPath[]; timestamp: number }) => {
             setIsLive(true);
             applySnapshot(payload.status, payload.stats ?? null, payload.watch_paths, undefined);
           },
           () => {
-            // SSE error; mark as not live and use polling
             setIsLive(false);
-            if (!pollTimer) {
-              startPolling();
-            }
-            // Only log the error once per connection attempt to reduce spam
-            console.debug("SSE stream disconnected, falling back to polling");
+            if (!pollTimer) startPolling();
+            console.debug("SSE status stream disconnected");
           }
         );
+        
+        // Connect to system initialization stream
+        stopInitStream = connectInitializationStream(
+          (initStatus: InitializationStatus) => {
+            // Map the streaming init status to our SystemInitialization type
+            const systemInit: SystemInitialization = {
+              timestamp: initStatus.timestamp,
+              overall_status: initStatus.overall_progress === 100 ? "healthy" : "degraded", // Stream doesn't send "critical" yet, assume degraded if not 100% or healthy
+              initialization_progress: initStatus.overall_progress,
+              services: Object.entries(initStatus.services).reduce((acc, [name, s]) => {
+                let status: "healthy" | "unhealthy" | "initializing" | "disabled" | "error" | "retry_scheduled" = 'initializing';
+                if (s.state === 'ready') status = 'healthy';
+                else if (s.state === 'failed') status = 'error';
+                else if (s.state === 'disabled') status = 'disabled';
+                else if (s.state === 'initializing') status = 'initializing';
+                
+                acc[name] = {
+                    status,
+                    message: s.current_phase?.message || s.error,
+                    state: s.state, // Preserve original state for UI
+                    user_friendly_name: s.user_friendly_name, // Pass through extras
+                    current_phase: s.current_phase,
+                    logs: s.logs,
+                    error: s.error
+                } as any; // We extend the type with extras which is fine
+                return acc;
+              }, {} as any),
+              summary: {
+                total_services: Object.keys(initStatus.services).length,
+                healthy_services: Object.values(initStatus.services).filter(s => s.state === 'ready').length,
+                failed_services: Object.values(initStatus.services).filter(s => s.state === 'failed').length,
+              },
+              capabilities: {
+                configuration_api: initStatus.services['database']?.state === 'ready',
+                search_api: initStatus.services['typesense']?.state === 'ready',
+                crawl_api: initStatus.services['crawl_manager']?.state === 'ready',
+                full_functionality: initStatus.overall_progress === 100
+              },
+              degraded_mode: Object.values(initStatus.services).some(s => s.state === 'failed'),
+              message: `Initialization progress: ${initStatus.overall_progress.toFixed(0)}%`
+            };
+            
+            setSystemInitialization(systemInit);
+          },
+          () => {
+             console.debug("SSE init stream disconnected");
+          }
+        );
+        
       } catch (e) {
-        console.warn("Failed to start SSE stream, falling back to polling", e);
+        console.warn("Failed to start SSE streams", e);
         setIsLive(false);
         startPolling();
       }
@@ -168,33 +217,11 @@ export function StatusProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      if (stopStream) {
-        stopStream();
-      }
+      if (stopStream) stopStream();
+      if (stopInitStream) stopInitStream();
       stopPolling();
     };
   }, [applySnapshot]);
-
-  // Convenience getters
-  const isInitializationComplete = useMemo(() => {
-    if (!systemInitialization) return false;
-    return systemInitialization.initialization_progress === 100;
-  }, [systemInitialization]);
-
-  const isSystemHealthy = useMemo(() => {
-    if (!systemInitialization) return false;
-    return systemInitialization.overall_status === "healthy";
-  }, [systemInitialization]);
-
-  const canUseSearch = useMemo(() => {
-    if (!systemInitialization) return false;
-    return systemInitialization.capabilities.search_api;
-  }, [systemInitialization]);
-
-  const canUseCrawler = useMemo(() => {
-    if (!systemInitialization) return false;
-    return systemInitialization.capabilities.crawl_api;
-  }, [systemInitialization]);
 
   const value = useMemo<StatusContextValue>(
     () => ({
@@ -206,12 +233,13 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       isLive,
       isLoading,
       error,
-      isInitializationComplete,
-      isSystemHealthy,
-      canUseSearch,
-      canUseCrawler,
+      // Computed properties
+      isInitializationComplete: systemInitialization?.initialization_progress === 100,
+      isSystemHealthy: systemInitialization?.overall_status === "healthy",
+      canUseSearch: systemInitialization?.capabilities?.search_api ?? false,
+      canUseCrawler: systemInitialization?.capabilities?.crawl_api ?? false,
     }),
-    [status, stats, systemInitialization, watchPaths, lastUpdate, isLive, isLoading, error, isInitializationComplete, isSystemHealthy, canUseSearch, canUseCrawler]
+    [status, stats, systemInitialization, watchPaths, lastUpdate, isLive, isLoading, error]
   );
 
   return (
