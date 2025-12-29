@@ -183,15 +183,14 @@ async def background_init():
                 # Get configuration from database for potential auto-resume
                 db = SessionLocal()
                 db_service = DatabaseService(db)
-                watch_paths = db_service.get_watch_paths(enabled_only=True)
+                watch_paths = db_service.list_watch_paths(enabled_only=True)
                 previous_state = db_service.get_crawler_state()
                 
                 service_manager.set_ready("crawl_manager", details={
                     "watch_paths_count": len(watch_paths) if watch_paths else 0,
                     "previous_state": {
                         "crawl_job_running": previous_state.crawl_job_running,
-                        "crawl_job_type": previous_state.crawl_job_type,
-                        "watcher_running": previous_state.watcher_running
+                        "crawl_job_type": previous_state.crawl_job_type
                     }
                 })
                 
@@ -209,35 +208,7 @@ async def background_init():
         
         service_manager.start_background_initialization("crawl_manager", init_crawl_manager, dependencies=["database"])
         
-        # File Watcher initialization (non-blocking)
-        try:
-            logger.info("Starting file watcher initialization in background...")
-            
-            async def init_file_watcher():
-                try:
-                    # Register file watcher health checker
-                    async def file_watcher_health_check():
-                        try:
-                            # Simple health check - verify watchdog library is available
-                            import watchdog.observers
-                            import watchdog.events
-                            return {"healthy": True, "library": "watchdog", "version": "available"}
-                        except ImportError as e:
-                            return {"healthy": False, "error": f"watchdog library not available: {str(e)}"}
-                        except Exception as e:
-                            return {"healthy": False, "error": str(e)}
-                    
-                    service_manager.register_health_checker("file_watcher", file_watcher_health_check)
-                    service_manager.set_ready("file_watcher", details={"library": "watchdog", "initialized": True})
-                    logger.info("✅ File watcher initialized in background")
-                    
-                except Exception as e:
-                    service_manager.set_failed("file_watcher", f"File watcher initialization error: {e}")
-            
-            service_manager.start_background_initialization("file_watcher", init_file_watcher, dependencies=["database"])
-            
-        except Exception as e:
-            service_manager.set_failed("file_watcher", f"File watcher setup error: {e}")
+
         
     except Exception as e:
         service_manager.set_failed("crawl_manager", f"Crawl manager setup error: {e}")
@@ -257,50 +228,28 @@ async def auto_resume_logic(watch_paths, previous_state):
         
         auto_resumed = False
         if watch_paths:
-            cj_type = (previous_state.crawl_job_type or "").lower() if previous_state.crawl_job_type else ""
+
             
             if previous_state.crawl_job_running:
                 # Previous session reported an active crawl job; treat as needing full resume.
                 logger.info(
                     "🔄 Detected previous in-progress crawl job; "
-                    "auto-resuming with crawl+monitor."
+                    "auto-resuming crawl job."
                 )
                 crawl_manager = get_crawl_job_manager()
                 success = await crawl_manager.start_crawl(
                     watch_paths,
-                    start_monitoring=True,
-                    include_subdirectories=True,
                 )
                 if success:
-                    logger.info("✅ Auto-resumed crawl+monitor based on previous state.")
+                    logger.info("✅ Auto-resumed crawl based on previous state.")
                     auto_resumed = True
                 else:
-                    logger.warning("⚠️ Failed to auto-resume crawl+monitor from previous state.")
+                    logger.warning("⚠️ Failed to auto-resume crawl from previous state.")
             
-            elif (not previous_state.crawl_job_running) and previous_state.watcher_running:
-                # No active crawl job flag, but watcher was running -> monitor-only session.
-                logger.info(
-                    "🔄 Detected previous monitor-only session; "
-                    "auto-resuming monitor-only (no full re-crawl)."
-                )
-                # Implement monitor-only by starting a crawl with monitoring enabled.
-                # Discovery will run, but Typesense/file_hash logic keeps this idempotent.
-                crawl_manager = get_crawl_job_manager()
-                success = await crawl_manager.start_crawl(
-                    watch_paths,
-                    start_monitoring=True,
-                    include_subdirectories=True,
-                )
-                if success:
-                    logger.info("✅ Auto-resumed monitor-only (crawl+monitor) based on previous watcher state.")
-                    auto_resumed = True
-                else:
-                    logger.warning("⚠️ Failed to auto-resume monitor-only from previous state.")
-        
         if not auto_resumed:
             if watch_paths:
                 logger.info("📁 Watch paths configured but no auto-resume conditions met.")
-                logger.info("💡 Use /api/crawler/start to manually start crawling or monitoring.")
+                logger.info("💡 Use /api/crawler/start to manually start crawling.")
             else:
                 logger.info(
                     "ℹ️ No watch paths configured. "
@@ -487,7 +436,7 @@ async def api_info():
         "features": {
             "parallel_discovery": "File discovery runs in parallel with indexing",
             "auto_resume": "Automatically resumes crawling if it was running before shutdown",
-            "monitoring": "Real-time file change detection with operation queue",
+
             "job_management": "Simple start/stop/clear operations with progress tracking",
             "instant_startup": "FastAPI starts instantly, services initialize in background",
             "health_monitoring": "Real-time health monitoring of all system services",
@@ -523,7 +472,7 @@ async def health_check():
                 "search_engine": "typesense",
                 "content_extraction": "tika_docker" if settings.tika_enabled else "disabled",
                 "crawl_engine": "crawl_job_manager",
-                "monitoring": "file_watcher"
+
             }
         }
         

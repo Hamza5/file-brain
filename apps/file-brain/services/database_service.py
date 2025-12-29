@@ -21,7 +21,7 @@ class DatabaseService:
         """Get all crawler settings with defaults"""
         settings = self.get_all_settings()
         return {
-            "start_monitoring": self.get_setting_bool("crawler_start_monitoring", default=True),
+            # "start_monitoring": self.get_setting_bool("crawler_start_monitoring", default=True),
         }
     
     def set_crawler_setting(self, key: str, value: Any) -> Setting:
@@ -37,8 +37,7 @@ class DatabaseService:
     
     def initialize_default_crawler_settings(self) -> None:
         """Initialize default crawler settings if they don't exist"""
-        if self.get_setting("crawler_start_monitoring") is None:
-            self.set_setting("crawler_start_monitoring", "true", "Whether to start file monitoring with crawl")
+
         
     
     # Watch Paths

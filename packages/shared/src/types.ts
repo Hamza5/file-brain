@@ -10,7 +10,6 @@ export interface CrawlStatus {
     files_indexed: number;
     files_skipped: number;
     queue_size: number;
-    monitoring_active: boolean;
     estimated_completion: number | null;
   };
   timestamp: number;

@@ -11,7 +11,7 @@ requires-python = ">=3.11,<3.15"
 dependencies = [
     "pydantic (>=2.12.4,<3.0.0)",
     "pydantic-settings (>=2.11.0,<3.0.0)",
-    "watchdog (>=6.0.0,<7.0.0)",
+
     "typesense (>=1.1.1,<2.0.0)",
     "python-magic (>=0.4.27,<0.5.0)",
     "fastapi[standard-no-fastapi-cloud-cli] (>=0.121.0,<0.122.0)",

@@ -59,11 +59,7 @@ class ServiceManager:
             ),
             "crawl_manager": ServiceStatus(
                 dependencies=["database"],
-                details={"components": ["discovery", "indexing", "monitoring"]}
-            ),
-            "file_watcher": ServiceStatus(
-                dependencies=["database"],
-                details={"library": "watchdog", "recursive": True}
+                details={"components": ["discovery", "indexing"]}
             )
         }
         self._lock = threading.RLock()

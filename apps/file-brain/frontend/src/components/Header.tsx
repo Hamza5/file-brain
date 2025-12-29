@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
-import { InputSwitch } from 'primereact/inputswitch';
 import { Badge } from 'primereact/badge';
 import { useSearchBox } from 'react-instantsearch';
 
@@ -202,27 +201,27 @@ export const Header: React.FC<HeaderProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 'max-content' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Crawler</span>
-                    <InputSwitch
-                        checked={isCrawlerActive}
-                        onChange={async (e) => {
-                            // Optimistic update: immediately update UI
+                    <Button
+                        label={isCrawlerActive ? "Stop" : "Start"}
+                        icon={isTogglingCrawler ? "pi pi-spin pi-spinner" : (isCrawlerActive ? "fa-solid fa-stop" : "fa-solid fa-play")}
+                        onClick={async () => {
                             setIsTogglingCrawler(true);
                             try {
-                                await onToggleCrawler(e.value);
+                                await onToggleCrawler(!isCrawlerActive);
                             } finally {
                                 setIsTogglingCrawler(false);
                             }
                         }}
                         disabled={isTogglingCrawler}
+                        size="small"
+                        severity={isCrawlerActive ? "danger" : "success"}
                         tooltip={
                             isTogglingCrawler
                                 ? "Processing..."
                                 : (isCrawlerActive ? "Stop Crawler" : "Start Crawler")
                         }
                     />
-                    {isTogglingCrawler && (
-                        <i className="pi pi-spin pi-spinner" style={{ fontSize: '0.875rem', color: 'var(--primary-color)' }} />
-                    )}
+
                     <Badge
                         value={
                             isTogglingCrawler
@@ -281,8 +280,7 @@ function getCrawlerPhaseLabel(crawlerStatus?: any): string {
             return "Discovering...";
         case 'indexing':
             return "Indexing...";
-        case 'monitoring':
-            return "Monitoring";
+
         case 'idle':
             return "Idle";
         default:

@@ -96,17 +96,14 @@ async def start_crawler(
                 detail="No valid watch paths configured"
             )
         
-        # Get settings from database
-        settings = db_service.get_crawler_settings()
-        start_monitoring = settings["start_monitoring"]
+        # Get settings from database - monitoring is removed
+        # settings = db_service.get_crawler_settings()
         
         logger.info(f"Starting crawl job for {len(valid_paths)} paths: {[p.path for p in valid_paths]}")
-        logger.info(f"File monitoring: {'enabled' if start_monitoring else 'disabled'}")
         
         # Start the crawl job
         success = await crawl_manager.start_crawl(
             watch_paths=valid_paths,
-            start_monitoring=start_monitoring,
         )
         
         if not success:
@@ -119,7 +116,7 @@ async def start_crawler(
         
         return MessageResponse(
             message=f"Enhanced crawl job started successfully for {len(valid_paths)} path(s). "
-                   f"Parallel discovery, indexing, and file monitoring {'are' if start_monitoring else 'are not'} running.",
+                   f"Parallel discovery and indexing are running.",
             success=True,
             timestamp=int(time.time() * 1000),
         )
@@ -194,8 +191,7 @@ async def stop_crawler(db: Session = Depends(get_db)):
         logger.info("Enhanced crawl job stopped successfully")
         
         return MessageResponse(
-            message="Enhanced crawl job stopped successfully. "
-                   "File monitoring has also been stopped.",
+            message="Enhanced crawl job stopped successfully.",
             success=True,
             timestamp=int(time.time() * 1000),
         )
@@ -439,10 +435,6 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                     last_heartbeat = time.time()
                     logger.debug("SSE: Sent heartbeat")
 
-                # Dynamic polling intervals based on current phase for optimal responsiveness
-                # - verifying/discovering: 2s (rapid changes expected)
-                # - indexing: 5s (moderate progress updates)
-                # - monitoring/idle: 15s (infrequent changes)
                 current_phase = status_dict.get("current_phase", "idle")
                 if current_phase in ("verifying", "discovering"):
                     poll_interval = 2.0
@@ -500,8 +492,9 @@ async def update_crawler_settings(
         
         # Update each setting
         for key, value in settings.items():
-            if key in ["start_monitoring"]:
-                db_service.set_crawler_setting(key, value)
+            pass
+            # if key in ["start_monitoring"]:
+            #     db_service.set_crawler_setting(key, value)
         
         logger.info(f"Updated crawler settings: {settings}")
         

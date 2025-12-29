@@ -70,7 +70,7 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
                             "content"
                         ],
                     "model_config": {
-                        "model_name": "ts/e5-small-v2"
+                        "model_name": "ts/paraphrase-multilingual-mpnet-base-v2"
                     }
                 }
             }

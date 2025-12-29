@@ -11,15 +11,8 @@ class CrawlerState(Base):
     __tablename__ = "crawler_state"
     
     id = Column(Integer, primary_key=True, default=1)  # Always 1
-    watcher_running = Column(Boolean, default=False, nullable=False)
-    processor_running = Column(Boolean, default=False, nullable=False)
-    paused = Column(Boolean, default=False, nullable=False)
-    started_at = Column(DateTime, nullable=True)
-    paused_at = Column(DateTime, nullable=True)
-    
-    # Enhanced job management
     crawl_job_running = Column(Boolean, default=False, nullable=False)
-    crawl_job_type = Column(String, nullable=True)  # "crawl", "monitor", or "crawl+monitor"
+    crawl_job_type = Column(String, nullable=True)  # "crawl"
     crawl_job_started_at = Column(DateTime, nullable=True)
     
     # Progress tracking

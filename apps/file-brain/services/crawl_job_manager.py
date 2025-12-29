@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from database.models import SessionLocal, CrawlerState, WatchPath
 from services.database_service import DatabaseService
 from services.typesense_client import get_typesense_client
-from services.watcher import create_watcher_for_crawl
+
 from services.extractor import get_extractor
 from api.models.operations import CrawlOperation, OperationType, BatchOperation
 from api.models.file_event import FileDiscoveredEvent, FileChangedEvent, FileDeletedEvent
@@ -63,7 +63,6 @@ class CrawlJobManager:
         self.typesense = get_typesense_client()
         self.extractor = get_extractor()
         self._operation_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
-        self._watcher = None
 
         # Shared set for tracking files currently being processed
         # Used by watcher to filter out self-access events
@@ -80,7 +79,6 @@ class CrawlJobManager:
     async def start_crawl(
         self,
         watch_paths: List['WatchPath'],
-        start_monitoring: bool = True,
     ) -> bool:
         """
         Start the crawl job with parallel discovery, indexing, and monitoring.
@@ -102,7 +100,6 @@ class CrawlJobManager:
         path_strs = [wp.path for wp in watch_paths]
         logger.info(f"Starting crawl job for {len(path_strs)} paths")
         logger.info(f"Watch paths: {path_strs}")
-        logger.info(f"File monitoring: {'enabled' if start_monitoring else 'disabled'}")
         
         self._running = True
         self._stop_event.clear()
@@ -113,7 +110,7 @@ class CrawlJobManager:
             db_service = DatabaseService(db)
             db_service.update_crawler_state(
                 crawl_job_running=True,
-                crawl_job_type="crawl+monitor" if start_monitoring else "crawl",
+                crawl_job_type="crawl",
                 crawl_job_started_at=datetime.utcnow(),
                 discovery_progress=0,
                 indexing_progress=0,
@@ -121,7 +118,6 @@ class CrawlJobManager:
                 files_indexed=0,
                 files_skipped=0,
                 estimated_total_files=0,
-                watcher_running=start_monitoring,
             )
         finally:
             db.close()
@@ -129,7 +125,7 @@ class CrawlJobManager:
         # Start the main crawl task (runs in background)
         # File monitoring will be started within the task to avoid blocking here
         self._crawl_task = asyncio.create_task(
-            self._run_crawl_job_with_monitoring(watch_paths, start_monitoring, path_strs)
+            self._run_crawl_job(watch_paths)
         )
         
         return True
@@ -154,8 +150,7 @@ class CrawlJobManager:
         # not on all heavy work finishing.
         self._stop_event.set()
  
-        # Stop file monitoring first so no new watch events are enqueued.
-        await self._stop_file_monitoring()
+
  
         # Cancel running tasks to interrupt awaits promptly.
         for task in (self._crawl_task, self._discovery_task, self._indexing_task):
@@ -182,7 +177,6 @@ class CrawlJobManager:
                 crawl_job_running=False,
                 crawl_job_type=None,
                 crawl_job_started_at=None,
-                watcher_running=False,
             )
         finally:
             db.close()
@@ -230,7 +224,8 @@ class CrawlJobManager:
             db_service = DatabaseService(db)
             state = db_service.get_crawler_state()
             start_time = state.crawl_job_started_at
-            job_type = state.crawl_job_type or "crawl+monitor"
+            start_time = state.crawl_job_started_at
+            job_type = state.crawl_job_type or "crawl"
         finally:
             db.close()
 
@@ -258,8 +253,6 @@ class CrawlJobManager:
             discovery_progress = 0
 
         # Total known operations:
-        # - For initial crawl: approximated by discovered
-        # - With monitoring: also consider completed + queued so progress never exceeds reality
         total_known_ops = max(discovered, completed + queue_size)
 
         # Compute indexing progress against all known work
@@ -290,15 +283,13 @@ class CrawlJobManager:
                 estimated_completion_dt = datetime.utcnow() + timedelta(seconds=remaining_time)
                 estimated_completion = int(estimated_completion_dt.timestamp() * 1000)
 
-        # Monitoring flag from watcher
-        monitoring_active = self._watcher is not None and self._watcher.is_running()
-
         # Determine current phase based on state
         current_phase = self._determine_current_phase(
-            discovery_progress, indexing_progress, queue_size, monitoring_active
+            discovery_progress, indexing_progress, queue_size
         )
 
         # Log suspicious situations for debugging progress correctness
+
         if indexing_progress == 100 and (queue_size > 0 or remaining > 0):
             logger.warning(
                 "Inconsistent progress state detected in get_status: "
@@ -318,7 +309,7 @@ class CrawlJobManager:
             "files_indexed": indexed_success,
             "files_skipped": skipped,
             "queue_size": queue_size,
-            "monitoring_active": monitoring_active,
+            "queue_size": queue_size,
             "estimated_completion": estimated_completion,
         }
     
@@ -327,7 +318,6 @@ class CrawlJobManager:
         discovery_progress: int,
         indexing_progress: int,
         queue_size: int,
-        monitoring_active: bool
     ) -> str:
         """
         Determine the current phase of the crawler based on progress metrics.
@@ -336,7 +326,6 @@ class CrawlJobManager:
         - verifying: Checking existing indexed files (first few seconds)
         - discovering: Finding files to index (0-100% discovery)
         - indexing: Processing files (discovery complete, indexing in progress)
-        - monitoring: Idle but watching for changes
         """
         # If discovery is not complete, we're in discovery phase
         if discovery_progress < 100:
@@ -346,11 +335,6 @@ class CrawlJobManager:
         if indexing_progress < 100 or queue_size > 0:
             return "indexing"
         
-        # If both complete and monitoring is active, we're in monitoring phase
-        if monitoring_active:
-            return "monitoring"
-        
-        # Otherwise, we're in an undefined active state (shouldn't normally happen)
         return "indexing"
     
     async def clear_indexes(self) -> bool:
@@ -376,66 +360,7 @@ class CrawlJobManager:
             logger.error(f"Error clearing indexes: {e}")
             return False
     
-    async def _start_file_monitoring(self, watch_paths: List[str]) -> None:
-        """
-        Start file monitoring for real-time changes
-        """
-        try:
-            logger.info(f"Starting file monitoring for: {watch_paths}")
-            
-            # Create integrated watcher with shared processing_files set
-            self._watcher, _ = create_watcher_for_crawl(
-                watch_paths=watch_paths,
-                operation_queue=self._operation_queue,
-                excluded_patterns=[],  # Remove excluded patterns as requested
-                processing_files=self._processing_files  # Share processing state
-            )
-            
-            # Start watcher in background
-            self._watcher.start()
-            
-            logger.info("File monitoring started successfully")
-            
-        except Exception as e:
-            logger.error(f"Error starting file monitoring: {e}")
-            # Continue without monitoring if it fails
-            pass
-    
-    async def _stop_file_monitoring(self) -> None:
-        """Stop file monitoring"""
-        if self._watcher:
-            try:
-                logger.info("Stopping file monitoring")
-                self._watcher.stop()
-                self._watcher = None
-                logger.info("File monitoring stopped")
-            except Exception as e:
-                logger.error(f"Error stopping file monitoring: {e}")
-    
-    async def _run_crawl_job_with_monitoring(
-        self, 
-        watch_paths: List['WatchPath'], 
-        start_monitoring: bool, 
-        path_strs: List[str]
-    ) -> None:
-        """
-        Wrapper that starts file monitoring and then runs the main crawl job.
-        This allows start_crawl to return immediately while monitoring starts in background.
-        """
-        try:
-            # Start file monitoring if requested (non-blocking)
-            if start_monitoring:
-                await self._start_file_monitoring(path_strs)
-            
-            # Run the main crawl job
-            await self._run_crawl_job(watch_paths)
-            
-        except Exception as e:
-            logger.error(f"Error in crawl job with monitoring: {e}")
-        finally:
-            # Ensure monitoring is stopped on completion
-            if start_monitoring:
-                await self._stop_file_monitoring()
+
     
     async def _run_crawl_job(self, watch_paths: List['WatchPath']) -> None:
         """Main crawl job coordinator - runs index verification, parallel discovery and indexing"""
@@ -486,9 +411,21 @@ class CrawlJobManager:
                     db_service.update_crawler_state(
                         discovery_progress=100,
                         indexing_progress=100,
+                        crawl_job_running=False,
+                        crawl_job_type=None,
+                        crawl_job_started_at=None,
+                    )
+                else:
+                    # Even if stopped, ensure the running flag is cleared in DB
+                    db_service.update_crawler_state(
+                        crawl_job_running=False,
+                        crawl_job_type=None,
+                        crawl_job_started_at=None,
                     )
             finally:
                 db.close()
+            
+            self._running = False
     
     async def _run_in_executor(self, func: Callable, *args, **kwargs):
         """
