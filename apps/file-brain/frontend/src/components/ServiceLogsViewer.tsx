@@ -97,7 +97,7 @@ export function ServiceLogsViewer({ visible, onHide, serviceName, userFriendlyNa
         )}
         
         <div className="flex justify-content-end mt-3">
-          <Button label="Close" icon="pi pi-times" onClick={onHide} />
+          <Button label="Close" icon="fas fa-times" onClick={onHide} />
         </div>
       </div>
     </Dialog>
