@@ -1,30 +1,11 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Card } from 'primereact/card';
 import { Chart } from 'primereact/chart';
-import { getCrawlerStats, type CrawlStats, listWatchPaths } from '../api/client';
-
-// Deep comparison helper for stats
-const statsEqual = (a: CrawlStats | null, b: CrawlStats | null): boolean => {
-    if (a === b) return true;
-    if (!a || !b) return false;
-
-    // Compare file_types (the main data for the chart)
-    const aTypes = JSON.stringify(a.file_types);
-    const bTypes = JSON.stringify(b.file_types);
-    if (aTypes !== bTypes) return false;
-
-    // Compare totals
-    if (a.totals.discovered !== b.totals.discovered || a.totals.indexed !== b.totals.indexed) return false;
-
-    // Compare runtime
-    if (a.runtime.running !== b.runtime.running) return false;
-
-    return true;
-};
+import { useStatus } from '../context/StatusContext';
 
 const centerTextPlugin = {
     id: 'centerText',
-    beforeDraw: function (chart: any) {
+    beforeDraw: function (chart: { config: { type: string; options: { plugins: { centerText?: { value: number } } } }; ctx: CanvasRenderingContext2D; chartArea: { top: number; left: number; width: number; height: number } }) {
         if (chart.config.type !== 'doughnut') return;
 
         const { ctx, chartArea: { top, left, width, height } } = chart;
@@ -45,7 +26,7 @@ const centerTextPlugin = {
         // Draw Number
         ctx.font = "bold 1.25rem sans-serif";
         ctx.fillStyle = textColor;
-        const text1 = chart.config.options.plugins.centerText?.value || "0";
+        const text1 = String(chart.config.options.plugins.centerText?.value || "0");
         ctx.fillText(text1, x, y - 10);
 
         // Draw Label
@@ -60,33 +41,9 @@ const centerTextPlugin = {
 
 
 export const HeroStats: React.FC = () => {
-    const [stats, setStats] = useState<CrawlStats | null>(null);
-    const [hasFoldersConfigured, setHasFoldersConfigured] = useState<boolean>(false);
+    const { stats, watchPaths } = useStatus();
+    const hasFoldersConfigured = watchPaths.length > 0;
     const hasRenderedChart = useRef(false);
-
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [statsData, watchPaths] = await Promise.all([
-                    getCrawlerStats(),
-                    listWatchPaths(false)
-                ]);
-
-                // Only update if data actually changed
-                setStats(prev => statsEqual(prev, statsData) ? prev : statsData);
-                setHasFoldersConfigured(watchPaths.length > 0);
-            } catch (error) {
-                console.error("Failed to fetch data:", error);
-            }
-        };
-
-        fetchData();
-        // Poll every 5 seconds
-        const interval = setInterval(fetchData, 5000);
-        return () => clearInterval(interval);
-    }, []);
-
-
 
     // Memoize chart data to prevent unnecessary rerenders - only update when file_types actually changes
     const chartConfig = useMemo(() => {
@@ -150,7 +107,7 @@ export const HeroStats: React.FC = () => {
                 },
                 tooltip: {
                     callbacks: {
-                        label: function (context: any) {
+                        label: function (context: { label?: string; parsed?: number }) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
@@ -236,19 +193,18 @@ export const HeroStats: React.FC = () => {
                     <div style={{ marginBottom: '0.35rem', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         Discovered
                     </div>
-                    {stats?.runtime.running ? (
-                        <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary-color)', margin: 0 }}>
-                            {stats ? stats.totals.discovered.toLocaleString() : '0'}
+                    <p style={{
+                        fontSize: '1.5rem',
+                        fontWeight: 700,
+                        color: stats?.totals.discovered && stats.totals.discovered > 0 ? 'var(--primary-color)' : 'var(--text-color-secondary)',
+                        margin: 0
+                    }}>
+                        {stats && stats.totals.discovered > 0 ? stats.totals.discovered.toLocaleString() : '—'}
+                    </p>
+                    {(!stats || stats.totals.discovered === 0) && (
+                        <p style={{ fontSize: '0.65rem', color: 'var(--text-color-secondary)', marginTop: '0.2rem' }}>
+                            Start crawler to discover files
                         </p>
-                    ) : (
-                        <>
-                            <p style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-color-secondary)', margin: 0 }}>
-                                —
-                            </p>
-                            <p style={{ fontSize: '0.65rem', color: 'var(--text-color-secondary)', marginTop: '0.2rem' }}>
-                                Start crawler to view
-                            </p>
-                        </>
                     )}
                 </Card>
 
@@ -276,8 +232,8 @@ export const HeroStats: React.FC = () => {
                     </p>
                 </Card>
 
-                {/* Indexing Progress Chart */}
-                {stats && stats.totals.discovered > 0 && (
+                {/* Indexing Progress Card - Only show when running OR when work is pending */}
+                {stats && stats.totals.discovered > 0 && (stats.runtime.running || stats.totals.indexed < stats.totals.discovered) && (
                     <Card
                         style={{
                             textAlign: 'center',

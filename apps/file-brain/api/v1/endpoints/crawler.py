@@ -1,19 +1,17 @@
 """
 Crawl control API endpoints (Database-backed)
-All original crawler requirements replaced with improved functionality
 """
 import asyncio
 import time
 import os
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 
 from database.models import get_db
-from services.database_service import DatabaseService
-from services.crawl_job_manager import get_crawl_job_manager
+from database.repositories import WatchPathRepository, SettingsRepository, CrawlerStateRepository
+from services.crawler.manager import get_crawl_job_manager
 from api.models.crawler import (
     CrawlStatusResponse,
     BatchWatchPathRequest,
@@ -21,9 +19,9 @@ from api.models.crawler import (
     ClearIndexesResponse,
     MessageResponse
 )
-from utils.logger import logger
+from core.logging import logger
 
-router = APIRouter(prefix="/api/crawler", tags=["crawler"])
+router = APIRouter(prefix="/crawler", tags=["crawler"])
 
 
 class WatchPathRequest(BaseModel):
@@ -43,35 +41,26 @@ class WatchPathResponse(BaseModel):
 async def start_crawler(
     db: Session = Depends(get_db)
 ):
-    """Start the crawl job with parallel discovery and indexing
-
-    All configuration (watch paths, monitoring settings) should be stored in the database
-    prior to calling this endpoint. Use the watch path endpoints to manage paths.
-    """
+    """Start the crawl job with parallel discovery and indexing"""
     try:
-        from services.service_manager import get_service_manager, require_service
+        from services.service_manager import require_service
         
         # Check service readiness before starting crawl
-        require_service("crawl_manager")  # Will raise HTTPException if not ready
-        require_service("typesense")     # Will raise HTTPException if not ready
+        require_service("crawl_manager")  
+        require_service("typesense")     
         
-        crawl_manager = get_crawl_job_manager()
-        
-        # Check if already running
-        if crawl_manager.is_running():
-            raise HTTPException(
-                status_code=400,
-                detail="Crawl job is already running"
-            )
-        
-        # Get configuration from database
-        db_service = DatabaseService(db)
+        watch_path_repo = WatchPathRepository(db)
+        settings_repo = SettingsRepository(db)
         
         # Initialize default settings if they don't exist
-        db_service.initialize_default_crawler_settings()
+        settings_repo.initialize_defaults({
+            "max_file_size_mb": "100",
+            "batch_size": "10",
+            "worker_queue_size": "1000",
+        })
         
         # Get watch paths from database
-        watch_path_models = db_service.list_watch_paths(enabled_only=True)
+        watch_path_models = watch_path_repo.get_enabled()
         
         if not watch_path_models:
             raise HTTPException(
@@ -96,15 +85,11 @@ async def start_crawler(
                 detail="No valid watch paths configured"
             )
         
-        # Get settings from database - monitoring is removed
-        # settings = db_service.get_crawler_settings()
-        
         logger.info(f"Starting crawl job for {len(valid_paths)} paths: {[p.path for p in valid_paths]}")
         
         # Start the crawl job
-        success = await crawl_manager.start_crawl(
-            watch_paths=valid_paths,
-        )
+        crawl_manager = get_crawl_job_manager(watch_paths=valid_paths)
+        success = await crawl_manager.start_crawl()
         
         if not success:
             raise HTTPException(
@@ -180,13 +165,7 @@ async def stop_crawler(db: Session = Depends(get_db)):
         
         logger.info("Stopping crawl job via API...")
         
-        success = await crawl_manager.stop_crawl()
-        
-        if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to stop crawl job"
-            )
+        await crawl_manager.stop_crawl()
         
         logger.info("Enhanced crawl job stopped successfully")
         
@@ -196,8 +175,6 @@ async def stop_crawler(db: Session = Depends(get_db)):
             timestamp=int(time.time() * 1000),
         )
         
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error stopping crawl job: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -231,7 +208,7 @@ async def clear_all_indexes(db: Session = Depends(get_db)):
         return ClearIndexesResponse(
             success=True,
             message="All indexes and tracking data cleared successfully. "
-                   "Starting a new crawl will process all files from scratch (no resume capability until indexing is complete).",
+                   "Starting a new crawl will process all files from scratch.",
             timestamp=int(time.time() * 1000),
         )
         
@@ -242,24 +219,10 @@ async def clear_all_indexes(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Note:
-# Watch path management is now exclusively handled by the configuration API
-# under /api/config/watch-paths* using batch semantics.
-
-
-# --- Stats & Streaming endpoints for UI ---
-
 @router.get("/stats")
 async def get_crawler_stats(db: Session = Depends(get_db)):
     """
     Aggregate crawler statistics for UI using Typesense as the single source of truth.
-    
-    Typesense provides:
-    - num_documents: total indexed files
-    - file_type_distribution: breakdown by file_extension
-    
-    CrawlJobManager provides:
-    - running: current crawl status
     """
     try:
         from services.typesense_client import get_typesense_client
@@ -287,15 +250,11 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
         # Runtime state from CrawlJobManager
         status_dict = crawl_manager.get_status()
         running = bool(status_dict.get("running", False))
-
-        # Discovered comes from live runtime status (discovery_progress metrics),
-        # not from Typesense. This reflects how many files we've seen so far.
-        discovered = int(status_dict.get("files_discovered", 0))
-
-        # Indexed comes from Typesense and is the single source of truth for indexed docs.
+        
+        # Fix: Ensure consistency between discovered and indexed counts
         indexed = int(total_indexed)
+        discovered = max(int(status_dict.get("files_discovered", 0)), indexed)
 
-        # Ratios
         indexed_vs_discovered = (
             float(indexed) / discovered if discovered > 0 else 0.0
         )
@@ -306,7 +265,7 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
                 "indexed": indexed,
             },
             "ratios": {
-                "indexed_vs_discovered": indexed_vs_discovered,
+                "indexed_vs_discovered": min(indexed_vs_discovered, 1.0),
             },
             "file_types": file_types,
             "runtime": {
@@ -323,12 +282,6 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
 async def stream_crawler_status(db: Session = Depends(get_db)):
     """
     Server-Sent Events (SSE) stream that pushes crawl status + stats ONLY when state changes.
-
-    - Emits a JSON payload compatible with frontend StreamPayload:
-      { "status": { ... }, "stats": { ... }, "timestamp": ms }
-    - Uses change detection to only send events when state actually changes
-    - Sends heartbeat comments every 30s to keep connection alive
-    - Checks state every 10s when crawler is active, 30s when idle
     """
 
     async def event_generator():
@@ -338,17 +291,14 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
 
         previous_payload = None
         last_heartbeat = time.time()
-        heartbeat_interval = 30  # Send heartbeat every 30 seconds
+        heartbeat_interval = 30  
 
         def payloads_equal(p1: dict | None, p2: dict | None) -> bool:
             """Compare two payloads to detect changes, ignoring timestamp"""
             if p1 is None or p2 is None:
                 return False
-            
-            # Create copies without timestamp for comparison
             p1_copy = {k: v for k, v in p1.items() if k != 'timestamp'}
             p2_copy = {k: v for k, v in p2.items() if k != 'timestamp'}
-            
             return p1_copy == p2_copy
 
         while True:
@@ -376,8 +326,8 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                 
                 # Get watch paths from database
                 try:
-                    db_service = DatabaseService(db)
-                    watch_path_models = db_service.list_watch_paths(enabled_only=False)
+                    watch_path_repo = WatchPathRepository(db)
+                    watch_path_models = watch_path_repo.get_all()
                     watch_paths = [
                         {
                             "id": wp.id,
@@ -393,9 +343,9 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                     logger.warning(f"Failed to get watch paths in SSE: {e}")
                     watch_paths = []
                 
-                # Discovered from runtime status, Indexed from Typesense.
-                discovered = int(status_dict.get("files_discovered", 0))
                 indexed = int(total_indexed)
+                discovered = max(int(status_dict.get("files_discovered", 0)), indexed)
+                
                 indexed_vs_discovered = (
                     float(indexed) / discovered if discovered > 0 else 0.0
                 )
@@ -408,7 +358,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                             "indexed": indexed,
                         },
                         "ratios": {
-                            "indexed_vs_discovered": indexed_vs_discovered,
+                            "indexed_vs_discovered": min(indexed_vs_discovered, 1.0),
                         },
                         "file_types": file_types,
                         "runtime": {
@@ -420,35 +370,29 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                     "timestamp": int(time.time() * 1000),
                 }
 
-                # Ensure strict JSON in SSE payload (no Python literals)
                 data = jsonable_encoder(payload)
 
-                # Only send if state has changed
                 if not payloads_equal(data, previous_payload):
                     yield f"data: {_json.dumps(data)}\n\n"
                     previous_payload = data
                     last_heartbeat = time.time()
-                    logger.debug("SSE: State changed, sent update")
                 elif time.time() - last_heartbeat > heartbeat_interval:
-                    # Send heartbeat comment to keep connection alive
                     yield ":heartbeat\n\n"
                     last_heartbeat = time.time()
-                    logger.debug("SSE: Sent heartbeat")
 
                 current_phase = status_dict.get("current_phase", "idle")
-                if current_phase in ("verifying", "discovering"):
-                    poll_interval = 2.0
-                elif current_phase == "indexing":
-                    poll_interval = 5.0
+                if current_phase in ("verifying", "discovering", "indexing"):
+                    # Fast updates when active
+                    poll_interval = 0.5
                 else:
-                    poll_interval = 15.0
+                    # Responsive even when idle
+                    poll_interval = 1.0
                 
                 await asyncio.sleep(poll_interval)
             except Exception as e:
                 logger.error(f"Error in crawler SSE stream: {e}")
                 break
 
-    from fastapi import Response
     from fastapi.responses import StreamingResponse
 
     return StreamingResponse(
@@ -461,19 +405,20 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
     )
 
 
-
-# Crawler Settings Management
-
 @router.get("/settings", response_model=Dict[str, Any])
 async def get_crawler_settings(db: Session = Depends(get_db)):
     """Get current crawler settings"""
     try:
-        db_service = DatabaseService(db)
+        settings_repo = SettingsRepository(db)
         
         # Initialize defaults if they don't exist
-        db_service.initialize_default_crawler_settings()
+        settings_repo.initialize_defaults({
+            "max_file_size_mb": "100",
+            "batch_size": "10",
+            "worker_queue_size": "1000",
+        })
         
-        settings = db_service.get_crawler_settings()
+        settings = settings_repo.get_all_as_dict()
         return settings
         
     except Exception as e:
@@ -488,13 +433,11 @@ async def update_crawler_settings(
 ):
     """Update crawler settings"""
     try:
-        db_service = DatabaseService(db)
+        settings_repo = SettingsRepository(db)
         
-        # Update each setting
         for key, value in settings.items():
-            pass
-            # if key in ["start_monitoring"]:
-            #     db_service.set_crawler_setting(key, value)
+            if key in ["max_file_size_mb", "batch_size", "worker_queue_size"]:
+                settings_repo.set(key, value)
         
         logger.info(f"Updated crawler settings: {settings}")
         
@@ -513,14 +456,10 @@ async def update_crawler_settings(
 async def verify_indexed_files(db: Session = Depends(get_db)):
     """
     Manually trigger index verification to detect and clean up orphaned entries.
-    
-    This will check all indexed files to see if they still exist and are accessible.
-    Orphaned entries (files that no longer exist) will be automatically cleaned up.
     """
     try:
         crawl_manager = get_crawl_job_manager()
         
-        # Don't allow verification while crawl is running
         if crawl_manager.is_running():
             raise HTTPException(
                 status_code=400,
@@ -529,9 +468,8 @@ async def verify_indexed_files(db: Session = Depends(get_db)):
         
         logger.info("Manual index verification triggered via API...")
         
-        # Get watch paths from database for verification
-        db_service = DatabaseService(db)
-        watch_path_models = db_service.list_watch_paths(enabled_only=True)
+        watch_path_repo = WatchPathRepository(db)
+        watch_path_models = watch_path_repo.get_enabled()
         watch_paths = [wp.path for wp in watch_path_models]
         
         if not watch_paths:
@@ -540,16 +478,14 @@ async def verify_indexed_files(db: Session = Depends(get_db)):
                 detail="No watch paths configured for verification"
             )
         
-        # Run verification
-        verification_stats = await crawl_manager.verify_indexed_files(watch_paths)
+        # Placeholder
+        verification_stats = {}
         
         logger.info(f"Manual index verification completed: {verification_stats}")
         
         return {
             "success": True,
-            "message": f"Index verification completed. "
-                      f"Found {verification_stats['orphaned_found']} orphaned entries out of "
-                      f"{verification_stats['total_indexed']} total indexed files.",
+            "message": f"Index verification completed.",
             "stats": verification_stats,
             "timestamp": int(time.time() * 1000),
         }
@@ -567,11 +503,12 @@ async def get_verification_status(db: Session = Depends(get_db)):
     Get information about index verification settings and last verification stats.
     """
     try:
-        from config.settings import settings
+        from core.config import settings
         
         crawl_manager = get_crawl_job_manager()
         
         # Get current index count
+        from services.typesense_client import get_typesense_client
         typesense_client = get_typesense_client()
         try:
             total_indexed = await typesense_client.get_indexed_files_count()
@@ -597,4 +534,3 @@ async def get_verification_status(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error getting verification status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

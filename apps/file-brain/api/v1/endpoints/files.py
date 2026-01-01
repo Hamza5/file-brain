@@ -4,15 +4,14 @@ File operations API for cross-platform file opening functionality
 import os
 import platform
 import subprocess
-import shutil
 from pathlib import Path
 from typing import List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from services.typesense_client import TypesenseClient
-from utils.logger import logger
+from core.logging import logger
 
-router = APIRouter(prefix="/api/files", tags=["files"])
+router = APIRouter(prefix="/files", tags=["files"])
 
 
 class FileOperationRequest(BaseModel):

@@ -8,7 +8,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/fs", tags=["filesystem"])
+router = APIRouter(prefix="/fs", tags=["filesystem"])
 
 
 class FsRoot(BaseModel):

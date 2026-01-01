@@ -2,40 +2,32 @@
 File Brain - Advanced file search engine powered by AI
 """
 import asyncio
-from datetime import datetime
-import time
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-
 import os
-import sys
+import socket
 
-from config.settings import settings
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from core.config import settings
+from core.factory import create_app
+from core.logging import logger
 from database.models import init_db, init_default_data, SessionLocal
-from services.database_service import DatabaseService
 from services.typesense_client import get_typesense_client
-from services.crawl_job_manager import get_crawl_job_manager
-from api.crawler import router as crawler_router
-from api.configuration import router as config_router
-from api.files import router as files_router
-from api.fs import router as fs_router
-from utils.logger import logger
+from services.crawler.manager import get_crawl_job_manager
+from api.v1.router import api_router
+from database.repositories import WatchPathRepository, CrawlerStateRepository
 
 
 async def critical_init():
     """
     Critical initialization that MUST complete before FastAPI startup
-    This includes only the essential services for API functionality
     """
-    from services.service_manager import get_service_manager, ServiceState
+    from services.service_manager import get_service_manager
     
     service_manager = get_service_manager()
     
-    # Database initialization (CRITICAL - blocks startup)
     try:
         logger.info("Initializing database...")
         init_db()
@@ -43,7 +35,6 @@ async def critical_init():
         init_default_data(db)
         db.close()
         
-        # Register database health checker
         async def database_health_check():
             try:
                 from sqlalchemy import text
@@ -59,7 +50,7 @@ async def critical_init():
         logger.info("✅ Database initialized")
     except Exception as e:
         service_manager.set_failed("database", f"Database initialization failed: {e}")
-        raise  # This blocks startup - database is required
+        raise 
 
     return {
         "database": "ready",
@@ -69,21 +60,16 @@ async def critical_init():
 async def background_init():
     """
     Background initialization that does NOT block FastAPI startup
-    These services can fail or be slow without affecting API availability
     """
     from services.service_manager import get_service_manager
-    from services.database_service import DatabaseService
-    from services.crawl_job_manager import get_crawl_job_manager
-    from database.models import SessionLocal
     
     service_manager = get_service_manager()
     
-    # Typesense initialization (non-blocking)
+    # Typesense initialization
     try:
         logger.info("Starting Typesense initialization in background...")
         typesense = get_typesense_client()
         
-        # Register Typesense health checker
         async def typesense_health_check():
             try:
                 await typesense.get_collection_stats()
@@ -93,7 +79,6 @@ async def background_init():
         
         service_manager.register_health_checker("typesense", typesense_health_check)
         
-        # Start background initialization
         async def init_typesense():
             try:
                 await typesense.initialize_collection()
@@ -113,12 +98,11 @@ async def background_init():
     except Exception as e:
         service_manager.set_failed("typesense", f"Typesense setup error: {e}")
     
-    # Tika initialization (non-blocking)
+    # Tika initialization
     if settings.tika_enabled:
         try:
             logger.info("Starting Tika initialization in background...")
             
-            # Register Tika health checker
             async def tika_health_check():
                 try:
                     import aiohttp
@@ -128,63 +112,47 @@ async def background_init():
                                 return {"healthy": True, "endpoint": settings.tika_url, "client_only": settings.tika_client_only}
                             else:
                                 return {"healthy": False, "error": f"Tika server returned status {response.status}"}
-                except asyncio.TimeoutError:
-                    return {"healthy": False, "error": "Tika server timeout"}
                 except Exception as e:
                     return {"healthy": False, "error": str(e)}
             
             service_manager.register_health_checker("tika", tika_health_check)
             
-            # Start background initialization
             async def init_tika():
-                try:
-                    # Just mark as ready since Tika runs in separate container
-                    service_manager.set_ready("tika", details={
-                        "endpoint": settings.tika_url,
-                        "client_only": settings.tika_client_only,
-                        "enabled": settings.tika_enabled
-                    })
-                    logger.info("✅ Tika initialized in background")
-                    
-                except Exception as e:
-                    service_manager.set_failed("tika", f"Tika initialization error: {e}")
+                service_manager.set_ready("tika", details={
+                    "endpoint": settings.tika_url,
+                    "client_only": settings.tika_client_only,
+                    "enabled": settings.tika_enabled
+                })
+                logger.info("✅ Tika initialized in background")
             
             service_manager.start_background_initialization("tika", init_tika, dependencies=["database"])
             
         except Exception as e:
             service_manager.set_failed("tika", f"Tika setup error: {e}")
     else:
-        logger.info("Tika extraction disabled via configuration")
         service_manager.set_disabled("tika", "Tika extraction disabled in settings")
     
-    # Crawl Manager initialization (non-blocking)
+    # Crawl Manager initialization
     try:
         logger.info("Starting crawl manager initialization in background...")
         
         async def init_crawl_manager():
             try:
-                # Initialize crawl manager
-                crawl_manager = get_crawl_job_manager()
+                db = SessionLocal()
+                watch_path_repo = WatchPathRepository(db)
+                crawler_state_repo = CrawlerStateRepository(db)
+                watch_paths = watch_path_repo.get_enabled()
+                previous_state = crawler_state_repo.get_state()
                 
-                # Register crawl manager health checker
+                crawl_manager = get_crawl_job_manager(watch_paths=watch_paths)
+                
                 async def crawl_manager_health_check():
-                    try:
-                        status = crawl_manager.get_status()
-                        return {
-                            "healthy": True,
-                            "running": status.get("running", False),
-                            "queue_size": status.get("queue_size", 0)
-                        }
-                    except Exception as e:
-                        return {"healthy": False, "error": str(e)}
+                    return {
+                        "healthy": True,
+                        "running": crawl_manager.is_running()
+                    }
                 
                 service_manager.register_health_checker("crawl_manager", crawl_manager_health_check)
-                
-                # Get configuration from database for potential auto-resume
-                db = SessionLocal()
-                db_service = DatabaseService(db)
-                watch_paths = db_service.list_watch_paths(enabled_only=True)
-                previous_state = db_service.get_crawler_state()
                 
                 service_manager.set_ready("crawl_manager", details={
                     "watch_paths_count": len(watch_paths) if watch_paths else 0,
@@ -195,9 +163,6 @@ async def background_init():
                 })
                 
                 logger.info("✅ Crawl manager initialized in background")
-                logger.info(f"📁 Watch paths: {len(watch_paths) if watch_paths else 0} configured")
-                
-                # Auto-resume logic moved to separate background task
                 if watch_paths:
                     await auto_resume_logic(watch_paths, previous_state)
                 
@@ -208,54 +173,24 @@ async def background_init():
         
         service_manager.start_background_initialization("crawl_manager", init_crawl_manager, dependencies=["database"])
         
-
-        
     except Exception as e:
         service_manager.set_failed("crawl_manager", f"Crawl manager setup error: {e}")
 
 
 async def auto_resume_logic(watch_paths, previous_state):
     """
-    Background auto-resume logic that runs after all services are initialized
+    Background auto-resume logic
     """
-    from services.crawl_job_manager import get_crawl_job_manager
-    
     try:
-        logger.info("Starting auto-resume logic in background...")
-        
-        # Wait a bit for services to be fully ready
         await asyncio.sleep(2)
-        
-        auto_resumed = False
-        if watch_paths:
-
-            
-            if previous_state.crawl_job_running:
-                # Previous session reported an active crawl job; treat as needing full resume.
-                logger.info(
-                    "🔄 Detected previous in-progress crawl job; "
-                    "auto-resuming crawl job."
-                )
-                crawl_manager = get_crawl_job_manager()
-                success = await crawl_manager.start_crawl(
-                    watch_paths,
-                )
-                if success:
-                    logger.info("✅ Auto-resumed crawl based on previous state.")
-                    auto_resumed = True
-                else:
-                    logger.warning("⚠️ Failed to auto-resume crawl from previous state.")
-            
-        if not auto_resumed:
-            if watch_paths:
-                logger.info("📁 Watch paths configured but no auto-resume conditions met.")
-                logger.info("💡 Use /api/crawler/start to manually start crawling.")
+        if watch_paths and previous_state.crawl_job_running:
+            logger.info("🔄 Detected previous in-progress crawl job; auto-resuming...")
+            crawl_manager = get_crawl_job_manager(watch_paths=watch_paths)
+            success = await crawl_manager.start_crawl()
+            if success:
+                logger.info("✅ Auto-resumed crawl based on previous state.")
             else:
-                logger.info(
-                    "ℹ️ No watch paths configured. "
-                    "Add paths via /api/config/watch-paths and /api/config/watch-paths/batch"
-                )
-        
+                logger.warning("⚠️ Failed to auto-resume crawl from previous state.")
     except Exception as e:
         logger.error(f"Auto-resume logic failed: {e}")
 
@@ -263,236 +198,107 @@ async def auto_resume_logic(watch_paths, previous_state):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Application lifespan manager with instant startup
-    Critical services block startup, non-critical services initialize in background
+    Application lifespan manager
     """
-    # Startup - CRITICAL PATH (must complete quickly)
     logger.info("=" * 50)
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info("=" * 50)
     
     try:
-        # CRITICAL: Database initialization (blocks startup until complete)
         await critical_init()
         logger.info("🚀 Critical services ready - API starting immediately!")
-        
-        # NON-CRITICAL: Start background initialization (doesn't block)
         asyncio.create_task(background_init())
-        
-        # Start health monitoring background task
         asyncio.create_task(health_monitoring_loop())
-        
-        logger.info("=" * 50)
-        logger.info("✅ FastAPI startup complete - background services initializing...")
-        logger.info(f"🔍 Search engine: {settings.typesense_url}")
-        logger.info(f"⚙️  Content extraction: Tika Docker ({settings.tika_url})")
-        logger.info(f"⚙️  Configuration API: /api/config")
-        logger.info("=" * 50)
-        
     except Exception as e:
         logger.error(f"❌ Critical initialization failed: {e}")
-        raise  # This blocks startup - critical services failed
+        raise 
     
     yield
     
-    # Shutdown
-    logger.info("=" * 50)
     logger.info("Shutting down...")
-    logger.info("=" * 50)
-    
     try:
-        # Stop crawl manager
-        logger.info("Stopping crawl manager...")
         crawl_manager = get_crawl_job_manager()
         if crawl_manager.is_running():
             await crawl_manager.stop_crawl()
             logger.info("✅ Crawl manager stopped")
-        
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
-    
-    logger.info("=" * 50)
     logger.info("👋 Application shutdown complete")
-    logger.info("=" * 50)
 
 
 async def health_monitoring_loop():
     """
-    Background task that periodically checks service health and updates status
+    Background health monitoring
     """
     from services.service_manager import get_service_manager
-    
     service_manager = get_service_manager()
-    
     while True:
         try:
-            # Check health of all services every 30 seconds
-            health_status = await service_manager.check_all_services_health()
-            
-            # Log if overall status changed
-            healthy_services = health_status["summary"]["healthy_services"]
-            total_services = health_status["summary"]["total_services"]
-            
-            if healthy_services == total_services:
-                logger.debug(f"Health check: All {total_services} services healthy")
-            elif healthy_services > 0:
-                logger.warning(f"Health check: {healthy_services}/{total_services} services healthy")
-            else:
-                logger.error(f"Health check: No services healthy ({total_services} failed)")
-            
+            await service_manager.check_all_services_health()
             await asyncio.sleep(30)
-            
         except Exception as e:
             logger.error(f"Health monitoring loop error: {e}")
-            await asyncio.sleep(60)  # Wait longer on error
+            await asyncio.sleep(60)
 
 
-# Create FastAPI app
-app = FastAPI(
-    title=settings.app_name,
-    version=settings.app_version,
-    description=settings.app_description,
-    lifespan=lifespan,
-)
+app = create_app()
+app.router.lifespan_context = lifespan
 
-# Include routers
-app.include_router(crawler_router)
-app.include_router(config_router)
-app.include_router(fs_router)
-app.include_router(files_router)
-from api.system import router as system_router
-app.include_router(system_router)
-from api.system_stream import router as system_stream_router
-app.include_router(system_stream_router)
+# Include API v1 router
+app.include_router(api_router)
 
-# Serve frontend static files
-# Mount assets directory for CSS, JS, fonts, etc.
-frontend_assets_path = os.path.join(os.path.dirname(__file__), "frontend", "dist", "assets")
+# Static files and SPA routing
+frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+frontend_assets_path = os.path.join(frontend_dist_path, "assets")
+
 if os.path.exists(frontend_assets_path):
     app.mount("/assets", StaticFiles(directory=frontend_assets_path), name="frontend_assets")
 
-# Serve icon file
-frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 if os.path.exists(frontend_dist_path):
     @app.get("/icon.svg")
     async def serve_icon():
         icon_path = os.path.join(frontend_dist_path, "icon.svg")
         if os.path.exists(icon_path):
             return FileResponse(icon_path)
-        return {"error": "Icon not found"}
+        return JSONResponse(status_code=404, content={"error": "Icon not found"})
 
     @app.get("/")
     async def serve_frontend():
-        """Serve the frontend application"""
         index_path = os.path.join(frontend_dist_path, "index.html")
         if os.path.exists(index_path):
             return FileResponse(index_path)
-        # Fallback to API info if frontend not built
-        return {
-            "name": settings.app_name,
-            "version": settings.app_version,
-            "status": "running",
-        }
+        return {"name": settings.app_name, "version": settings.app_version, "status": "running"}
 
-    # Catch-all route for SPA routing - serve index.html for non-API routes
     @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        """Serve SPA routes - anything that's not an API route"""
-        # Skip API routes
+    async def serve_spa(request: Request, full_path: str):
+        """
+        Serve the single-page application.
+        Handles all routes except for the API.
+        """
+        # Let the API router handle its own paths
         if full_path.startswith("api/"):
-            from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=404,
-                content={"error": "API endpoint not found", "path": f"/{full_path}"}
-            )
-        
-        # Serve index.html for frontend routes
+            # This will be handled by FastAPI's routing; if no route matches,
+            # it will correctly return a 404. We don't need to manually handle it.
+            # We can add a catch-all at the end of the router if we want a custom message.
+            pass
+
         index_path = os.path.join(frontend_dist_path, "index.html")
         if os.path.exists(index_path):
             return FileResponse(index_path)
-        
-        return {"error": "Frontend not available"}
 
-
-@app.get("/api/info")
-async def api_info():
-    """API information endpoint (alternative to root for API clients)"""
-    return {
-        "name": settings.app_name,
-        "version": settings.app_version,
-        "status": "running",
-        "endpoints": {
-            "docs": "/docs",
-            "redoc": "/redoc",
-            "health": "/health",
-            "crawler": {
-                "status": "/api/crawler/status",
-                "start": "/api/crawler/start",
-                "stop": "/api/crawler/stop",
-                "clear_indexes": "/api/crawler/clear-indexes",
-                "watch_paths": "/api/config/watch-paths",
-                "batch_watch_paths": "/api/config/watch-paths/batch"
-            },
-            "configuration": "/api/config",
-        },
-        "features": {
-            "parallel_discovery": "File discovery runs in parallel with indexing",
-            "auto_resume": "Automatically resumes crawling if it was running before shutdown",
-
-            "job_management": "Simple start/stop/clear operations with progress tracking",
-            "instant_startup": "FastAPI starts instantly, services initialize in background",
-            "health_monitoring": "Real-time health monitoring of all system services",
-            "docker_tika": "Apache Tika content extraction via Docker container"
-        }
-    }
-
-
-@app.get("/health")
-async def health_check():
-    """Enhanced health check endpoint with service status"""
-    from services.service_manager import get_service_manager
-    
-    try:
-        service_manager = get_service_manager()
-        health_status = await service_manager.check_all_services_health()
-        
-        # Determine HTTP status code based on overall health
-        overall_status = health_status["overall_status"]
-        status_code = 200
-        if overall_status == "critical":
-            status_code = 503
-        elif overall_status == "degraded":
-            status_code = 200  # Still functional but degraded
-        
-        return {
-            "status": overall_status,
-            "timestamp": int(time.time() * 1000),
-            "services": health_status["services"],
-            "summary": health_status["summary"],
-            "details": {
-                "database": "sqlite_connection",
-                "search_engine": "typesense",
-                "content_extraction": "tika_docker" if settings.tika_enabled else "disabled",
-                "crawl_engine": "crawl_job_manager",
-
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        # Fallback for when the frontend is not built
         return JSONResponse(
-            status_code=503,
+            status_code=404,
             content={
-                "status": "unhealthy",
-                "timestamp": int(time.time() * 1000),
-                "error": str(e),
-            },
+                "error": "Frontend not built. Run `npm run build` in the frontend directory.",
+                "path": full_path
+            }
         )
 
-
 def get_available_port(start_port: int, max_attempts: int = 100) -> int:
-    """Find an available port starting from start_port"""
-    import socket
+    """
+    Finds an available port starting from start_port.
+    """
     port = start_port
     while port < start_port + max_attempts:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -503,18 +309,32 @@ def get_available_port(start_port: int, max_attempts: int = 100) -> int:
                 port += 1
     return start_port
 
+@app.get("/health")
+async def health_check():
+    """
+    Combined health and info endpoint.
+    """
+    from services.service_manager import get_service_manager
+    
+    service_manager = get_service_manager()
+    health_status = await service_manager.check_all_services_health()
+    
+    return {
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "api_version": "v1",
+        "services": health_status
+    }
+
 
 if __name__ == "__main__":
-    if sys.stdout is None:
-        sys.stdout = open(os.devnull, "w")
-    if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w")
     port = get_available_port(settings.app_port)
     logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
-    
-    if not settings.debug:
-        from flaskwebgui import FlaskUI
-        FlaskUI(app=app, server="fastapi", port=port).run()
-    else:
-        import uvicorn
-        uvicorn.run(app, host="0.0.0.0", port=port)
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=settings.debug,
+        log_level="info"
+    )

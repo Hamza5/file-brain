@@ -8,9 +8,9 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from services.service_manager import get_service_manager, ServiceState
-from utils.logger import logger
+from core.logging import logger
 
-router = APIRouter(prefix="/api/system", tags=["system"])
+router = APIRouter(prefix="/system", tags=["system"])
 
 @router.get("/initialization/stream")
 async def stream_initialization_status():

@@ -6,7 +6,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Import app metadata from pyproject.toml (single source of truth)
-from utils.app_info import get_app_name, get_app_version, get_app_description
+from core.app_info import get_app_name, get_app_version, get_app_description
 
 
 class Settings(BaseSettings):

@@ -5,15 +5,14 @@ including archive handling
 import os
 import mimetypes
 import re
-from pathlib import Path
 from typing import Dict, Any, Optional
 
 # Import chardet for smart text extraction
 import chardet
 
 from api.models.file_event import DocumentContent
-from config.settings import settings
-from utils.logger import logger
+from core.config import settings
+from core.logging import logger
 from services.archive_extractor import (
     is_likely_archive,
     extract_and_parse_archive

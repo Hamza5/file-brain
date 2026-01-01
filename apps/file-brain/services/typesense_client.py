@@ -8,9 +8,9 @@ import time
 
 import typesense
 
-from config.typesense_schema import get_collection_schema
-from utils.logger import logger
-from config.settings import settings
+from core.typesense_schema import get_collection_schema
+from core.logging import logger
+from core.config import settings
 
 
 class TypesenseClient:

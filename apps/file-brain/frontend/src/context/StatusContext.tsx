@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -46,8 +47,14 @@ export function StatusProvider({ children }: { children: ReactNode }) {
   const [watchPaths, setWatchPaths] = useState<WatchPath[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [isLive, setIsLive] = useState<boolean>(false);
+  const isLiveRef = useRef(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const updateLiveStatus = useCallback((live: boolean) => {
+    setIsLive(live);
+    isLiveRef.current = live;
+  }, []);
 
   const applySnapshot = useCallback(
     (nextStatus: CrawlStatus["status"] | null, nextStats: CrawlStats | null, nextWatchPaths?: WatchPath[], nextSystemInit?: SystemInitialization | null) => {
@@ -106,8 +113,12 @@ export function StatusProvider({ children }: { children: ReactNode }) {
 
     function startPolling() {
       if (pollTimer !== null) return;
+      
+      // Only poll if SSE is not active
       const intervalMs = 5000;
       pollTimer = window.setInterval(async () => {
+        if (isLiveRef.current) return; // Skip polling if we have a live connection
+        
         try {
           const [statusRes, statsRes, watchPathsRes, systemInitRes] = await Promise.allSettled([
             getCrawlerStatus(),
@@ -147,11 +158,11 @@ export function StatusProvider({ children }: { children: ReactNode }) {
         // Connect to crawler status stream
         stopStream = connectStatusStream(
           (payload: { status: CrawlStatus["status"]; stats?: CrawlStats | undefined; watch_paths?: WatchPath[]; timestamp: number }) => {
-            setIsLive(true);
+            updateLiveStatus(true);
             applySnapshot(payload.status, payload.stats ?? null, payload.watch_paths, undefined);
           },
           () => {
-            setIsLive(false);
+            updateLiveStatus(false);
             if (!pollTimer) startPolling();
             console.debug("SSE status stream disconnected");
           }
@@ -180,9 +191,9 @@ export function StatusProvider({ children }: { children: ReactNode }) {
                     current_phase: s.current_phase,
                     logs: s.logs,
                     error: s.error
-                } as any; // We extend the type with extras which is fine
+                } as unknown as SystemInitialization["services"][string];
                 return acc;
-              }, {} as any),
+              }, {} as SystemInitialization["services"]),
               summary: {
                 total_services: Object.keys(initStatus.services).length,
                 healthy_services: Object.values(initStatus.services).filter(s => s.state === 'ready').length,

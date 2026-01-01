@@ -11,13 +11,13 @@ import io
 import os
 import tarfile
 import zipfile
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 
 # Import Tika
 from tika import parser
 
-from utils.logger import logger
+from core.logging import logger
 
 
 def try_extract_zip(data: bytes) -> Optional[Dict[str, bytes]]:

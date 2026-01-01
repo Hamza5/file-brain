@@ -198,7 +198,7 @@ export function FileContextMenu({
             color: '#6c757d' // Gray for forget operation
           }}
         />
-        <span>Forget from Index</span>
+        <span>Forget</span>
       </div>
     </div>
   );

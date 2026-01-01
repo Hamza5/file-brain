@@ -4,14 +4,14 @@ Enables instant FastAPI startup with parallel background initialization
 """
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 import threading
 
-from config.settings import settings
-from utils.logger import logger
+from core.config import settings
+from core.logging import logger
 
 
 class ServiceState(Enum):

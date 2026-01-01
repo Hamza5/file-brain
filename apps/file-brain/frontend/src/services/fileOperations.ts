@@ -66,7 +66,7 @@ export interface SystemInfoResponse {
 
 export async function openFile(filePath: string): Promise<FileOperationResponse> {
   try {
-    return await requestJSON<FileOperationResponse>("/api/files/open", {
+    return await requestJSON<FileOperationResponse>("/api/v1/files/open", {
       method: "POST",
       body: JSON.stringify({
         file_path: filePath,
@@ -84,7 +84,7 @@ export async function openFile(filePath: string): Promise<FileOperationResponse>
 
 export async function openFolder(filePath: string): Promise<FileOperationResponse> {
   try {
-    return await requestJSON<FileOperationResponse>("/api/files/open", {
+    return await requestJSON<FileOperationResponse>("/api/v1/files/open", {
       method: "POST",
       body: JSON.stringify({
         file_path: filePath,
@@ -102,7 +102,7 @@ export async function openFolder(filePath: string): Promise<FileOperationRespons
 
 export async function openMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
   try {
-    return await requestJSON<MultipleFileOperationResponse>("/api/files/open-multiple", {
+    return await requestJSON<MultipleFileOperationResponse>("/api/v1/files/open-multiple", {
       method: "POST",
       body: JSON.stringify({
         file_paths: filePaths,
@@ -122,7 +122,7 @@ export async function openMultipleFiles(filePaths: string[]): Promise<MultipleFi
 
 export async function getSystemInfo(): Promise<SystemInfoResponse> {
   try {
-    return await requestJSON<SystemInfoResponse>("/api/files/info");
+    return await requestJSON<SystemInfoResponse>("/api/v1/files/info");
   } catch (error) {
     console.error('Error getting system info:', error);
     return {
@@ -135,7 +135,7 @@ export async function getSystemInfo(): Promise<SystemInfoResponse> {
 
 export async function deleteFile(filePath: string): Promise<FileOperationResponse> {
   try {
-    return await requestJSON<FileOperationResponse>("/api/files/delete", {
+    return await requestJSON<FileOperationResponse>("/api/v1/files/delete", {
       method: "POST",
       body: JSON.stringify({
         file_path: filePath,
@@ -153,7 +153,7 @@ export async function deleteFile(filePath: string): Promise<FileOperationRespons
 
 export async function forgetFile(filePath: string): Promise<FileOperationResponse> {
   try {
-    return await requestJSON<FileOperationResponse>("/api/files/forget", {
+    return await requestJSON<FileOperationResponse>("/api/v1/files/forget", {
       method: "POST",
       body: JSON.stringify({
         file_path: filePath,
@@ -171,7 +171,7 @@ export async function forgetFile(filePath: string): Promise<FileOperationRespons
 
 export async function deleteMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
   try {
-    return await requestJSON<MultipleFileOperationResponse>("/api/files/delete-multiple", {
+    return await requestJSON<MultipleFileOperationResponse>("/api/v1/files/delete-multiple", {
       method: "POST",
       body: JSON.stringify({
         file_paths: filePaths,
@@ -191,7 +191,7 @@ export async function deleteMultipleFiles(filePaths: string[]): Promise<Multiple
 
 export async function forgetMultipleFiles(filePaths: string[]): Promise<MultipleFileOperationResponse> {
   try {
-    return await requestJSON<MultipleFileOperationResponse>("/api/files/forget-multiple", {
+    return await requestJSON<MultipleFileOperationResponse>("/api/v1/files/forget-multiple", {
       method: "POST",
       body: JSON.stringify({
         file_paths: filePaths,

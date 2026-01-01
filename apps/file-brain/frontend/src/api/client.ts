@@ -103,37 +103,37 @@ export interface CrawlerRunsResponse {
 
 // Crawler control
 export async function startCrawler(): Promise<{ message: string; success: boolean; timestamp: number }> {
-  return requestJSON("/api/crawler/start", { method: "POST" });
+  return requestJSON("/api/v1/crawler/start", { method: "POST" });
 }
 
 export async function stopCrawler(): Promise<{ message: string; success: boolean; timestamp: number }> {
-  return requestJSON("/api/crawler/stop", { method: "POST" });
+  return requestJSON("/api/v1/crawler/stop", { method: "POST" });
 }
 
 export async function clearIndexes(): Promise<{ success: boolean; message: string; timestamp: number }> {
-  return requestJSON("/api/crawler/clear-indexes", { method: "POST" });
+  return requestJSON("/api/v1/crawler/clear-indexes", { method: "POST" });
 }
 
 // Status / settings / stats
 export async function getCrawlerStatus(): Promise<CrawlStatus> {
-  return requestJSON("/api/crawler/status");
+  return requestJSON("/api/v1/crawler/status");
 }
 
 export async function getCrawlerSettings(): Promise<Record<string, unknown>> {
-  return requestJSON("/api/crawler/settings");
+  return requestJSON("/api/v1/crawler/settings");
 }
 
 export async function updateCrawlerSettings(
   settings: Record<string, unknown>
 ): Promise<{ message: string; success: boolean; timestamp: number }> {
-  return requestJSON("/api/crawler/settings", {
+  return requestJSON("/api/v1/crawler/settings", {
     method: "PUT",
     body: JSON.stringify(settings),
   });
 }
 
 export async function getCrawlerStats(): Promise<CrawlStats> {
-  return requestJSON("/api/crawler/stats");
+  return requestJSON("/api/v1/crawler/stats");
 }
 
 // Watch paths config (UI management)
@@ -171,14 +171,14 @@ export interface BatchWatchPathsResponse {
 
 export async function listWatchPaths(enabledOnly = false): Promise<WatchPath[]> {
   const qs = enabledOnly ? "?enabled_only=true" : "";
-  return requestJSON(`/api/config/watch-paths${qs}`);
+  return requestJSON(`/api/v1/config/watch-paths${qs}`);
 }
 
 export async function addWatchPath(path: string, includeSubdirectories: boolean = true): Promise<WatchPath> {
   // Prefer batch API to leverage existing validation
   const body: BatchWatchPathsRequest = { paths: [path], include_subdirectories: includeSubdirectories };
   const res = await requestJSON<BatchWatchPathsResponse>(
-    "/api/config/watch-paths/batch",
+    "/api/v1/config/watch-paths/batch",
     {
       method: "POST",
       body: JSON.stringify(body),
@@ -202,20 +202,20 @@ export async function addWatchPath(path: string, includeSubdirectories: boolean 
 
 export async function replaceWatchPaths(paths: string[]): Promise<void> {
   const body: BatchWatchPathsRequest = { paths };
-  await requestJSON("/api/config/watch-paths", {
+  await requestJSON("/api/v1/config/watch-paths", {
     method: "PUT",
     body: JSON.stringify(body),
   });
 }
 
 export async function clearWatchPaths(): Promise<void> {
-  await requestJSON("/api/config/watch-paths", {
+  await requestJSON("/api/v1/config/watch-paths", {
     method: "DELETE",
   });
 }
 
 export async function deleteWatchPath(pathId: number): Promise<void> {
-  await requestJSON(`/api/config/watch-paths/${pathId}`, {
+  await requestJSON(`/api/v1/config/watch-paths/${pathId}`, {
     method: "DELETE",
   });
 }
@@ -224,7 +224,7 @@ export async function updateWatchPath(
   pathId: number,
   update: { enabled?: boolean; include_subdirectories?: boolean }
 ): Promise<WatchPath> {
-  return requestJSON(`/api/config/watch-paths/${pathId}`, {
+  return requestJSON(`/api/v1/config/watch-paths/${pathId}`, {
     method: "PUT",
     body: JSON.stringify(update),
   });
@@ -246,12 +246,12 @@ export interface FsEntry {
 }
 
 export async function getFsRoots(): Promise<FsRoot[]> {
-  return requestJSON("/api/fs/roots");
+  return requestJSON("/api/v1/fs/roots");
 }
 
 export async function listFs(path: string): Promise<FsEntry[]> {
   const qs = `?path=${encodeURIComponent(path)}`;
-  return requestJSON(`/api/fs/list${qs}`);
+  return requestJSON(`/api/v1/fs/list${qs}`);
 }
 
 // SSE stream connection
@@ -268,7 +268,7 @@ export function connectStatusStream(
   onUpdate: StreamUpdateHandler,
   onError?: StreamErrorHandler
 ): () => void {
-  const es = new EventSource("/api/crawler/stream");
+  const es = new EventSource("/api/v1/crawler/stream");
 
   es.onmessage = (event: MessageEvent) => {
     try {
@@ -343,22 +343,22 @@ export interface ServiceStatus {
 }
 
 export async function getSystemInitialization(): Promise<SystemInitialization> {
-  return requestJSON("/api/system/initialization");
+  return requestJSON("/api/v1/system/initialization");
 }
 
 export async function getServicesStatus(): Promise<ServiceStatus> {
-  return requestJSON("/api/system/services");
+  return requestJSON("/api/v1/system/services");
 }
 
 export async function retryService(serviceName: string): Promise<{ message: string; timestamp: number }> {
-  return requestJSON(`/api/system/services/${serviceName}/retry`, { method: "POST" });
+  return requestJSON(`/api/v1/system/services/${serviceName}/retry`, { method: "POST" });
 }
 
 export function connectInitializationStream(
   onUpdate: (status: InitializationStatus) => void,
   onError?: () => void
 ): () => void {
-  const eventSource = new EventSource('/api/system/initialization/stream');
+  const eventSource = new EventSource('/api/v1/system/initialization/stream');
   
   eventSource.onmessage = (event) => {
     try {

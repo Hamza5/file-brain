@@ -3,12 +3,11 @@ System API endpoints for initialization status and service management
 """
 import time
 from fastapi import APIRouter, HTTPException
-from typing import Dict, Any
 
 from services.service_manager import get_service_manager
-from utils.logger import logger
+from core.logging import logger
 
-router = APIRouter(prefix="/api/system", tags=["system"])
+router = APIRouter(prefix="/system", tags=["system"])
 
 
 @router.get("/initialization")
@@ -33,6 +32,16 @@ async def get_initialization_status():
                           search_available)
         configuration_available = services_status.get("database", {}).get("status") == "healthy"
         
+        # Determine status message
+        if initialization_progress >= 100:
+            message = "All services initialized successfully. System fully operational."
+        elif services_health["overall_status"] == "critical":
+            message = "Critical services failed to initialize. System functionality is limited."
+        elif services_health["overall_status"] == "degraded":
+            message = "System is operational but some services are still initializing or failed to start."
+        else:
+            message = f"System is initializing... {initialization_progress:.1f}% complete."
+
         return {
             "timestamp": int(time.time() * 1000),
             "overall_status": services_health["overall_status"],
@@ -46,7 +55,7 @@ async def get_initialization_status():
                 "full_functionality": initialization_progress == 100.0
             },
             "degraded_mode": services_health["overall_status"] in ["degraded", "critical"],
-            "message": _get_status_message(services_health["overall_status"], initialization_progress)
+            "message": message
         }
         
     except Exception as e:
@@ -120,7 +129,6 @@ async def retry_service_initialization(service_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @router.get("/services/{service_name}/logs")
 async def get_service_logs(service_name: str, limit: int = 100):
     """Get initialization logs for a specific service"""
@@ -136,17 +144,3 @@ async def get_service_logs(service_name: str, limit: int = 100):
     except Exception as e:
         logger.error(f"Error getting service logs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-def _get_status_message(overall_status: str, progress: float) -> str:
-    """Generate appropriate status message based on overall status and progress"""
-    if overall_status == "healthy" and progress == 100.0:
-        return "All services initialized successfully. System fully operational."
-    elif overall_status == "degraded":
-        return "System is operational but some services are still initializing or failed to start."
-    elif overall_status == "critical":
-        return "Critical services failed to initialize. System functionality is limited."
-    elif progress > 0:
-        return f"System is initializing... {progress:.1f}% complete."
-    else:
-        return "System startup in progress..."
