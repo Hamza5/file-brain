@@ -203,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Crawler</span>
                     <Button
                         label={isCrawlerActive ? "Stop" : "Start"}
-                        icon={isTogglingCrawler ? "pi pi-spin pi-spinner" : (isCrawlerActive ? "fa-solid fa-stop" : "fa-solid fa-play")}
+                        icon={isTogglingCrawler ? "fas fa-spinner fa-spin" : (isCrawlerActive ? "fa-solid fa-stop" : "fa-solid fa-play")}
                         onClick={async () => {
                             setIsTogglingCrawler(true);
                             try {

@@ -15,31 +15,31 @@ export function ServiceStatusCard({ service }: ServiceStatusCardProps) {
 
   // Determine severity and icon based on state
   let severity: 'success' | 'info' | 'warning' | 'danger' | null = 'info';
-  let icon = 'pi pi-spin pi-spinner';
+  let icon = 'fas fa-spinner fa-spin';
   const currentState = service.state || 'unknown';
   let statusLabel = currentState.toUpperCase();
   
   switch(currentState) {
     case 'ready':
       severity = 'success';
-      icon = 'pi pi-check';
+      icon = 'fas fa-check';
       break;
     case 'failed':
       severity = 'danger';
-      icon = 'pi pi-times';
+      icon = 'fas fa-times';
       break;
     case 'disabled':
       severity = 'warning';
-      icon = 'pi pi-ban';
+      icon = 'fas fa-ban';
       break;
     case 'not_started':
       severity = 'info';
-      icon = 'pi pi-clock';
+      icon = 'fas fa-clock';
       statusLabel = 'WAITING';
       break;
     case 'initializing':
       severity = 'info';
-      icon = 'pi pi-spin pi-spinner';
+      icon = 'fas fa-spinner fa-spin';
       statusLabel = service.current_phase?.name || 'INITIALIZING';
       break;
   }
@@ -58,7 +58,7 @@ export function ServiceStatusCard({ service }: ServiceStatusCardProps) {
             <Tag severity={severity} value={statusLabel} icon={icon} />
           </div>
           <Button 
-            icon="pi pi-list" 
+            icon="fas fa-list"
             className="p-button-text p-button-secondary p-button-sm" 
             tooltip="View Logs"
             onClick={() => setShowLogs(true)}

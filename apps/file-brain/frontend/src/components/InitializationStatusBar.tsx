@@ -32,7 +32,7 @@ export function InitializationStatusBar() {
   return (
     <div className="surface-overlay border-top-1 border-200 p-2 flex align-items-center justify-content-between px-4" style={bottomBarStyle}>
       <div className="flex align-items-center gap-3">
-        {!isInitializationComplete && <i className="pi pi-spin pi-spinner text-primary" />}
+        {!isInitializationComplete && <i className="fas fa-spinner fa-spin text-primary" />}
         <span className="font-medium text-700 text-sm">
           {isInitializationComplete 
            ? "System operating in degraded mode" 
@@ -50,7 +50,7 @@ export function InitializationStatusBar() {
                 key={s.name}
                 severity={state === 'failed' ? 'danger' : 'warning'} 
                 value={`${s.user_friendly_name}: ${state.toUpperCase()}`}
-                icon={state === 'failed' ? 'pi pi-times' : 'pi pi-spin pi-spinner'}
+                icon={state === 'failed' ? 'fas fa-times' : 'fas fa-spinner fa-spin'}
                 className="text-xs"
             />
           );

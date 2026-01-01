@@ -47,7 +47,7 @@ export function InitializationOverlay() {
         style={{ width: '600px', maxWidth: '90vw' }}
       >
         <div className="text-center mb-5">
-          <i className="pi pi-bolt text-5xl text-primary mb-3"></i>
+          <i className="fas fa-bolt text-5xl text-primary mb-3"></i>
           <h1 className="text-3xl font-bold m-0 text-900 mb-2">Starting File Brain</h1>
           <p className="text-600 m-0">Initializing system services and models...</p>
         </div>
