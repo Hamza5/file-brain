@@ -41,7 +41,7 @@ const centerTextPlugin = {
 
 
 export const HeroStats: React.FC = () => {
-    const { stats, watchPaths } = useStatus();
+    const { status, stats, watchPaths } = useStatus();
     const hasFoldersConfigured = watchPaths.length > 0;
     const hasRenderedChart = useRef(false);
 
@@ -232,8 +232,8 @@ export const HeroStats: React.FC = () => {
                     </p>
                 </Card>
 
-                {/* Indexing Progress Card - Only show when running OR when work is pending */}
-                {stats && stats.totals.discovered > 0 && (stats.runtime.running || stats.totals.indexed < stats.totals.discovered) && (
+                {/* Indexing Progress Card - Only show when running OR when work is pending, but NOT during verification */}
+                {stats && status && status.current_phase !== 'verifying' && stats.totals.discovered > 0 && (stats.runtime.running || stats.totals.indexed < stats.totals.discovered) && (
                     <Card
                         style={{
                             textAlign: 'center',

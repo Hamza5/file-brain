@@ -14,10 +14,12 @@ class CrawlerStatus(BaseModel):
     elapsed_time: Optional[int] = None  # Seconds
     discovery_progress: int = 0  # 0-100
     indexing_progress: int = 0   # 0-100
+    verification_progress: int = 0 # 0-100
     files_discovered: int = 0
     files_indexed: int = 0
     files_skipped: int = 0
     files_error: int = 0
+    orphan_count: int = 0
     queue_size: int = 0
     estimated_completion: Optional[int] = None  # Unix timestamp in ms
 
@@ -28,6 +30,7 @@ class CrawlerStats(BaseModel):
     files_indexed: int = 0
     files_error: int = 0
     files_deleted: int = 0
+    files_orphaned: int = 0
     queue_size: int = 0
     last_activity: Optional[int] = None
 
@@ -48,10 +51,12 @@ class CrawlStatus(BaseModel):
     elapsed_time: Optional[int] = None  # Seconds
     discovery_progress: int = 0  # 0-100
     indexing_progress: int = 0   # 0-100
+    verification_progress: int = 0 # 0-100
     files_discovered: int = 0
     files_indexed: int = 0
     files_skipped: int = 0
     files_error: int = 0
+    orphan_count: int = 0
     queue_size: int = 0
     estimated_completion: Optional[int] = None  # Unix timestamp in ms
 

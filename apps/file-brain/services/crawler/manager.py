@@ -11,6 +11,7 @@ from database.models import WatchPath, SessionLocal
 from database.repositories import CrawlerStateRepository
 from services.crawler.discoverer import FileDiscoverer
 from services.crawler.indexer import FileIndexer
+from services.crawler.verification import IndexVerifier, VerificationProgress
 from services.typesense_client import get_typesense_client
 from core.logging import logger
 
@@ -41,12 +42,14 @@ class CrawlJobManager:
         self.watch_paths = watch_paths or []
         self.discoverer = FileDiscoverer(self.watch_paths)
         self.indexer = FileIndexer()
+        self.verifier = IndexVerifier()
         self._stop_event = asyncio.Event()
         self._running = False
         
         # Progress tracking
         self.discovery_progress = DiscoveryProgress()
         self.indexing_progress = IndexingProgress()
+        self.verification_progress = VerificationProgress()
         self._start_time: Optional[datetime] = None
 
     def is_running(self) -> bool:
@@ -81,6 +84,7 @@ class CrawlJobManager:
                 "elapsed_time": None,
                 "discovery_progress": min(state.discovery_progress or 0, 100),
                 "indexing_progress": min(indexing_progress, 100),
+                "verification_progress": 0,
                 "files_discovered": files_discovered,
                 "files_indexed": files_indexed,
                 "files_skipped": 0,
@@ -101,6 +105,14 @@ class CrawlJobManager:
             discovery_pct = int((self.discovery_progress.processed_paths / self.discovery_progress.total_paths) * 100)
             discovery_pct = min(discovery_pct, 100)
 
+        # Verification progress
+        verification_pct = 0
+        if self.verification_progress.total_indexed > 0:
+            verification_pct = int((self.verification_progress.processed_count / self.verification_progress.total_indexed) * 100)
+            verification_pct = min(verification_pct, 100)
+        elif self.verification_progress.is_complete:
+            verification_pct = 100
+            
         # Indexing progress
         files_indexed = self.indexing_progress.files_indexed
         # Use discoverer.files_found for the most up-to-date count from the background thread
@@ -112,7 +124,10 @@ class CrawlJobManager:
             indexing_pct = min(indexing_pct, 100)
 
         current_phase = "discovering" if discovery_pct < 100 else "indexing"
-        if indexing_pct >= 100 and discovery_pct >= 100:
+        if not self.verification_progress.is_complete:
+            current_phase = "verifying"
+        
+        if indexing_pct >= 100 and discovery_pct >= 100 and self.verification_progress.is_complete:
             current_phase = "idle"
 
         return {
@@ -123,12 +138,14 @@ class CrawlJobManager:
             "elapsed_time": int(elapsed_time),
             "discovery_progress": discovery_pct,
             "indexing_progress": indexing_pct,
+            "verification_progress": verification_pct,
             "files_discovered": total_known,
             "files_indexed": files_indexed,
             "files_skipped": self.discovery_progress.files_skipped,
             "queue_size": max(0, total_known - files_indexed),
             "monitoring_active": False,
             "estimated_completion": None,
+            "orphan_count": self.verification_progress.orphaned_count,
         }
 
     async def start_crawl(self) -> bool:
@@ -144,6 +161,10 @@ class CrawlJobManager:
         self.discoverer.files_found = 0
         self.discovery_progress = DiscoveryProgress(total_paths=len(self.watch_paths), start_time=time.time())
         self.indexing_progress = IndexingProgress(start_time=time.time())
+        
+        # Reset verifier
+        self.verifier = IndexVerifier() # Re-instantiate to reset progress
+        self.verification_progress = self.verifier.progress
 
         # Update DB state - explicitly reset counts
         db = SessionLocal()
@@ -167,6 +188,24 @@ class CrawlJobManager:
 
     async def _run_crawl(self):
         """Run discovery and indexing in parallel using a queue"""
+        
+        # Phase 1: Verify Index
+        # We run this BEFORE discovery to ensure the index is clean
+        try:
+            logger.info("Starting index verification phase...")
+            await self.verifier.verify_index()
+            logger.info("Index verification phase completed.")
+        except Exception as e:
+            logger.error(f"Index verification failed: {e}")
+            # We continue to discovery even if verification fails, 
+            # but mark verification as complete so we don't get stuck in 'verifying' phase
+            self.verification_progress.is_complete = True
+
+        if self._stop_event.is_set():
+            self._running = False
+            return
+
+        # Phase 2: Parallel Discovery & Indexing
         # Internal queue to buffer discovered files for indexing
         # Larger queue to allow discovery to run ahead
         queue = asyncio.Queue(maxsize=2000)
@@ -256,6 +295,7 @@ class CrawlJobManager:
             return
         logger.info("Stopping crawl job...")
         self._stop_event.set()
+        self.verifier.stop()
         self.discoverer.stop()
         self.indexer.stop()
 

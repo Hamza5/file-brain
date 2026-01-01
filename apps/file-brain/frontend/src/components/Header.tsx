@@ -275,7 +275,8 @@ function getCrawlerPhaseLabel(crawlerStatus?: any): string {
     const phase = crawlerStatus.current_phase;
     switch (phase) {
         case 'verifying':
-            return "Verifying...";
+            const vProgress = crawlerStatus.verification_progress || 0;
+            return `Verifying (${vProgress}%)`;
         case 'discovering':
             return "Discovering...";
         case 'indexing':

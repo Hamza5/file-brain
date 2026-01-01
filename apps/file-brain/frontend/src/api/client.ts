@@ -5,11 +5,14 @@ export interface CrawlStatus {
     job_type: string | null;
     start_time: number | null;
     elapsed_time: number | null;
+    current_phase: string;
     discovery_progress: number;
     indexing_progress: number;
+    verification_progress: number;
     files_discovered: number;
     files_indexed: number;
     files_skipped: number;
+    orphan_count: number;
     queue_size: number;
     monitoring_active: boolean;
     estimated_completion: number | null;
