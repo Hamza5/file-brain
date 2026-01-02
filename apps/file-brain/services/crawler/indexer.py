@@ -2,17 +2,17 @@
 File Indexer component
 """
 
-import os
+import asyncio
 import hashlib
 import mimetypes
-import asyncio
+import os
 from pathlib import Path
 from typing import Tuple
 
-from services.typesense_client import get_typesense_client
-from services.extractor import get_extractor
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
+from services.extractor import get_extractor
+from services.typesense_client import get_typesense_client
 
 
 class FileIndexer:
@@ -72,12 +72,8 @@ class FileIndexer:
             file_size=operation.file_size,
             mime_type=mimetypes.guess_type(file_path)[0] or "application/octet-stream",
             content=document_content.content,
-            modified_time=int(operation.modified_time)
-            if operation.modified_time is not None
-            else None,
-            created_time=int(operation.created_time)
-            if operation.created_time is not None
-            else None,
+            modified_time=int(operation.modified_time) if operation.modified_time is not None else None,
+            created_time=int(operation.created_time) if operation.created_time is not None else None,
             file_hash=file_hash,
             metadata=document_content.metadata,
         )

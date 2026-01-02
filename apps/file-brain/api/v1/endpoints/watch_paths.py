@@ -2,20 +2,21 @@
 Watch paths management API endpoints
 """
 
+import os
 from typing import List
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-import os
 
-from database.models import get_db
-from database.repositories import WatchPathRepository
-from core.logging import logger
 from api.models.crawler import (
     BatchWatchPathRequest,
     BatchWatchPathResponse,
     MessageResponse,
 )
+from core.logging import logger
+from database.models import get_db
+from database.repositories import WatchPathRepository
 
 router = APIRouter(prefix="/config/watch-paths", tags=["configuration"])
 
@@ -95,12 +96,8 @@ async def add_watch_paths_batch(
                     path=watch_path.path,
                     enabled=watch_path.enabled,
                     include_subdirectories=watch_path.include_subdirectories,
-                    created_at=watch_path.created_at.isoformat()
-                    if watch_path.created_at
-                    else None,
-                    updated_at=watch_path.updated_at.isoformat()
-                    if watch_path.updated_at
-                    else None,
+                    created_at=watch_path.created_at.isoformat() if watch_path.created_at else None,
+                    updated_at=watch_path.updated_at.isoformat() if watch_path.updated_at else None,
                 ).model_dump()
             )
             logger.info(f"Added watch path via batch API: {path}")
@@ -195,12 +192,8 @@ async def update_watch_path_by_id(
         path=updated_path.path,
         enabled=updated_path.enabled,
         include_subdirectories=updated_path.include_subdirectories,
-        created_at=updated_path.created_at.isoformat()
-        if updated_path.created_at
-        else None,
-        updated_at=updated_path.updated_at.isoformat()
-        if updated_path.updated_at
-        else None,
+        created_at=updated_path.created_at.isoformat() if updated_path.created_at else None,
+        updated_at=updated_path.updated_at.isoformat() if updated_path.updated_at else None,
     )
 
 

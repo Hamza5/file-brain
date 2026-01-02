@@ -2,16 +2,16 @@
 Typesense client for search operations
 """
 
-import hashlib
 import asyncio
-from typing import Optional, Dict, Any, List
+import hashlib
 import time
+from typing import Any, Dict, List, Optional
 
 import typesense
 
-from core.typesense_schema import get_collection_schema
-from core.logging import logger
 from core.config import settings
+from core.logging import logger
+from core.typesense_schema import get_collection_schema
 
 
 class TypesenseClient:
@@ -61,9 +61,7 @@ class TypesenseClient:
         attempt = 0
         backoff = initial_backoff_seconds
 
-        service_manager.append_service_log(
-            service_name, f"Starting initialization (max attempts: {max_attempts})"
-        )
+        service_manager.append_service_log(service_name, f"Starting initialization (max attempts: {max_attempts})")
 
         while attempt < max_attempts:
             attempt += 1
@@ -86,12 +84,8 @@ class TypesenseClient:
 
                 self.client.collections[self.collection_name].retrieve()
 
-                service_manager.append_service_log(
-                    service_name, f"Collection '{self.collection_name}' already exists"
-                )
-                logger.info(
-                    f"Collection '{self.collection_name}' already exists (attempt {attempt}/{max_attempts})"
-                )
+                service_manager.append_service_log(service_name, f"Collection '{self.collection_name}' already exists")
+                logger.info(f"Collection '{self.collection_name}' already exists (attempt {attempt}/{max_attempts})")
                 self.collection_ready = True
                 return
             except typesense.exceptions.ObjectNotFound:
@@ -103,9 +97,7 @@ class TypesenseClient:
                         60,
                         "This may take several minutes on first run...",
                     )
-                    service_manager.append_service_log(
-                        service_name, "Creating collection (may trigger model download)"
-                    )
+                    service_manager.append_service_log(service_name, "Creating collection (may trigger model download)")
 
                     schema = get_collection_schema(self.collection_name)
                     self.client.collections.create(schema)
@@ -115,8 +107,7 @@ class TypesenseClient:
                         f"Collection '{self.collection_name}' created successfully",
                     )
                     logger.info(
-                        f"Collection '{self.collection_name}' created successfully "
-                        f"(attempt {attempt}/{max_attempts})"
+                        f"Collection '{self.collection_name}' created successfully (attempt {attempt}/{max_attempts})"
                     )
 
                     # 4. Finalizing
@@ -130,9 +121,7 @@ class TypesenseClient:
                     return
                 except typesense.exceptions.ObjectAlreadyExists:
                     # Race condition: someone else created it between our 404 and create.
-                    service_manager.append_service_log(
-                        service_name, "Collection created by another process"
-                    )
+                    service_manager.append_service_log(service_name, "Collection created by another process")
                     logger.info(
                         f"Collection '{self.collection_name}' already exists after race "
                         f"(attempt {attempt}/{max_attempts})"
@@ -160,9 +149,7 @@ class TypesenseClient:
             if attempt < max_attempts:
                 wait_msg = f"Retrying in {backoff} seconds..."
                 service_manager.append_service_log(service_name, wait_msg)
-                service_manager.set_service_phase(
-                    service_name, "Retrying Connection", 10, wait_msg
-                )
+                service_manager.set_service_phase(service_name, "Retrying Connection", 10, wait_msg)
                 await asyncio.sleep(backoff)
                 backoff *= 2
 
@@ -202,11 +189,7 @@ class TypesenseClient:
         """
         try:
             doc_id = self.generate_doc_id(file_path)
-            return (
-                self.client.collections[self.collection_name]
-                .documents[doc_id]
-                .retrieve()
-            )
+            return self.client.collections[self.collection_name].documents[doc_id].retrieve()
         except typesense.exceptions.ObjectNotFound:
             return None
         except Exception as e:
@@ -343,9 +326,7 @@ class TypesenseClient:
             if filter_by:
                 search_parameters["filter_by"] = filter_by
 
-            results = self.client.collections[self.collection_name].documents.search(
-                search_parameters
-            )
+            results = self.client.collections[self.collection_name].documents.search(search_parameters)
 
             return results
         except Exception as e:
@@ -409,9 +390,7 @@ class TypesenseClient:
             logger.error(f"Error clearing documents: {e}")
             raise
 
-    async def get_all_indexed_files(
-        self, limit: int = 1000, offset: int = 0
-    ) -> List[Dict[str, Any]]:
+    async def get_all_indexed_files(self, limit: int = 1000, offset: int = 0) -> List[Dict[str, Any]]:
         """
         Get all indexed files with pagination for verification.
 
@@ -437,9 +416,7 @@ class TypesenseClient:
     async def get_indexed_files_count(self) -> int:
         """Get total count of indexed files for verification progress tracking"""
         try:
-            results = self.client.collections[self.collection_name].documents.search(
-                {"q": "*", "per_page": 1}
-            )
+            results = self.client.collections[self.collection_name].documents.search({"q": "*", "per_page": 1})
             return results.get("found", 0)
         except Exception as e:
             logger.error(f"Error getting indexed files count: {e}")
@@ -468,9 +445,7 @@ class TypesenseClient:
                 failed += 1
                 logger.error(f"Failed to remove orphaned index entry {file_path}: {e}")
 
-        logger.info(
-            f"Batch cleanup completed: {successful} successful, {failed} failed"
-        )
+        logger.info(f"Batch cleanup completed: {successful} successful, {failed} failed")
         return {"successful": successful, "failed": failed}
 
 

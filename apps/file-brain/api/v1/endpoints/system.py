@@ -3,10 +3,11 @@ System API endpoints for initialization status and service management
 """
 
 import time
+
 from fastapi import APIRouter, HTTPException
 
-from services.service_manager import get_service_manager
 from core.logging import logger
+from services.service_manager import get_service_manager
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -21,28 +22,17 @@ async def get_initialization_status():
         # Calculate initialization progress
         total_services = len(services_health["services"])
         ready_services = sum(
-            1
-            for service in services_health["services"].values()
-            if service.get("status") == "healthy"
+            1 for service in services_health["services"].values() if service.get("status") == "healthy"
         )
 
-        initialization_progress = (
-            (ready_services / total_services) * 100 if total_services > 0 else 0
-        )
+        initialization_progress = (ready_services / total_services) * 100 if total_services > 0 else 0
 
         # Determine if system is ready for different operations
         services_status = services_health["services"]
 
-        search_available = (
-            services_status.get("typesense", {}).get("status") == "healthy"
-        )
-        crawl_available = (
-            services_status.get("crawl_manager", {}).get("status") == "healthy"
-            and search_available
-        )
-        configuration_available = (
-            services_status.get("database", {}).get("status") == "healthy"
-        )
+        search_available = services_status.get("typesense", {}).get("status") == "healthy"
+        crawl_available = services_status.get("crawl_manager", {}).get("status") == "healthy" and search_available
+        configuration_available = services_status.get("database", {}).get("status") == "healthy"
 
         # Determine status message
         if initialization_progress >= 100:
@@ -52,9 +42,7 @@ async def get_initialization_status():
         elif services_health["overall_status"] == "degraded":
             message = "System is operational but some services are still initializing or failed to start."
         else:
-            message = (
-                f"System is initializing... {initialization_progress:.1f}% complete."
-            )
+            message = f"System is initializing... {initialization_progress:.1f}% complete."
 
         return {
             "timestamp": int(time.time() * 1000),
@@ -68,8 +56,7 @@ async def get_initialization_status():
                 "crawl_api": crawl_available,
                 "full_functionality": initialization_progress == 100.0,
             },
-            "degraded_mode": services_health["overall_status"]
-            in ["degraded", "critical"],
+            "degraded_mode": services_health["overall_status"] in ["degraded", "critical"],
             "message": message,
         }
 
@@ -119,14 +106,10 @@ async def retry_service_initialization(service_name: str):
         service_status = service_manager.get_service_status(service_name)
 
         if not service_status:
-            raise HTTPException(
-                status_code=404, detail=f"Service {service_name} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Service {service_name} not found")
 
         if service_status.state == ServiceState.READY:
-            raise HTTPException(
-                status_code=400, detail=f"Service {service_name} is already ready"
-            )
+            raise HTTPException(status_code=400, detail=f"Service {service_name} is already ready")
 
         # Reset failed state to trigger retry
         service_manager.set_initializing(service_name, details={"manual_retry": True})

@@ -5,11 +5,12 @@ System initialization stream API
 import asyncio
 import json
 import time
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from services.service_manager import get_service_manager, ServiceState
 from core.logging import logger
+from services.service_manager import ServiceState, get_service_manager
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -69,10 +70,7 @@ async def stream_initialization_status():
                     for status in all_services.values():
                         if status.state == ServiceState.READY:
                             total_progress += 100
-                        elif (
-                            status.state == ServiceState.INITIALIZING
-                            and status.current_phase
-                        ):
+                        elif status.state == ServiceState.INITIALIZING and status.current_phase:
                             # Map service specific phase progress (0-100) to overall contribution
                             total_progress += status.current_phase.progress_percent
                         # Failed or not started count as 0

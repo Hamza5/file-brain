@@ -3,11 +3,12 @@ Application configuration using pydantic-settings
 """
 
 from typing import List
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Import app metadata from pyproject.toml (single source of truth)
-from core.app_info import get_app_name, get_app_version, get_app_description
+from core.app_info import get_app_description, get_app_name, get_app_version
 
 
 class Settings(BaseSettings):
@@ -46,12 +47,8 @@ class Settings(BaseSettings):
     verification_batch_size: int = Field(
         default=100, description="Number of files to process in each verification batch"
     )
-    max_verification_files: int = Field(
-        default=10000, description="Maximum number of files to verify in a single run"
-    )
-    cleanup_orphaned_files: bool = Field(
-        default=True, description="Automatically clean up orphaned index entries"
-    )
+    max_verification_files: int = Field(default=10000, description="Maximum number of files to verify in a single run")
+    cleanup_orphaned_files: bool = Field(default=True, description="Automatically clean up orphaned index entries")
 
     # Processing
     batch_size: int = Field(default=10)
@@ -79,9 +76,7 @@ class Settings(BaseSettings):
     @property
     def typesense_url(self) -> str:
         """Get full Typesense URL"""
-        return (
-            f"{self.typesense_protocol}://{self.typesense_host}:{self.typesense_port}"
-        )
+        return f"{self.typesense_protocol}://{self.typesense_host}:{self.typesense_port}"
 
     @property
     def tika_url(self) -> str:

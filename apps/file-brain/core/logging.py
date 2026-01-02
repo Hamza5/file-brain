@@ -7,9 +7,7 @@ import sys
 from typing import Optional
 
 
-def setup_logger(
-    name: str, level: int = logging.INFO, format_string: Optional[str] = None
-) -> logging.Logger:
+def setup_logger(name: str, level: int = logging.INFO, format_string: Optional[str] = None) -> logging.Logger:
     """
     Setup and return a configured logger
 

@@ -42,8 +42,8 @@ def get_db():
 
 def init_default_data(db):
     """Initialize default data"""
-    from .setting import Setting
     from .crawler_state import CrawlerState
+    from .setting import Setting
 
     # Initialize crawler state if not exists
     state = db.query(CrawlerState).filter(CrawlerState.id == 1).first()

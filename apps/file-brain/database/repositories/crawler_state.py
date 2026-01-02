@@ -3,11 +3,12 @@ CrawlerState repository
 """
 
 from datetime import datetime
+
 from sqlalchemy.orm import Session
 
+from core.logging import logger
 from database.models.crawler_state import CrawlerState as DBCrawlerState
 from database.repositories.base import BaseRepository
-from core.logging import logger
 
 
 class CrawlerStateRepository(BaseRepository[DBCrawlerState]):

@@ -3,22 +3,22 @@ File Brain - Advanced file search engine powered by AI
 """
 
 import asyncio
-from contextlib import asynccontextmanager
 import os
 import socket
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from api.v1.router import api_router
 from core.config import settings
 from core.factory import create_app
 from core.logging import logger
-from database.models import init_db, init_default_data, SessionLocal
-from services.typesense_client import get_typesense_client
+from database.models import SessionLocal, init_db, init_default_data
+from database.repositories import CrawlerStateRepository, WatchPathRepository
 from services.crawler.manager import get_crawl_job_manager
-from api.v1.router import api_router
-from database.repositories import WatchPathRepository, CrawlerStateRepository
+from services.typesense_client import get_typesense_client
 
 
 async def critical_init():
@@ -48,9 +48,7 @@ async def critical_init():
                 return {"healthy": False, "error": str(e)}
 
         service_manager.register_health_checker("database", database_health_check)
-        service_manager.set_ready(
-            "database", details={"type": "sqlite", "tables": "created"}
-        )
+        service_manager.set_ready("database", details={"type": "sqlite", "tables": "created"})
         logger.info("✅ Database initialized")
     except Exception as e:
         service_manager.set_failed("database", f"Database initialization failed: {e}")
@@ -97,17 +95,11 @@ async def background_init():
                     )
                     logger.info("✅ Typesense initialized in background")
                 else:
-                    service_manager.set_failed(
-                        "typesense", "Collection initialization failed"
-                    )
+                    service_manager.set_failed("typesense", "Collection initialization failed")
             except Exception as e:
-                service_manager.set_failed(
-                    "typesense", f"Typesense initialization error: {e}"
-                )
+                service_manager.set_failed("typesense", f"Typesense initialization error: {e}")
 
-        service_manager.start_background_initialization(
-            "typesense", init_typesense, dependencies=["database"]
-        )
+        service_manager.start_background_initialization("typesense", init_typesense, dependencies=["database"])
 
     except Exception as e:
         service_manager.set_failed("typesense", f"Typesense setup error: {e}")
@@ -153,9 +145,7 @@ async def background_init():
                 )
                 logger.info("✅ Tika initialized in background")
 
-            service_manager.start_background_initialization(
-                "tika", init_tika, dependencies=["database"]
-            )
+            service_manager.start_background_initialization("tika", init_tika, dependencies=["database"])
 
         except Exception as e:
             service_manager.set_failed("tika", f"Tika setup error: {e}")
@@ -179,9 +169,7 @@ async def background_init():
                 async def crawl_manager_health_check():
                     return {"healthy": True, "running": crawl_manager.is_running()}
 
-                service_manager.register_health_checker(
-                    "crawl_manager", crawl_manager_health_check
-                )
+                service_manager.register_health_checker("crawl_manager", crawl_manager_health_check)
 
                 service_manager.set_ready(
                     "crawl_manager",
@@ -201,13 +189,9 @@ async def background_init():
                 db.close()
 
             except Exception as e:
-                service_manager.set_failed(
-                    "crawl_manager", f"Crawl manager initialization error: {e}"
-                )
+                service_manager.set_failed("crawl_manager", f"Crawl manager initialization error: {e}")
 
-        service_manager.start_background_initialization(
-            "crawl_manager", init_crawl_manager, dependencies=["database"]
-        )
+        service_manager.start_background_initialization("crawl_manager", init_crawl_manager, dependencies=["database"])
 
     except Exception as e:
         service_manager.set_failed("crawl_manager", f"Crawl manager setup error: {e}")
@@ -289,9 +273,7 @@ frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 frontend_assets_path = os.path.join(frontend_dist_path, "assets")
 
 if os.path.exists(frontend_assets_path):
-    app.mount(
-        "/assets", StaticFiles(directory=frontend_assets_path), name="frontend_assets"
-    )
+    app.mount("/assets", StaticFiles(directory=frontend_assets_path), name="frontend_assets")
 
 if os.path.exists(frontend_dist_path):
 
@@ -378,6 +360,4 @@ if __name__ == "__main__":
     logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
     import uvicorn
 
-    uvicorn.run(
-        "main:app", host="0.0.0.0", port=port, reload=settings.debug, log_level="info"
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=settings.debug, log_level="info")

@@ -3,7 +3,9 @@ Setting model
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text
+
+from sqlalchemy import Column, DateTime, Integer, String, Text
+
 from .base import Base
 
 
@@ -17,6 +19,4 @@ class Setting(Base):
     value = Column(Text, nullable=False)
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

@@ -2,7 +2,8 @@
 API request/response models for crawl functionality
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -88,9 +89,7 @@ class BatchWatchPathResponse(BaseModel):
     """Response for batch watch path operations"""
 
     added: List[Dict[str, Any]] = Field(..., description="Successfully added paths")
-    skipped: List[Dict[str, str]] = Field(
-        default_factory=list, description="Skipped paths with reasons"
-    )
+    skipped: List[Dict[str, str]] = Field(default_factory=list, description="Skipped paths with reasons")
     total_added: int = 0
     total_skipped: int = 0
 

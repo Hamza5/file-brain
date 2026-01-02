@@ -2,8 +2,10 @@
 Base repository class
 """
 
-from typing import Generic, TypeVar, Type, Optional, List, Any
+from typing import Any, Generic, List, Optional, Type, TypeVar
+
 from sqlalchemy.orm import Session
+
 from database.models.base import Base
 
 ModelType = TypeVar("ModelType", bound=Base)

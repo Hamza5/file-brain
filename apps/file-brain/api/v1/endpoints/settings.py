@@ -2,13 +2,13 @@
 Settings management API endpoints
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from core.logging import logger
 from database.models import get_db
 from database.repositories import SettingsRepository
-from core.logging import logger
 
 router = APIRouter(prefix="/config/settings", tags=["configuration"])
 
@@ -46,15 +46,11 @@ async def get_setting(key: str, db: Session = Depends(get_db)):
 
 
 @router.put("/{key}")
-async def update_setting(
-    key: str, value: str, description: str | None = None, db: Session = Depends(get_db)
-):
+async def update_setting(key: str, value: str, description: str | None = None, db: Session = Depends(get_db)):
     """Update a setting"""
     settings_repo = SettingsRepository(db)
     setting = settings_repo.set(key, value, description)
 
     logger.info(f"Updated setting via API: {key}={value}")
 
-    return SettingResponse(
-        key=setting.key, value=setting.value, description=setting.description
-    )
+    return SettingResponse(key=setting.key, value=setting.value, description=setting.description)

@@ -11,8 +11,8 @@ import io
 import os
 import tarfile
 import zipfile
-from typing import Dict, List, Optional, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Import Tika
 from tika import parser
@@ -115,9 +115,7 @@ def try_extract_xz(data: bytes) -> Optional[Dict[str, bytes]]:
         return None
 
 
-def extract_archive(
-    data: bytes, filename: str = "archive"
-) -> Optional[Dict[str, bytes]]:
+def extract_archive(data: bytes, filename: str = "archive") -> Optional[Dict[str, bytes]]:
     """
     Try to extract an archive using multiple methods until one succeeds.
 
@@ -143,9 +141,7 @@ def extract_archive(
         try:
             result = extract_func(data)
             if result is not None:
-                logger.info(
-                    f"Successfully extracted as {format_name}: {filename} ({len(result)} files)"
-                )
+                logger.info(f"Successfully extracted as {format_name}: {filename} ({len(result)} files)")
                 return result
         except Exception as e:
             logger.debug(f"Failed to extract as {format_name}: {e}")
@@ -189,9 +185,7 @@ def parse_archive_recursively(
         # Not an archive or extraction failed, try to parse directly with Tika
         try:
             if len(data) > max_file_size:
-                logger.warning(
-                    f"Skipping large file: {filename} ({len(data) / (1024 * 1024):.1f} MB)"
-                )
+                logger.warning(f"Skipping large file: {filename} ({len(data) / (1024 * 1024):.1f} MB)")
                 return results
 
             parsed = parser.from_buffer(io.BytesIO(data), tika_endpoint)
@@ -216,9 +210,7 @@ def parse_archive_recursively(
     for extracted_filename, file_data in extracted_files.items():
         # Skip very large files
         if len(file_data) > max_file_size:
-            logger.warning(
-                f"Skipping large file: {extracted_filename} ({len(file_data) / (1024 * 1024):.1f} MB)"
-            )
+            logger.warning(f"Skipping large file: {extracted_filename} ({len(file_data) / (1024 * 1024):.1f} MB)")
             continue
 
         # Check if this file is also an archive
@@ -260,13 +252,9 @@ def parse_archive_recursively(
                     if content_type.startswith("image/"):
                         content_preview = (parsed["content"] or "")[:100]
                         if content_preview.strip():
-                            logger.debug(
-                                f"  ✓ Image with OCR text: {extracted_filename}"
-                            )
+                            logger.debug(f"  ✓ Image with OCR text: {extracted_filename}")
                         else:
-                            logger.debug(
-                                f"  ○ Image (no text/OCR): {extracted_filename}"
-                            )
+                            logger.debug(f"  ○ Image (no text/OCR): {extracted_filename}")
 
             except Exception as e:
                 logger.error(f"Error parsing {extracted_filename}: {e}")
@@ -274,9 +262,7 @@ def parse_archive_recursively(
     return results
 
 
-def concatenate_archive_content(
-    parsed_files: List[Dict[str, Any]], archive_filename: str
-) -> str:
+def concatenate_archive_content(parsed_files: List[Dict[str, Any]], archive_filename: str) -> str:
     """
     Concatenate content from all parsed files in an archive.
 
@@ -370,13 +356,9 @@ def extract_and_parse_archive(
             "files_extracted": len(parsed_files),
             "total_content_size": len(concatenated_content),
             "total_original_size": total_size,
-            "nested_archive_depth": max(f.get("depth", 0) for f in parsed_files)
-            if parsed_files
-            else 0,
+            "nested_archive_depth": max(f.get("depth", 0) for f in parsed_files) if parsed_files else 0,
             "mime_types_found": mime_types,
-            "files_with_content": len(
-                [f for f in parsed_files if f.get("content", "").strip()]
-            ),
+            "files_with_content": len([f for f in parsed_files if f.get("content", "").strip()]),
             "extracted_files": [
                 {
                     "file_path": f.get("file_path"),
@@ -389,9 +371,7 @@ def extract_and_parse_archive(
             ],
         }
 
-        logger.info(
-            f"Successfully extracted and parsed archive: {filename} ({len(parsed_files)} files)"
-        )
+        logger.info(f"Successfully extracted and parsed archive: {filename} ({len(parsed_files)} files)")
 
         return {"content": concatenated_content, "metadata": metadata}
 

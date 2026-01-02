@@ -3,7 +3,9 @@ Watch path model
 """
 
 from datetime import datetime
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
+
 from .base import Base
 
 
@@ -17,6 +19,4 @@ class WatchPath(Base):
     enabled = Column(Boolean, default=True, nullable=False)
     include_subdirectories = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

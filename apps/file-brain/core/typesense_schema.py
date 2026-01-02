@@ -2,7 +2,7 @@
 Typesense collection schema definition
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 def get_collection_schema(collection_name: str) -> Dict[str, Any]:
@@ -72,9 +72,7 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
                         "author",
                         "content",
                     ],
-                    "model_config": {
-                        "model_name": "ts/paraphrase-multilingual-mpnet-base-v2"
-                    },
+                    "model_config": {"model_name": "ts/paraphrase-multilingual-mpnet-base-v2"},
                 },
             },
         ],

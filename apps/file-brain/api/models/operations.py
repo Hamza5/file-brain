@@ -2,10 +2,11 @@
 Enhanced operation queue with operation types
 """
 
+from datetime import datetime
 from enum import Enum
 from typing import Optional
+
 from pydantic import BaseModel, Field
-from datetime import datetime
 
 
 class OperationType(str, Enum):
@@ -28,9 +29,7 @@ class CrawlOperation(BaseModel):
     file_size: Optional[int] = None
     modified_time: Optional[int] = None  # Unix timestamp in ms
     created_time: Optional[int] = None  # Unix timestamp in ms
-    discovered_at: Optional[int] = (
-        None  # When file was discovered (for initial crawl ordering)
-    )
+    discovered_at: Optional[int] = None  # When file was discovered (for initial crawl ordering)
 
     # Additional metadata
     source: str = Field(description="Source of operation: 'crawl' or 'watch'")
@@ -47,9 +46,7 @@ class BatchOperation(BaseModel):
     operations: list[CrawlOperation]
     batch_id: str
     source: str = "batch"
-    created_at: int = Field(
-        default_factory=lambda: int(datetime.now().timestamp() * 1000)
-    )
+    created_at: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
 
 
 class OperationResult(BaseModel):
@@ -58,9 +55,7 @@ class OperationResult(BaseModel):
     operation_id: str
     success: bool
     error_message: Optional[str] = None
-    processed_at: int = Field(
-        default_factory=lambda: int(datetime.now().timestamp() * 1000)
-    )
+    processed_at: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
     processing_time_ms: Optional[int] = None
     file_path: str
     operation: OperationType

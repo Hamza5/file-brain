@@ -2,14 +2,14 @@
 File Discoverer component
 """
 
-import os
 import asyncio
+import os
 import time
 from typing import List
 
-from database.models import WatchPath
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
+from database.models import WatchPath
 
 
 class FileDiscoverer:
@@ -44,9 +44,7 @@ class FileDiscoverer:
                         break
 
                     logger.info(f"Scanning directory: {watch_path_model.path}")
-                    for root, dirs, files in os.walk(
-                        watch_path_model.path, topdown=True
-                    ):
+                    for root, dirs, files in os.walk(watch_path_model.path, topdown=True):
                         if self._sync_stop_event:
                             return
 
@@ -72,9 +70,7 @@ class FileDiscoverer:
                                 )
                                 # Use thread-safe way to put into async queue
                                 # We use .result() to provide backpressure: if the queue is full, the thread will wait
-                                asyncio.run_coroutine_threadsafe(
-                                    queue.put(op), loop
-                                ).result()
+                                asyncio.run_coroutine_threadsafe(queue.put(op), loop).result()
                             except FileNotFoundError:
                                 continue
                             except Exception as e:

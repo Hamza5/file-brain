@@ -7,8 +7,8 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-from services.typesense_client import get_typesense_client
 from core.logging import logger
+from services.typesense_client import get_typesense_client
 
 
 @dataclass
@@ -63,9 +63,7 @@ class IndexVerifier:
                     break
 
                 # Fetch batch of documents
-                documents = await self.typesense.get_all_indexed_files(
-                    limit=batch_size, offset=offset
-                )
+                documents = await self.typesense.get_all_indexed_files(limit=batch_size, offset=offset)
 
                 if not documents:
                     break
@@ -93,9 +91,7 @@ class IndexVerifier:
 
                 # 3. Batch delete orphaned files
                 if orphaned_ids:
-                    logger.info(
-                        f"Removing {len(orphaned_ids)} orphaned files from index..."
-                    )
+                    logger.info(f"Removing {len(orphaned_ids)} orphaned files from index...")
                     # We can use the client to delete by ID or by path.
                     # typeense_client.batch_remove_files takes paths.
                     await self.typesense.batch_remove_files(orphaned_paths)

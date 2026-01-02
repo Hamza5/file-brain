@@ -4,17 +4,17 @@ Crawl Job Manager - coordinates discovery and indexing
 
 import asyncio
 import time
-from datetime import datetime
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from database.models import WatchPath, SessionLocal
+from core.logging import logger
+from database.models import SessionLocal, WatchPath
 from database.repositories import CrawlerStateRepository
 from services.crawler.discoverer import FileDiscoverer
 from services.crawler.indexer import FileIndexer
 from services.crawler.verification import IndexVerifier, VerificationProgress
 from services.typesense_client import get_typesense_client
-from core.logging import logger
 
 
 @dataclass
@@ -104,33 +104,19 @@ class CrawlJobManager:
 
     def _get_live_status(self) -> Dict[str, Any]:
         """Calculate status from internal counters"""
-        elapsed_time = (
-            (datetime.utcnow() - self._start_time).total_seconds()
-            if self._start_time
-            else 0
-        )
+        elapsed_time = (datetime.utcnow() - self._start_time).total_seconds() if self._start_time else 0
 
         # Discovery progress
         discovery_pct = 0
         if self.discovery_progress.total_paths > 0:
-            discovery_pct = int(
-                (
-                    self.discovery_progress.processed_paths
-                    / self.discovery_progress.total_paths
-                )
-                * 100
-            )
+            discovery_pct = int((self.discovery_progress.processed_paths / self.discovery_progress.total_paths) * 100)
             discovery_pct = min(discovery_pct, 100)
 
         # Verification progress
         verification_pct = 0
         if self.verification_progress.total_indexed > 0:
             verification_pct = int(
-                (
-                    self.verification_progress.processed_count
-                    / self.verification_progress.total_indexed
-                )
-                * 100
+                (self.verification_progress.processed_count / self.verification_progress.total_indexed) * 100
             )
             verification_pct = min(verification_pct, 100)
         elif self.verification_progress.is_complete:
@@ -155,20 +141,14 @@ class CrawlJobManager:
         if not self.verification_progress.is_complete:
             current_phase = "verifying"
 
-        if (
-            indexing_pct >= 100
-            and discovery_pct >= 100
-            and self.verification_progress.is_complete
-        ):
+        if indexing_pct >= 100 and discovery_pct >= 100 and self.verification_progress.is_complete:
             current_phase = "idle"
 
         return {
             "running": self._running,
             "job_type": "crawl",
             "current_phase": current_phase,
-            "start_time": int(self._start_time.timestamp() * 1000)
-            if self._start_time
-            else None,
+            "start_time": int(self._start_time.timestamp() * 1000) if self._start_time else None,
             "elapsed_time": int(elapsed_time),
             "discovery_progress": discovery_pct,
             "indexing_progress": indexing_pct,
@@ -193,9 +173,7 @@ class CrawlJobManager:
 
         # Reset progress
         self.discoverer.files_found = 0
-        self.discovery_progress = DiscoveryProgress(
-            total_paths=len(self.watch_paths), start_time=time.time()
-        )
+        self.discovery_progress = DiscoveryProgress(total_paths=len(self.watch_paths), start_time=time.time())
         self.indexing_progress = IndexingProgress(start_time=time.time())
 
         # Reset verifier
@@ -257,9 +235,7 @@ class CrawlJobManager:
 
                 # Signal indexing that discovery is finished
                 await queue.put(None)
-                self.discovery_progress.processed_paths = (
-                    self.discovery_progress.total_paths
-                )
+                self.discovery_progress.processed_paths = self.discovery_progress.total_paths
             except Exception as e:
                 logger.error(f"Discovery worker failed: {e}")
                 await queue.put(None)

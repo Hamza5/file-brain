@@ -4,12 +4,12 @@ Enables instant FastAPI startup with parallel background initialization
 """
 
 import asyncio
+import threading
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field
-import threading
+from typing import Any, Dict, List, Optional
 
 from core.config import settings
 from core.logging import logger
@@ -101,9 +101,7 @@ class ServiceManager:
         """Register a health check function for a service"""
         with self._lock:
             if service_name not in self._services:
-                self._services[service_name] = ServiceStatus(
-                    user_friendly_name=service_name
-                )
+                self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
             self._health_checkers[service_name] = checker
 
     def get_service_status(self, service_name: str) -> Optional[ServiceStatus]:
@@ -116,15 +114,11 @@ class ServiceManager:
         with self._lock:
             return {name: status for name, status in self._services.items()}
 
-    def set_service_phase(
-        self, service_name: str, phase_name: str, progress_percent: float, message: str
-    ):
+    def set_service_phase(self, service_name: str, phase_name: str, progress_percent: float, message: str):
         """Update the current initialization phase for a service"""
         with self._lock:
             if service_name not in self._services:
-                self._services[service_name] = ServiceStatus(
-                    user_friendly_name=service_name
-                )
+                self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
 
             status = self._services[service_name]
             status.current_phase = ServicePhase(
@@ -137,9 +131,7 @@ class ServiceManager:
             if status.state == ServiceState.NOT_STARTED:
                 status.state = ServiceState.INITIALIZING
 
-            self.append_service_log(
-                service_name, f"Phase changed to '{phase_name}': {message}"
-            )
+            self.append_service_log(service_name, f"Phase changed to '{phase_name}': {message}")
 
     def append_service_log(self, service_name: str, message: str):
         """Append a log message to the service's initialization log"""
@@ -170,9 +162,7 @@ class ServiceManager:
         """Update service state with timestamp"""
         with self._lock:
             if service_name not in self._services:
-                self._services[service_name] = ServiceStatus(
-                    user_friendly_name=service_name
-                )
+                self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
 
             status = self._services[service_name]
             status.state = state
@@ -190,9 +180,7 @@ class ServiceManager:
                     message="Service is fully operational",
                 )
                 self.append_service_log(service_name, "Service is ready")
-                logger.debug(
-                    f"Service {service_name} marked as ready at {status.last_success}"
-                )
+                logger.debug(f"Service {service_name} marked as ready at {status.last_success}")
 
             elif state == ServiceState.FAILED:
                 status.error_message = error_message
@@ -205,14 +193,10 @@ class ServiceManager:
                         service_name,
                         f"Failed (attempt {status.retry_count}): {error_message}",
                     )
-                    logger.warning(
-                        f"Service {service_name} failed (attempt {status.retry_count}): {error_message}"
-                    )
+                    logger.warning(f"Service {service_name} failed (attempt {status.retry_count}): {error_message}")
                 else:
                     status.next_retry = None  # Max retries reached
-                    self.append_service_log(
-                        service_name, f"Permanently failed: {error_message}"
-                    )
+                    self.append_service_log(service_name, f"Permanently failed: {error_message}")
                     logger.error(
                         f"Service {service_name} failed permanently after {status.max_retries} attempts: {error_message}"
                     )
@@ -226,17 +210,13 @@ class ServiceManager:
 
     def set_initializing(self, service_name: str, details: Optional[Dict] = None):
         """Mark service as initializing"""
-        self.update_service_state(
-            service_name, ServiceState.INITIALIZING, details=details
-        )
+        self.update_service_state(service_name, ServiceState.INITIALIZING, details=details)
 
     def set_ready(self, service_name: str, details: Optional[Dict] = None):
         """Mark service as ready"""
         self.update_service_state(service_name, ServiceState.READY, details=details)
 
-    def set_failed(
-        self, service_name: str, error_message: str, details: Optional[Dict] = None
-    ):
+    def set_failed(self, service_name: str, error_message: str, details: Optional[Dict] = None):
         """Mark service as failed"""
         self.update_service_state(
             service_name,
@@ -265,18 +245,12 @@ class ServiceManager:
             if status.state == ServiceState.DISABLED:
                 return {
                     "status": "disabled",
-                    "message": status.details.get(
-                        "disabled_reason", "Service disabled"
-                    ),
+                    "message": status.details.get("disabled_reason", "Service disabled"),
                     "timestamp": status.last_check,
                 }
 
             # Check if we need to retry
-            if (
-                status.state == ServiceState.FAILED
-                and status.next_retry
-                and time.time() < status.next_retry
-            ):
+            if status.state == ServiceState.FAILED and status.next_retry and time.time() < status.next_retry:
                 return {
                     "status": "retry_scheduled",
                     "message": f"Retry scheduled at {datetime.fromtimestamp(status.next_retry)}",
@@ -306,9 +280,7 @@ class ServiceManager:
                     return {
                         "status": "healthy",
                         "timestamp": status.last_success or status.last_check,
-                        "uptime_seconds": int(
-                            time.time() - (status.last_success or status.last_check)
-                        ),
+                        "uptime_seconds": int(time.time() - (status.last_success or status.last_check)),
                     }
 
             # Perform actual health check if checker is registered
@@ -321,9 +293,7 @@ class ServiceManager:
                         self.set_ready(service_name, details=result)
                         return {"status": "healthy", "timestamp": time.time(), **result}
                     else:
-                        self.set_failed(
-                            service_name, result.get("error", "Health check failed")
-                        )
+                        self.set_failed(service_name, result.get("error", "Health check failed"))
                         return {
                             "status": "unhealthy",
                             "error": result.get("error", "Health check failed"),
@@ -356,9 +326,7 @@ class ServiceManager:
             results[service_name] = await self.check_service_health(service_name)
 
         # Calculate overall system health
-        healthy_count = sum(
-            1 for result in results.values() if result.get("status") == "healthy"
-        )
+        healthy_count = sum(1 for result in results.values() if result.get("status") == "healthy")
         total_count = len(results)
 
         overall_status = "healthy"
@@ -397,9 +365,7 @@ class ServiceManager:
                     all_ready = False
                 else:
                     dep_status = self._services[dep]
-                    dependency_results[dep] = {
-                        "ready": dep_status.state == ServiceState.READY
-                    }
+                    dependency_results[dep] = {"ready": dep_status.state == ServiceState.READY}
                     if dep_status.state != ServiceState.READY:
                         all_ready = False
 
@@ -415,21 +381,15 @@ class ServiceManager:
         if dependencies:
             with self._lock:
                 if service_name not in self._services:
-                    self._services[service_name] = ServiceStatus(
-                        user_friendly_name=service_name
-                    )
+                    self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
                 self._services[service_name].dependencies = dependencies
 
         # Create and store the initialization task
-        task = asyncio.create_task(
-            self._initialize_service_background(service_name, init_func)
-        )
+        task = asyncio.create_task(self._initialize_service_background(service_name, init_func))
         with self._lock:
             self._initialization_tasks[service_name] = task
 
-    async def _initialize_service_background(
-        self, service_name: str, init_func: callable
-    ):
+    async def _initialize_service_background(self, service_name: str, init_func: callable):
         """Background task to initialize a service"""
         try:
             logger.info(f"Starting background initialization for {service_name}")
@@ -454,16 +414,10 @@ class ServiceManager:
                         break
 
                 if not dep_status["ready"]:
-                    missing_deps = [
-                        dep
-                        for dep, status in dep_status["dependencies"].items()
-                        if not status["ready"]
-                    ]
+                    missing_deps = [dep for dep, status in dep_status["dependencies"].items() if not status["ready"]]
                     raise Exception(f"Dependencies timed out: {missing_deps}")
 
-            self.set_service_phase(
-                service_name, "Initializing", 10, "Starting initialization sequence"
-            )
+            self.set_service_phase(service_name, "Initializing", 10, "Starting initialization sequence")
 
             # Run the initialization function
             if asyncio.iscoroutinefunction(init_func):
@@ -530,16 +484,12 @@ def require_service(service_name: str) -> bool:
 
         status = get_service_manager().get_service_status(service_name)
         if status and status.state == ServiceState.INITIALIZING:
-            raise HTTPException(
-                status_code=503, detail=f"Service {service_name} is initializing"
-            )
+            raise HTTPException(status_code=503, detail=f"Service {service_name} is initializing")
         elif status and status.state == ServiceState.FAILED:
             raise HTTPException(
                 status_code=503,
                 detail=f"Service {service_name} failed: {status.error_message}",
             )
         else:
-            raise HTTPException(
-                status_code=503, detail=f"Service {service_name} is not available"
-            )
+            raise HTTPException(status_code=503, detail=f"Service {service_name} is not available")
     return True

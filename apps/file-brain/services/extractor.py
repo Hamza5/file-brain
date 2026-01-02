@@ -3,21 +3,21 @@ Document content extraction using Apache Tika with comprehensive format support
 including archive handling
 """
 
-import os
 import mimetypes
+import os
 import re
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 # Import chardet for smart text extraction
 import chardet
 
+# Import Tika
+from tika import parser
+
 from api.models.file_event import DocumentContent
 from core.config import settings
 from core.logging import logger
-from services.archive_extractor import is_likely_archive, extract_and_parse_archive
-
-# Import Tika
-from tika import parser
+from services.archive_extractor import extract_and_parse_archive, is_likely_archive
 
 
 class ContentExtractor:
@@ -28,9 +28,7 @@ class ContentExtractor:
         # Configure tika-python for client-only mode when Docker Tika is enabled
         if settings.tika_enabled and settings.tika_client_only:
             os.environ["TIKA_CLIENT_ONLY"] = "True"
-            logger.info(
-                f"Configured Tika client-only mode for endpoint: {settings.tika_url}"
-            )
+            logger.info(f"Configured Tika client-only mode for endpoint: {settings.tika_url}")
 
     def extract(self, file_path: str) -> DocumentContent:
         """
@@ -106,9 +104,7 @@ class ContentExtractor:
                 }
             )
 
-            logger.info(
-                f"Successfully extracted archive: {file_path} ({metadata.get('files_extracted', 0)} files)"
-            )
+            logger.info(f"Successfully extracted archive: {file_path} ({metadata.get('files_extracted', 0)} files)")
 
             return DocumentContent(content=content, metadata=metadata)
 
@@ -152,17 +148,13 @@ class ContentExtractor:
             if tika_endpoint:
                 metadata["tika_endpoint"] = tika_endpoint
 
-            logger.info(
-                f"Successfully extracted {len(content)} characters from {file_path}"
-            )
+            logger.info(f"Successfully extracted {len(content)} characters from {file_path}")
 
             return DocumentContent(content=content, metadata=metadata)
 
         except ConnectionError as e:
             logger.error(f"Connection error to Tika server {settings.tika_url}: {e}")
-            logger.info(
-                "Ensure Tika Docker container is running on the configured port"
-            )
+            logger.info("Ensure Tika Docker container is running on the configured port")
             raise
         except Exception as e:
             logger.error(f"Error during Tika extraction of {file_path}: {e}")
@@ -223,9 +215,7 @@ class ContentExtractor:
         ]:
             if date_key in raw_metadata and raw_metadata[date_key]:
                 # Tika often returns dates in ISO format or human readable format
-                metadata[f"{date_key.replace('-', '_').lower()}"] = str(
-                    raw_metadata[date_key]
-                )
+                metadata[f"{date_key.replace('-', '_').lower()}"] = str(raw_metadata[date_key])
 
         # Handle metadata as lists (like keywords)
         for key in ["keywords", "creator", "author"]:
@@ -283,9 +273,7 @@ class ContentExtractor:
             text = raw_data.decode(encoding, errors="ignore")
 
             # Filter out control characters but keep whitespace
-            text = "".join(
-                char for char in text if char.isprintable() or char.isspace()
-            )
+            text = "".join(char for char in text if char.isprintable() or char.isspace())
 
             # Check if text seems legitimate (ratio of alphanumeric to total)
             if len(text) > 0:
@@ -302,9 +290,7 @@ class ContentExtractor:
                 return None
 
             extracted_text = " ".join(words)
-            logger.info(
-                f"Smart extraction successful: {len(extracted_text)} characters from {file_path}"
-            )
+            logger.info(f"Smart extraction successful: {len(extracted_text)} characters from {file_path}")
             return extracted_text
 
         except Exception as e:

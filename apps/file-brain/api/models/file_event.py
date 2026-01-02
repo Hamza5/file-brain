@@ -3,7 +3,8 @@ File event data models
 """
 
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -50,9 +51,7 @@ class DocumentContent(BaseModel):
     """Extracted document content"""
 
     content: str = Field(description="Document content")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Document metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
 
 
 # NOTE:

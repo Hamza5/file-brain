@@ -3,22 +3,23 @@ Crawl control API endpoints (Database-backed)
 """
 
 import asyncio
-import time
 import os
-from fastapi import APIRouter, HTTPException, Depends
+import time
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
 from sqlalchemy.orm import Session
 
-from database.models import get_db
-from database.repositories import WatchPathRepository, SettingsRepository
-from services.crawler.manager import get_crawl_job_manager
 from api.models.crawler import (
-    CrawlStatusResponse,
     ClearIndexesResponse,
+    CrawlStatusResponse,
     MessageResponse,
 )
 from core.logging import logger
+from database.models import get_db
+from database.repositories import SettingsRepository, WatchPathRepository
+from services.crawler.manager import get_crawl_job_manager
 
 router = APIRouter(prefix="/crawler", tags=["crawler"])
 
@@ -79,13 +80,9 @@ async def start_crawler(db: Session = Depends(get_db)):
             valid_paths.append(path_model)
 
         if not valid_paths:
-            raise HTTPException(
-                status_code=400, detail="No valid watch paths configured"
-            )
+            raise HTTPException(status_code=400, detail="No valid watch paths configured")
 
-        logger.info(
-            f"Starting crawl job for {len(valid_paths)} paths: {[p.path for p in valid_paths]}"
-        )
+        logger.info(f"Starting crawl job for {len(valid_paths)} paths: {[p.path for p in valid_paths]}")
 
         # Start the crawl job
         crawl_manager = get_crawl_job_manager(watch_paths=valid_paths)
@@ -277,9 +274,11 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
     """
 
     async def event_generator():
-        from fastapi.encoders import jsonable_encoder
-        from services.typesense_client import get_typesense_client
         import json as _json
+
+        from fastapi.encoders import jsonable_encoder
+
+        from services.typesense_client import get_typesense_client
 
         previous_payload = None
         last_heartbeat = time.time()
@@ -326,12 +325,8 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                             "path": wp.path,
                             "enabled": wp.enabled,
                             "include_subdirectories": wp.include_subdirectories,
-                            "created_at": wp.created_at.isoformat()
-                            if wp.created_at
-                            else None,
-                            "updated_at": wp.updated_at.isoformat()
-                            if wp.updated_at
-                            else None,
+                            "created_at": wp.created_at.isoformat() if wp.created_at else None,
+                            "updated_at": wp.updated_at.isoformat() if wp.updated_at else None,
                         }
                         for wp in watch_path_models
                     ]
@@ -342,9 +337,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                 indexed = int(total_indexed)
                 discovered = max(int(status_dict.get("files_discovered", 0)), indexed)
 
-                indexed_vs_discovered = (
-                    float(indexed) / discovered if discovered > 0 else 0.0
-                )
+                indexed_vs_discovered = float(indexed) / discovered if discovered > 0 else 0.0
 
                 payload = {
                     "status": status_dict,
@@ -425,9 +418,7 @@ async def get_crawler_settings(db: Session = Depends(get_db)):
 
 
 @router.put("/settings", response_model=MessageResponse)
-async def update_crawler_settings(
-    settings: Dict[str, Any], db: Session = Depends(get_db)
-):
+async def update_crawler_settings(settings: Dict[str, Any], db: Session = Depends(get_db)):
     """Update crawler settings"""
     try:
         settings_repo = SettingsRepository(db)
@@ -470,9 +461,7 @@ async def verify_indexed_files(db: Session = Depends(get_db)):
         watch_paths = [wp.path for wp in watch_path_models]
 
         if not watch_paths:
-            raise HTTPException(
-                status_code=400, detail="No watch paths configured for verification"
-            )
+            raise HTTPException(status_code=400, detail="No watch paths configured for verification")
 
         # Placeholder
         verification_stats = {}

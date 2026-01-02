@@ -7,10 +7,12 @@ import platform
 import subprocess
 from pathlib import Path
 from typing import List
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from services.typesense_client import TypesenseClient
+
 from core.logging import logger
+from services.typesense_client import TypesenseClient
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -189,9 +191,7 @@ def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
         return False, f"Error deleting file: {str(e)}"
 
 
-async def forget_file_from_index(
-    file_path: str, typesense_client: TypesenseClient
-) -> tuple[bool, str]:
+async def forget_file_from_index(file_path: str, typesense_client: TypesenseClient) -> tuple[bool, str]:
     """Remove a file from the search index (but keep it on disk)"""
     try:
         # Validate file path
@@ -220,9 +220,7 @@ async def open_file_operation(request: FileOperationRequest):
         elif request.operation == "folder":
             success, message = open_folder_cross_platform(request.file_path)
         else:
-            raise HTTPException(
-                status_code=400, detail="Invalid operation. Must be 'file' or 'folder'"
-            )
+            raise HTTPException(status_code=400, detail="Invalid operation. Must be 'file' or 'folder'")
 
         if success:
             return {
@@ -262,9 +260,7 @@ async def open_multiple_files_operation(request: MultipleFileOperationRequest):
             elif request.operation == "folder":
                 success, message = open_folder_cross_platform(file_path)
             else:
-                errors.append(
-                    f"Invalid operation '{request.operation}' for: {file_path}"
-                )
+                errors.append(f"Invalid operation '{request.operation}' for: {file_path}")
                 continue
 
             if success:
@@ -351,9 +347,7 @@ async def delete_file_operation(request: FileOperationRequest):
     """Delete a single file from the filesystem and remove from search index"""
     try:
         if request.operation != "delete":
-            raise HTTPException(
-                status_code=400, detail="Invalid operation. Must be 'delete'"
-            )
+            raise HTTPException(status_code=400, detail="Invalid operation. Must be 'delete'")
 
         success, message = delete_file_cross_platform(request.file_path)
 
@@ -362,13 +356,9 @@ async def delete_file_operation(request: FileOperationRequest):
             try:
                 typesense_client = TypesenseClient()
                 await typesense_client.remove_from_index(request.file_path)
-                logger.info(
-                    f"Removed deleted file from search index: {request.file_path}"
-                )
+                logger.info(f"Removed deleted file from search index: {request.file_path}")
             except Exception as e:
-                logger.warning(
-                    f"Failed to remove deleted file from index {request.file_path}: {e}"
-                )
+                logger.warning(f"Failed to remove deleted file from index {request.file_path}: {e}")
                 # Don't fail the operation if index removal fails
 
             return {
@@ -391,15 +381,11 @@ async def forget_file_operation(request: FileOperationRequest):
     """Remove a single file from the search index"""
     try:
         if request.operation != "forget":
-            raise HTTPException(
-                status_code=400, detail="Invalid operation. Must be 'forget'"
-            )
+            raise HTTPException(status_code=400, detail="Invalid operation. Must be 'forget'")
 
         # Initialize Typesense client
         typesense_client = TypesenseClient()
-        success, message = await forget_file_from_index(
-            request.file_path, typesense_client
-        )
+        success, message = await forget_file_from_index(request.file_path, typesense_client)
 
         if success:
             return {
@@ -425,9 +411,7 @@ async def delete_multiple_files_operation(request: MultipleFileOperationRequest)
 
     try:
         if request.operation != "delete":
-            raise HTTPException(
-                status_code=400, detail="Invalid operation. Must be 'delete'"
-            )
+            raise HTTPException(status_code=400, detail="Invalid operation. Must be 'delete'")
 
         for file_path in request.file_paths:
             try:
@@ -440,9 +424,7 @@ async def delete_multiple_files_operation(request: MultipleFileOperationRequest)
                         typesense_client = TypesenseClient()
                         await typesense_client.remove_from_index(file_path)
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to remove deleted file from index {file_path}: {e}"
-                        )
+                        logger.warning(f"Failed to remove deleted file from index {file_path}: {e}")
                 else:
                     errors.append(f"{file_path}: {message}")
 
@@ -471,18 +453,14 @@ async def forget_multiple_files_operation(request: MultipleFileOperationRequest)
 
     try:
         if request.operation != "forget":
-            raise HTTPException(
-                status_code=400, detail="Invalid operation. Must be 'forget'"
-            )
+            raise HTTPException(status_code=400, detail="Invalid operation. Must be 'forget'")
 
         # Initialize Typesense client
         typesense_client = TypesenseClient()
 
         for file_path in request.file_paths:
             try:
-                success, message = await forget_file_from_index(
-                    file_path, typesense_client
-                )
+                success, message = await forget_file_from_index(file_path, typesense_client)
 
                 if success:
                     results.append(file_path)

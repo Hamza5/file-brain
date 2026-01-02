@@ -2,8 +2,9 @@
 WatchPath repository
 """
 
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
 
 from database.models.watch_path import WatchPath
@@ -26,9 +27,7 @@ class WatchPathRepository(BaseRepository[WatchPath]):
         """Get all enabled watch paths"""
         return self.db.query(WatchPath).filter(WatchPath.enabled == True).all()
 
-    def create_if_not_exists(
-        self, path: str, enabled: bool = True, include_subdirectories: bool = True
-    ) -> WatchPath:
+    def create_if_not_exists(self, path: str, enabled: bool = True, include_subdirectories: bool = True) -> WatchPath:
         """Create a watch path if it doesn't exist"""
         existing = self.get_by_path(path)
         if existing:

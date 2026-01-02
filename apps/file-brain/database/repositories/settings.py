@@ -2,13 +2,14 @@
 Settings repository
 """
 
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from sqlalchemy.orm import Session
 
+from core.logging import logger
 from database.models.setting import Setting
 from database.repositories.base import BaseRepository
-from core.logging import logger
 
 
 class SettingsRepository(BaseRepository[Setting]):
