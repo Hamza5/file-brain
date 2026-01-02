@@ -1,6 +1,7 @@
 """
 Main router for API v1
 """
+
 from fastapi import APIRouter
 
 from .endpoints import crawler, settings, watch_paths, files, fs, system, system_stream

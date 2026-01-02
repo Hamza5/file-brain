@@ -1,6 +1,7 @@
 """
 File Indexer component
 """
+
 import os
 import hashlib
 import mimetypes
@@ -13,10 +14,12 @@ from services.extractor import get_extractor
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
 
+
 class FileIndexer:
     """
     Handles indexing of a single file.
     """
+
     def __init__(self):
         self.typesense = get_typesense_client()
         self.extractor = get_extractor()
@@ -61,7 +64,7 @@ class FileIndexer:
             return True
 
         document_content = self.extractor.extract(file_path)
-        
+
         await self.typesense.index_file(
             file_path=file_path,
             file_name=Path(file_path).name,
@@ -69,8 +72,12 @@ class FileIndexer:
             file_size=operation.file_size,
             mime_type=mimetypes.guess_type(file_path)[0] or "application/octet-stream",
             content=document_content.content,
-            modified_time=int(operation.modified_time) if operation.modified_time is not None else None,
-            created_time=int(operation.created_time) if operation.created_time is not None else None,
+            modified_time=int(operation.modified_time)
+            if operation.modified_time is not None
+            else None,
+            created_time=int(operation.created_time)
+            if operation.created_time is not None
+            else None,
             file_hash=file_hash,
             metadata=document_content.metadata,
         )
@@ -95,6 +102,7 @@ class FileIndexer:
 
     async def _calculate_file_hash(self, file_path: str) -> str:
         loop = asyncio.get_running_loop()
+
         def _hash():
             try:
                 hash_md5 = hashlib.md5()
@@ -105,4 +113,5 @@ class FileIndexer:
             except Exception as e:
                 logger.error(f"Error calculating file hash for {file_path}: {e}")
                 return ""
+
         return await loop.run_in_executor(None, _hash)

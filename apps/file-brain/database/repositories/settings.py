@@ -1,6 +1,7 @@
 """
 Settings repository
 """
+
 from typing import Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ class SettingsRepository(BaseRepository[Setting]):
     """
     Repository for Setting model
     """
+
     def __init__(self, db: Session):
         super().__init__(Setting, db)
 
@@ -46,9 +48,9 @@ class SettingsRepository(BaseRepository[Setting]):
             str_value = "true" if value else "false"
         else:
             str_value = str(value)
-            
+
         setting = self.db.query(Setting).filter(Setting.key == key).first()
-        
+
         if setting:
             setting.value = str_value
             setting.updated_at = datetime.utcnow()
@@ -57,7 +59,7 @@ class SettingsRepository(BaseRepository[Setting]):
         else:
             setting = Setting(key=key, value=str_value, description=description)
             self.db.add(setting)
-        
+
         self.db.commit()
         self.db.refresh(setting)
         logger.info(f"Set setting {key}={str_value}")

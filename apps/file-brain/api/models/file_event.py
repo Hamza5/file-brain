@@ -1,6 +1,7 @@
 """
 File event data models
 """
+
 from enum import Enum
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
@@ -8,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class FileEventType(str, Enum):
     """Type of file system event"""
+
     CREATED = "created"
     MODIFIED = "modified"
     DELETED = "deleted"
@@ -15,6 +17,7 @@ class FileEventType(str, Enum):
 
 class FileEvent(BaseModel):
     """Base file event model"""
+
     event_type: FileEventType
     file_path: str
     timestamp: int = Field(description="Event timestamp in milliseconds")
@@ -22,6 +25,7 @@ class FileEvent(BaseModel):
 
 class FileDiscoveredEvent(FileEvent):
     """File discovered/created event"""
+
     event_type: FileEventType = FileEventType.CREATED
     file_size: int
     modified_time: int
@@ -30,6 +34,7 @@ class FileDiscoveredEvent(FileEvent):
 
 class FileChangedEvent(FileEvent):
     """File modified event"""
+
     event_type: FileEventType = FileEventType.MODIFIED
     file_size: int
     modified_time: int
@@ -37,13 +42,17 @@ class FileChangedEvent(FileEvent):
 
 class FileDeletedEvent(FileEvent):
     """File deleted event"""
+
     event_type: FileEventType = FileEventType.DELETED
 
 
 class DocumentContent(BaseModel):
     """Extracted document content"""
+
     content: str = Field(description="Document content")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Document metadata"
+    )
 
 
 # NOTE:
@@ -51,6 +60,7 @@ class DocumentContent(BaseModel):
 # It no longer reflects a DB table; Typesense is the source of truth.
 class IndexedFile(BaseModel):
     """Indexed file model matching Typesense schema (Typesense-only, no local DB)."""
+
     id: str
     file_path: str
     file_name: str

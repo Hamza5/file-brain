@@ -1,9 +1,10 @@
 """
 Crawl Job Manager - coordinates discovery and indexing
 """
+
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
@@ -15,9 +16,11 @@ from services.crawler.verification import IndexVerifier, VerificationProgress
 from services.typesense_client import get_typesense_client
 from core.logging import logger
 
+
 @dataclass
 class DiscoveryProgress:
     """Progress tracking for file discovery"""
+
     total_paths: int = 0
     processed_paths: int = 0
     files_found: int = 0
@@ -25,19 +28,23 @@ class DiscoveryProgress:
     current_path: Optional[str] = None
     start_time: Optional[float] = None
 
+
 @dataclass
 class IndexingProgress:
     """Progress tracking for file indexing"""
+
     files_to_index: int = 0
     files_indexed: int = 0
     files_failed: int = 0
     current_file: Optional[str] = None
     start_time: Optional[float] = None
 
+
 class CrawlJobManager:
     """
     Coordinates the file discovery and indexing process.
     """
+
     def __init__(self, watch_paths: List[WatchPath] = None):
         self.watch_paths = watch_paths or []
         self.discoverer = FileDiscoverer(self.watch_paths)
@@ -45,7 +52,7 @@ class CrawlJobManager:
         self.verifier = IndexVerifier()
         self._stop_event = asyncio.Event()
         self._running = False
-        
+
         # Progress tracking
         self.discovery_progress = DiscoveryProgress()
         self.indexing_progress = IndexingProgress()
@@ -61,21 +68,21 @@ class CrawlJobManager:
         """
         if self._running:
             return self._get_live_status()
-        
+
         # If not running, try to get last known state from DB
         db = SessionLocal()
         try:
             repo = CrawlerStateRepository(db)
             state = repo.get_state()
-            
+
             # Ensure consistency even in idle state
             files_indexed = state.files_indexed or 0
             files_discovered = max(state.files_discovered or 0, files_indexed)
-            
+
             indexing_progress = 0
             if files_discovered > 0:
                 indexing_progress = int((files_indexed / files_discovered) * 100)
-            
+
             return {
                 "running": False,
                 "job_type": None,
@@ -97,27 +104,48 @@ class CrawlJobManager:
 
     def _get_live_status(self) -> Dict[str, Any]:
         """Calculate status from internal counters"""
-        elapsed_time = (datetime.utcnow() - self._start_time).total_seconds() if self._start_time else 0
+        elapsed_time = (
+            (datetime.utcnow() - self._start_time).total_seconds()
+            if self._start_time
+            else 0
+        )
 
         # Discovery progress
         discovery_pct = 0
         if self.discovery_progress.total_paths > 0:
-            discovery_pct = int((self.discovery_progress.processed_paths / self.discovery_progress.total_paths) * 100)
+            discovery_pct = int(
+                (
+                    self.discovery_progress.processed_paths
+                    / self.discovery_progress.total_paths
+                )
+                * 100
+            )
             discovery_pct = min(discovery_pct, 100)
 
         # Verification progress
         verification_pct = 0
         if self.verification_progress.total_indexed > 0:
-            verification_pct = int((self.verification_progress.processed_count / self.verification_progress.total_indexed) * 100)
+            verification_pct = int(
+                (
+                    self.verification_progress.processed_count
+                    / self.verification_progress.total_indexed
+                )
+                * 100
+            )
             verification_pct = min(verification_pct, 100)
         elif self.verification_progress.is_complete:
             verification_pct = 100
-            
+
         # Indexing progress
         files_indexed = self.indexing_progress.files_indexed
         # Use discoverer.files_found for the most up-to-date count from the background thread
-        total_known = max(self.discoverer.files_found, self.discovery_progress.files_found, self.indexing_progress.files_to_index, files_indexed)
-        
+        total_known = max(
+            self.discoverer.files_found,
+            self.discovery_progress.files_found,
+            self.indexing_progress.files_to_index,
+            files_indexed,
+        )
+
         indexing_pct = 0
         if total_known > 0:
             indexing_pct = int((files_indexed / total_known) * 100)
@@ -126,15 +154,21 @@ class CrawlJobManager:
         current_phase = "discovering" if discovery_pct < 100 else "indexing"
         if not self.verification_progress.is_complete:
             current_phase = "verifying"
-        
-        if indexing_pct >= 100 and discovery_pct >= 100 and self.verification_progress.is_complete:
+
+        if (
+            indexing_pct >= 100
+            and discovery_pct >= 100
+            and self.verification_progress.is_complete
+        ):
             current_phase = "idle"
 
         return {
             "running": self._running,
             "job_type": "crawl",
             "current_phase": current_phase,
-            "start_time": int(self._start_time.timestamp() * 1000) if self._start_time else None,
+            "start_time": int(self._start_time.timestamp() * 1000)
+            if self._start_time
+            else None,
             "elapsed_time": int(elapsed_time),
             "discovery_progress": discovery_pct,
             "indexing_progress": indexing_pct,
@@ -156,14 +190,16 @@ class CrawlJobManager:
         self._running = True
         self._stop_event.clear()
         self._start_time = datetime.utcnow()
-        
+
         # Reset progress
         self.discoverer.files_found = 0
-        self.discovery_progress = DiscoveryProgress(total_paths=len(self.watch_paths), start_time=time.time())
+        self.discovery_progress = DiscoveryProgress(
+            total_paths=len(self.watch_paths), start_time=time.time()
+        )
         self.indexing_progress = IndexingProgress(start_time=time.time())
-        
+
         # Reset verifier
-        self.verifier = IndexVerifier() # Re-instantiate to reset progress
+        self.verifier = IndexVerifier()  # Re-instantiate to reset progress
         self.verification_progress = self.verifier.progress
 
         # Update DB state - explicitly reset counts
@@ -181,14 +217,14 @@ class CrawlJobManager:
             )
         finally:
             db.close()
-        
+
         # Run in background
         asyncio.create_task(self._run_crawl())
         return True
 
     async def _run_crawl(self):
         """Run discovery and indexing in parallel using a queue"""
-        
+
         # Phase 1: Verify Index
         # We run this BEFORE discovery to ensure the index is clean
         try:
@@ -197,7 +233,7 @@ class CrawlJobManager:
             logger.info("Index verification phase completed.")
         except Exception as e:
             logger.error(f"Index verification failed: {e}")
-            # We continue to discovery even if verification fails, 
+            # We continue to discovery even if verification fails,
             # but mark verification as complete so we don't get stuck in 'verifying' phase
             self.verification_progress.is_complete = True
 
@@ -209,7 +245,7 @@ class CrawlJobManager:
         # Internal queue to buffer discovered files for indexing
         # Larger queue to allow discovery to run ahead
         queue = asyncio.Queue(maxsize=2000)
-        
+
         async def discovery_worker():
             """Discovery task: scans filesystem and fills the queue"""
             try:
@@ -218,10 +254,12 @@ class CrawlJobManager:
                         break
                     self.discovery_progress.files_found += 1
                     await queue.put(operation)
-                
+
                 # Signal indexing that discovery is finished
                 await queue.put(None)
-                self.discovery_progress.processed_paths = self.discovery_progress.total_paths
+                self.discovery_progress.processed_paths = (
+                    self.discovery_progress.total_paths
+                )
             except Exception as e:
                 logger.error(f"Discovery worker failed: {e}")
                 await queue.put(None)
@@ -231,18 +269,18 @@ class CrawlJobManager:
             try:
                 while True:
                     operation = await queue.get()
-                    if operation is None: # End signal
+                    if operation is None:  # End signal
                         break
-                    
+
                     self.indexing_progress.files_to_index += 1
                     success = await self.indexer.index_file(operation)
                     if success:
                         self.indexing_progress.files_indexed += 1
                     else:
                         self.indexing_progress.files_failed += 1
-                    
+
                     queue.task_done()
-                    
+
                     # Periodically update DB (every 20 files for efficiency)
                     if self.indexing_progress.files_indexed % 20 == 0:
                         self._update_db_progress()
@@ -253,14 +291,14 @@ class CrawlJobManager:
             # Run both workers concurrently
             await asyncio.gather(discovery_worker(), indexing_worker())
             self._update_db_progress()
-            
+
         except Exception as e:
             logger.error(f"Crawl job failed: {e}")
         finally:
             # Important: Get final status while counters are still accurate
             final_status = self._get_live_status()
             self._running = False
-            
+
             db = SessionLocal()
             try:
                 repo = CrawlerStateRepository(db)
@@ -306,13 +344,13 @@ class CrawlJobManager:
             # 1. Clear search index
             typesense = get_typesense_client()
             await typesense.clear_all_documents()
-            
+
             db = SessionLocal()
             try:
                 # 2. Reset crawler statistics and state
                 state_repo = CrawlerStateRepository(db)
                 state_repo.reset_stats()
-                
+
                 logger.info("✅ Indexes cleared and statistics reset")
             finally:
                 db.close()
@@ -329,11 +367,13 @@ class CrawlJobManager:
             "total_indexed": 0,
             "verified_accessible": 0,
             "orphaned_found": 0,
-            "verification_errors": 0
+            "verification_errors": 0,
         }
+
 
 # Global crawl job manager instance
 _crawl_job_manager: CrawlJobManager | None = None
+
 
 def get_crawl_job_manager(watch_paths: List[WatchPath] = None) -> CrawlJobManager:
     """Get or create global crawl job manager"""

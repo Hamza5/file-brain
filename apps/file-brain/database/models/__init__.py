@@ -1,6 +1,7 @@
 """
 Database models package
 """
+
 from .base import Base, engine, SessionLocal, init_db, init_default_data, get_db
 from .watch_path import WatchPath
 from .setting import Setting

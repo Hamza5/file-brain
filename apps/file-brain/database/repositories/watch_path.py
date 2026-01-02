@@ -1,6 +1,7 @@
 """
 WatchPath repository
 """
+
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ class WatchPathRepository(BaseRepository[WatchPath]):
     """
     Repository for WatchPath model
     """
+
     def __init__(self, db: Session):
         super().__init__(WatchPath, db)
 
@@ -24,24 +26,28 @@ class WatchPathRepository(BaseRepository[WatchPath]):
         """Get all enabled watch paths"""
         return self.db.query(WatchPath).filter(WatchPath.enabled == True).all()
 
-    def create_if_not_exists(self, path: str, enabled: bool = True, include_subdirectories: bool = True) -> WatchPath:
+    def create_if_not_exists(
+        self, path: str, enabled: bool = True, include_subdirectories: bool = True
+    ) -> WatchPath:
         """Create a watch path if it doesn't exist"""
         existing = self.get_by_path(path)
         if existing:
             return existing
-        
-        return self.create({
-            "path": path,
-            "enabled": enabled,
-            "include_subdirectories": include_subdirectories
-        })
+
+        return self.create(
+            {
+                "path": path,
+                "enabled": enabled,
+                "include_subdirectories": include_subdirectories,
+            }
+        )
 
     def toggle(self, path: str, enabled: bool) -> Optional[WatchPath]:
         """Toggle enabled status of a watch path"""
         watch_path = self.get_by_path(path)
         if not watch_path:
             return None
-        
+
         watch_path.enabled = enabled
         watch_path.updated_at = datetime.utcnow()
         self.db.commit()
