@@ -1,19 +1,21 @@
 """
 CrawlerState repository
 """
-from typing import Optional, Any
+
 from datetime import datetime
+
 from sqlalchemy.orm import Session
 
+from core.logging import logger
 from database.models.crawler_state import CrawlerState as DBCrawlerState
 from database.repositories.base import BaseRepository
-from core.logging import logger
 
 
 class CrawlerStateRepository(BaseRepository[DBCrawlerState]):
     """
     Repository for CrawlerState model
     """
+
     def __init__(self, db: Session):
         super().__init__(DBCrawlerState, db)
 
@@ -30,11 +32,11 @@ class CrawlerStateRepository(BaseRepository[DBCrawlerState]):
     def update_state(self, **kwargs) -> DBCrawlerState:
         """Update crawler state fields"""
         state = self.get_state()
-        
+
         for key, value in kwargs.items():
             if hasattr(state, key):
                 setattr(state, key, value)
-        
+
         state.updated_at = datetime.utcnow()
         self.db.commit()
         self.db.refresh(state)
@@ -43,7 +45,7 @@ class CrawlerStateRepository(BaseRepository[DBCrawlerState]):
     def increment_stat(self, stat_name: str) -> DBCrawlerState:
         """Increment a statistics counter"""
         state = self.get_state()
-        
+
         if hasattr(state, stat_name):
             current = getattr(state, stat_name)
             setattr(state, stat_name, current + 1)
@@ -51,7 +53,7 @@ class CrawlerStateRepository(BaseRepository[DBCrawlerState]):
             state.updated_at = datetime.utcnow()
             self.db.commit()
             self.db.refresh(state)
-        
+
         return state
 
     def reset_stats(self) -> DBCrawlerState:

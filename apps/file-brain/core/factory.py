@@ -1,13 +1,11 @@
 """
 Application factory
 """
+
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-import os
 
 from core.config import settings
 from core.exceptions import setup_exception_handlers
-from core.logging import logger
 
 
 def create_app() -> FastAPI:
@@ -19,12 +17,13 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description=settings.app_description,
     )
-    
+
     # Setup exception handlers
     setup_exception_handlers(app)
-    
+
     # Configure CORS (if needed, defaulting to permissive for dev)
     from fastapi.middleware.cors import CORSMiddleware
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -35,5 +34,5 @@ def create_app() -> FastAPI:
 
     # Note: Routers will be registered here or in main.py during migration
     # For now, we return the configured app shell
-    
+
     return app

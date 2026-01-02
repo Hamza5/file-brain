@@ -1,22 +1,25 @@
 """
 File Indexer component
 """
-import os
+
+import asyncio
 import hashlib
 import mimetypes
-import asyncio
+import os
 from pathlib import Path
 from typing import Tuple
 
-from services.typesense_client import get_typesense_client
-from services.extractor import get_extractor
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
+from services.extractor import get_extractor
+from services.typesense_client import get_typesense_client
+
 
 class FileIndexer:
     """
     Handles indexing of a single file.
     """
+
     def __init__(self):
         self.typesense = get_typesense_client()
         self.extractor = get_extractor()
@@ -61,7 +64,7 @@ class FileIndexer:
             return True
 
         document_content = self.extractor.extract(file_path)
-        
+
         await self.typesense.index_file(
             file_path=file_path,
             file_name=Path(file_path).name,
@@ -95,6 +98,7 @@ class FileIndexer:
 
     async def _calculate_file_hash(self, file_path: str) -> str:
         loop = asyncio.get_running_loop()
+
         def _hash():
             try:
                 hash_md5 = hashlib.md5()
@@ -105,4 +109,5 @@ class FileIndexer:
             except Exception as e:
                 logger.error(f"Error calculating file hash for {file_path}: {e}")
                 return ""
+
         return await loop.run_in_executor(None, _hash)

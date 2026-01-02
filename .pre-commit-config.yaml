@@ -1,0 +1,22 @@
+repos:
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.7
+    hooks:
+    -   id: ruff
+        args: [ --fix ]
+    -   id: ruff-format
+
+-   repo: local
+    hooks:
+    -   id: no-fixme-todo
+        name: Check for FIXME/TODO
+        entry: scripts/check_todo.sh
+        language: system
+        types: [text]
+        exclude: ^(\.pre-commit-config\.yaml|scripts/.*)$
+
+    -   id: check-duplicate-msg
+        name: Check duplicate commit message
+        entry: python3 scripts/check_commit_msg.py
+        language: system
+        stages: [commit-msg]

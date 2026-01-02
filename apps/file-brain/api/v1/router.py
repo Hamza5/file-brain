@@ -1,9 +1,10 @@
 """
 Main router for API v1
 """
+
 from fastapi import APIRouter
 
-from .endpoints import crawler, settings, watch_paths, files, fs, system, system_stream
+from .endpoints import crawler, files, fs, settings, system, system_stream, watch_paths
 
 api_router = APIRouter(prefix="/api/v1")
 

@@ -1,22 +1,25 @@
 """
 Watch paths management API endpoints
 """
+
+import os
 from typing import List
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-import os
 
-from database.models import get_db
-from database.repositories import WatchPathRepository
-from core.logging import logger
 from api.models.crawler import (
     BatchWatchPathRequest,
     BatchWatchPathResponse,
     MessageResponse,
 )
+from core.logging import logger
+from database.models import get_db
+from database.repositories import WatchPathRepository
 
 router = APIRouter(prefix="/config/watch-paths", tags=["configuration"])
+
 
 class WatchPathResponse(BaseModel):
     id: int
@@ -26,9 +29,11 @@ class WatchPathResponse(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
 
+
 class WatchPathUpdateRequest(BaseModel):
     enabled: bool | None = None
     include_subdirectories: bool | None = None
+
 
 @router.get("", response_model=List[WatchPathResponse])
 async def get_watch_paths(
@@ -45,7 +50,7 @@ async def get_watch_paths(
         paths = watch_path_repo.get_enabled()
     else:
         paths = watch_path_repo.get_all()
-        
+
     return [
         WatchPathResponse(
             id=p.id,
@@ -57,6 +62,7 @@ async def get_watch_paths(
         )
         for p in paths
     ]
+
 
 @router.post("/batch", response_model=BatchWatchPathResponse)
 async def add_watch_paths_batch(
@@ -105,6 +111,7 @@ async def add_watch_paths_batch(
         total_skipped=len(skipped_paths),
     )
 
+
 @router.put("", response_model=MessageResponse)
 async def replace_watch_paths(
     request: BatchWatchPathRequest,
@@ -131,12 +138,13 @@ async def replace_watch_paths(
             continue
 
     logger.info(f"Replaced watch paths via batch API: {added_count} added")
- 
+
     return MessageResponse(
         message=f"Replaced all watch paths. Added {added_count} path(s).",
         success=True,
         timestamp=None,
     )
+
 
 @router.delete("", response_model=MessageResponse)
 async def clear_watch_paths(
@@ -155,6 +163,7 @@ async def clear_watch_paths(
         success=True,
     )
 
+
 @router.put("/{path_id}", response_model=WatchPathResponse)
 async def update_watch_path_by_id(
     path_id: int,
@@ -165,11 +174,11 @@ async def update_watch_path_by_id(
     Update a single watch path by its ID.
     """
     watch_path_repo = WatchPathRepository(db)
-    
+
     update_data = request.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided")
-    
+
     watch_path = watch_path_repo.get(path_id)
     if not watch_path:
         raise HTTPException(status_code=404, detail="Watch path not found")
@@ -186,6 +195,7 @@ async def update_watch_path_by_id(
         created_at=updated_path.created_at.isoformat() if updated_path.created_at else None,
         updated_at=updated_path.updated_at.isoformat() if updated_path.updated_at else None,
     )
+
 
 @router.delete("/{path_id}", response_model=MessageResponse)
 async def delete_watch_path_by_id(
@@ -204,6 +214,7 @@ async def delete_watch_path_by_id(
     logger.info(f"Deleted watch path with ID {path_id} via API")
 
     import time
+
     return MessageResponse(
         message=f"Watch path with ID {path_id} deleted.",
         success=True,

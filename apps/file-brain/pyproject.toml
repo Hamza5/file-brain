@@ -30,4 +30,13 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"
+pre-commit = "^4.5.1"
+ruff = "^0.14.10"
 
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`), pycodestyle (`E`, `W`), isort (`I`)
+select = ["E", "F", "I"]
+fixable = ["ALL"]

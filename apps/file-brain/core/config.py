@@ -1,12 +1,14 @@
 """
 Application configuration using pydantic-settings
 """
+
 from typing import List
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Import app metadata from pyproject.toml (single source of truth)
-from core.app_info import get_app_name, get_app_version, get_app_description
+from core.app_info import get_app_description, get_app_name, get_app_version
 
 
 class Settings(BaseSettings):
@@ -26,7 +28,6 @@ class Settings(BaseSettings):
     debug: bool = False
     app_port: int = Field(default=8274, description="Default application port")
 
-
     # Typesense
     typesense_host: str = Field(default="localhost")
     typesense_port: int = Field(default=8108)
@@ -37,24 +38,28 @@ class Settings(BaseSettings):
     # Crawler
     watch_paths: str = Field(default="")  # Comma-separated paths
     max_file_size_mb: int = Field(default=100)
-    
+
     # Index Verification Settings
-    verify_index_on_crawl: bool = Field(default=True, description="Verify indexed files exist and are accessible during crawl")
-    verification_batch_size: int = Field(default=100, description="Number of files to process in each verification batch")
+    verify_index_on_crawl: bool = Field(
+        default=True,
+        description="Verify indexed files exist and are accessible during crawl",
+    )
+    verification_batch_size: int = Field(
+        default=100, description="Number of files to process in each verification batch"
+    )
     max_verification_files: int = Field(default=10000, description="Maximum number of files to verify in a single run")
     cleanup_orphaned_files: bool = Field(default=True, description="Automatically clean up orphaned index entries")
 
     # Processing
     batch_size: int = Field(default=10)
     worker_queue_size: int = Field(default=1000)
-    
+
     # Tika Server (Docker-based)
     tika_host: str = Field(default="localhost")
     tika_port: int = Field(default=9998)
     tika_protocol: str = Field(default="http")
     tika_enabled: bool = Field(default=True)
     tika_client_only: bool = Field(default=True)
-    
 
     @property
     def watch_paths_list(self) -> List[str]:
