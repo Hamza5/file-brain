@@ -8,11 +8,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from api.models.operations import CrawlOperation
 from core.logging import logger
 from database.models import SessionLocal, WatchPath
 from database.repositories import CrawlerStateRepository
 from services.crawler.discoverer import FileDiscoverer
 from services.crawler.indexer import FileIndexer
+from services.crawler.monitor import FileMonitorService
+from services.crawler.queue import DedupQueue
 from services.crawler.verification import IndexVerifier, VerificationProgress
 from services.typesense_client import get_typesense_client
 
@@ -50,14 +53,46 @@ class CrawlJobManager:
         self.discoverer = FileDiscoverer(self.watch_paths)
         self.indexer = FileIndexer()
         self.verifier = IndexVerifier()
+        self.queue = DedupQueue[CrawlOperation]()  # Shared queue
+        self.monitor = FileMonitorService(self.queue)  # Pass queue to monitor
         self._stop_event = asyncio.Event()
         self._running = False
+
+        # Start persistent indexing worker
+        self._indexing_task = asyncio.create_task(self._process_queue())
 
         # Progress tracking
         self.discovery_progress = DiscoveryProgress()
         self.indexing_progress = IndexingProgress()
         self.verification_progress = VerificationProgress()
         self._start_time: Optional[datetime] = None
+
+        # Restore monitoring state on init
+        self._restore_monitoring_state()
+
+    def _restore_monitoring_state(self):
+        """Check DB and restart monitor if it was active"""
+        db = SessionLocal()
+        try:
+            repo = CrawlerStateRepository(db)
+            state = repo.get_state()
+            if state.monitoring_active:
+                # We need configured paths to start monitoring
+                # If watch_paths are not yet loaded (empty init), we might need to fetch them
+                if not self.watch_paths:
+                    from database.repositories import WatchPathRepository
+
+                    wp_repo = WatchPathRepository(db)
+                    self.watch_paths = wp_repo.get_enabled()
+                    self.discoverer.watch_paths = self.watch_paths  # Sync discoverer too
+
+                if self.watch_paths:
+                    logger.info("Restoring file monitor state: Active")
+                    self.monitor.start(self.watch_paths)
+        except Exception as e:
+            logger.error(f"Failed to restore monitoring state: {e}")
+        finally:
+            db.close()
 
     def is_running(self) -> bool:
         return self._running
@@ -96,7 +131,7 @@ class CrawlJobManager:
                 "files_indexed": files_indexed,
                 "files_skipped": 0,
                 "queue_size": 0,
-                "monitoring_active": False,
+                "monitoring_active": state.monitoring_active or False,
                 "estimated_completion": None,
             }
         finally:
@@ -157,7 +192,7 @@ class CrawlJobManager:
             "files_indexed": files_indexed,
             "files_skipped": self.discovery_progress.files_skipped,
             "queue_size": max(0, total_known - files_indexed),
-            "monitoring_active": False,
+            "monitoring_active": self.monitor.is_running(),
             "estimated_completion": None,
             "orphan_count": self.verification_progress.orphaned_count,
         }
@@ -200,73 +235,87 @@ class CrawlJobManager:
         asyncio.create_task(self._run_crawl())
         return True
 
+    async def _process_queue(self):
+        """
+        Persistent worker that processes operations from the shared queue.
+        """
+        logger.info("Indexing worker started")
+        while True:
+            try:
+                operation = await self.queue.get()
+
+                # Check for stop signal (None) if we ever use one,
+                # but currently we run forever until app stop.
+                # If we want to support graceful shutdown we can check for None.
+
+                self.indexing_progress.files_to_index += 1
+
+                # Process the operation
+                success = await self.indexer.index_file(operation)
+
+                if success:
+                    self.indexing_progress.files_indexed += 1
+                else:
+                    self.indexing_progress.files_failed += 1
+
+                self.queue.task_done()
+
+                # Periodically update DB
+                if self.indexing_progress.files_indexed % 20 == 0:
+                    self._update_db_progress()
+
+            except asyncio.CancelledError:
+                logger.info("Indexing worker cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in indexing worker: {e}")
+                await asyncio.sleep(1)  # Prevent tight loop on error
+
     async def _run_crawl(self):
-        """Run discovery and indexing in parallel using a queue"""
+        """Run discovery and fill the shared queue"""
 
         # Phase 1: Verify Index
-        # We run this BEFORE discovery to ensure the index is clean
         try:
             logger.info("Starting index verification phase...")
             await self.verifier.verify_index()
             logger.info("Index verification phase completed.")
         except Exception as e:
             logger.error(f"Index verification failed: {e}")
-            # We continue to discovery even if verification fails,
-            # but mark verification as complete so we don't get stuck in 'verifying' phase
             self.verification_progress.is_complete = True
 
         if self._stop_event.is_set():
             self._running = False
             return
 
-        # Phase 2: Parallel Discovery & Indexing
-        # Internal queue to buffer discovered files for indexing
-        # Larger queue to allow discovery to run ahead
-        queue = asyncio.Queue(maxsize=2000)
-
-        async def discovery_worker():
-            """Discovery task: scans filesystem and fills the queue"""
-            try:
-                async for operation in self.discoverer.discover():
-                    if self._stop_event.is_set():
-                        break
-                    self.discovery_progress.files_found += 1
-                    await queue.put(operation)
-
-                # Signal indexing that discovery is finished
-                await queue.put(None)
-                self.discovery_progress.processed_paths = self.discovery_progress.total_paths
-            except Exception as e:
-                logger.error(f"Discovery worker failed: {e}")
-                await queue.put(None)
-
-        async def indexing_worker():
-            """Indexing task: consumes from queue and indexes files"""
-            try:
-                while True:
-                    operation = await queue.get()
-                    if operation is None:  # End signal
-                        break
-
-                    self.indexing_progress.files_to_index += 1
-                    success = await self.indexer.index_file(operation)
-                    if success:
-                        self.indexing_progress.files_indexed += 1
-                    else:
-                        self.indexing_progress.files_failed += 1
-
-                    queue.task_done()
-
-                    # Periodically update DB (every 20 files for efficiency)
-                    if self.indexing_progress.files_indexed % 20 == 0:
-                        self._update_db_progress()
-            except Exception as e:
-                logger.error(f"Indexing worker failed: {e}")
+        # Phase 2: Discovery
+        # We push directly to the shared queue
 
         try:
-            # Run both workers concurrently
-            await asyncio.gather(discovery_worker(), indexing_worker())
-            self._update_db_progress()
+            async for operation in self.discoverer.discover():
+                if self._stop_event.is_set():
+                    break
+                self.discovery_progress.files_found += 1
+                # Use file path as key for deduplication
+                await self.queue.put(operation.file_path, operation)
+
+            self.discovery_progress.processed_paths = self.discovery_progress.total_paths
+
+            # Wait for indexing to catch up with discovery
+            # We consider the crawl "active" until we are idle or stopped
+            while self._running and not self._stop_event.is_set():
+                # Check if we are done:
+                # 1. Discovery is done (we are past the loop)
+                # 2. Queue is empty
+                # 3. All discovered files have been attempted (indexed or failed)
+
+                total_processed = self.indexing_progress.files_indexed + self.indexing_progress.files_failed
+
+                # Note: files_found might be > processed if queue is not empty
+                if self.queue.qsize() == 0 and total_processed >= self.discovery_progress.files_found:
+                    logger.info("Crawl job completed (queue empty and all files processed)")
+                    break
+
+                await asyncio.sleep(1)
 
         except Exception as e:
             logger.error(f"Crawl job failed: {e}")
@@ -345,6 +394,59 @@ class CrawlJobManager:
             "orphaned_found": 0,
             "verification_errors": 0,
         }
+
+    async def start_monitoring(self) -> bool:
+        """Start file monitoring"""
+        logger.info("Starting file monitoring...")
+
+        # Get enabled paths
+        if not self.watch_paths:
+            db = SessionLocal()
+            try:
+                from database.repositories import WatchPathRepository
+
+                wp_repo = WatchPathRepository(db)
+                self.watch_paths = wp_repo.get_enabled()
+                # Update discoverer too
+                self.discoverer.watch_paths = self.watch_paths
+            finally:
+                db.close()
+
+        if not self.watch_paths:
+            logger.warning("No watch paths to monitor")
+            return False
+
+        try:
+            self.monitor.start(self.watch_paths)
+
+            # Persist state
+            db = SessionLocal()
+            try:
+                repo = CrawlerStateRepository(db)
+                repo.update_state(monitoring_active=True)
+            finally:
+                db.close()
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to start monitoring: {e}")
+            return False
+
+    async def stop_monitoring(self):
+        """Stop file monitoring"""
+        logger.info("Stopping file monitoring...")
+        try:
+            self.monitor.stop()
+
+            # Persist state
+            db = SessionLocal()
+            try:
+                repo = CrawlerStateRepository(db)
+                repo.update_state(monitoring_active=False)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to stop monitoring: {e}")
 
 
 # Global crawl job manager instance

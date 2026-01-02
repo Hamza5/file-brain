@@ -321,6 +321,7 @@ export const HeroStats: React.FC = () => {
                             lineHeight: 1.5,
                             marginBottom: '0.75rem'
                         }}>
+                            <li>Enable the <strong>Monitor</strong> toggle to track changes</li>
                             <li>Enable the <strong>Crawler</strong> toggle to start indexing your configured folders</li>
                             <li>Wait for the crawler to discover and index your files</li>
                         </ol>
@@ -335,9 +336,11 @@ export const HeroStats: React.FC = () => {
                         }}>
                             <li>Click the <i className="fa-solid fa-gear" style={{ color: 'var(--primary-color)' }} /> <strong>Settings</strong> icon in the top right</li>
                             <li>Add folders you want to watch and index</li>
+                            <li>Enable the <strong>Monitor</strong> toggle to track file changes</li>
                             <li>Enable the <strong>Crawler</strong> toggle to start indexing</li>
                         </ol>
                     )}
+
                     <p style={{
                         fontSize: '0.75rem',
                         color: 'var(--text-color-secondary)',

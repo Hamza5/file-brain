@@ -21,6 +21,7 @@ dependencies = [
     "py7zr (>=1.0.0,<2.0.0)",
     "rarfile (>=4.2,<5.0)",
     "flaskwebgui (>=1.1.8,<2.0.0)",
+    "watchdog (>=6.0.0,<7.0.0)",
 ]
 
 

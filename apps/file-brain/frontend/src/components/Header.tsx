@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Badge } from 'primereact/badge';
+import { InputSwitch } from 'primereact/inputswitch';
 import { useSearchBox } from 'react-instantsearch';
 
 interface HeaderProps {
     onSettingsClick: () => void;
     isCrawlerActive: boolean;
     onToggleCrawler: (value: boolean) => void;
+    isMonitoring?: boolean;
+    onToggleMonitoring?: (value: boolean) => void;
     crawlerStatus?: any;
     hasIndexedFiles?: boolean;
     hasFoldersConfigured?: boolean;
@@ -17,6 +20,8 @@ export const Header: React.FC<HeaderProps> = ({
     onSettingsClick,
     isCrawlerActive,
     onToggleCrawler,
+    isMonitoring = false,
+    onToggleMonitoring,
     crawlerStatus,
     hasIndexedFiles = true,
     hasFoldersConfigured = false
@@ -24,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
     const { query, refine } = useSearchBox();
     const [searchValue, setSearchValue] = useState('');
     const [isTogglingCrawler, setIsTogglingCrawler] = useState(false);
+    const [isTogglingMonitor, setIsTogglingMonitor] = useState(false);
 
     // Sync local state with instant search query when it changes externally
     React.useEffect(() => {
@@ -200,6 +206,40 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Actions Area */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 'max-content' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    
+                    {/* Monitor Switch */}
+                    {onToggleMonitoring && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '1rem' }}>
+                             <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-color)' }}>Monitor</span>
+                            <div style={{ position: 'relative', width: '3rem', height: '1.75rem' }}>
+                                 {isTogglingMonitor && (
+                                    <i className="pi pi-spin pi-spinner" style={{ 
+                                        position: 'absolute', 
+                                        left: '50%', 
+                                        top: '50%', 
+                                        transform: 'translate(-50%, -50%)', 
+                                        zIndex: 10,
+                                        fontSize: '0.8rem'
+                                    }} />
+                                )}
+                                <InputSwitch 
+                                    checked={isMonitoring} 
+                                    onChange={async (e) => {
+                                        setIsTogglingMonitor(true);
+                                        try {
+                                            await onToggleMonitoring(e.value);
+                                        } finally {
+                                            setIsTogglingMonitor(false);
+                                        }
+                                    }}
+                                    disabled={isTogglingMonitor}
+                                    style={{ opacity: isTogglingMonitor ? 0.7 : 1 }}
+                                    tooltip={isMonitoring ? "File Monitoring Active" : "Enable File Monitoring"}
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Crawler</span>
                     <Button
                         label={isCrawlerActive ? "Stop" : "Start"}

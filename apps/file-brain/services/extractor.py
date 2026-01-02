@@ -161,9 +161,7 @@ class ContentExtractor:
             # Enhanced error handling for Docker connectivity
             if "Connection refused" in str(e) or "Failed to connect" in str(e):
                 logger.error(f"Cannot connect to Tika server at {settings.tika_url}")
-                logger.error(
-                    "Please ensure the Tika Docker container is running: docker run -p 9998:9998 apache/tika:latest-full"
-                )
+                logger.error("Please ensure the Tika Docker container is running")
             raise
 
     def _process_tika_metadata(self, raw_metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -184,7 +182,6 @@ class ContentExtractor:
         field_mapping = {
             "title": "title",
             "Author": "author",
-            "creator": "author",
             "Creation-Date": "created_date",
             "CreationDate": "created_date",
             "last-modified": "modified_date",
@@ -242,56 +239,82 @@ class ContentExtractor:
         return metadata
 
     def _extract_smart_text(
-        self, file_path: str, min_word_length: int = 3, min_text_ratio: float = 0.3
+        self,
+        file_path: str,
+        min_word_length: int = 3,
+        min_text_ratio: float = 0.3,
+        max_text_size: int = 10 * 1024 * 1024,
     ) -> Optional[str]:
         """
-        Smart text extraction from any file using chardet encoding detection
+        Smart text extraction from any file.
+        Attempts to extract strings from binary files (similar to 'strings' command).
 
         Args:
             file_path: Path to file
-            min_word_length: Minimum word length to consider
-            min_text_ratio: Minimum ratio of alphanumeric characters to total text
+            min_word_length: Minimum word length to consider (used for validation only)
+            min_text_ratio: Minimum ratio of alphanumeric characters to total text (ignored now)
+            max_text_size: Maximum amount of text to extract (default 10MB)
 
         Returns:
-            Extracted text or None if extraction fails
+            Extracted text or None if extraction fails or yields no text
         """
         try:
-            # Read binary data
+            # First pass: Read header to detect encoding
+            header_size = 4096
             with open(file_path, "rb") as f:
-                raw_data = f.read()
+                header = f.read(header_size)
+
+            if not header:
+                return None
 
             # Detect encoding
-            detected = chardet.detect(raw_data)
-            encoding = detected.get("encoding", "utf-8")
+            detected = chardet.detect(header)
+            encoding = detected.get("encoding")
             confidence = detected.get("confidence", 0)
 
-            if confidence < 0.7:
-                logger.debug(f"Low encoding confidence ({confidence}) for {file_path}")
+            # Fallback to utf-8 if detection fails or is low confidence
+            # This allows us to process binaries that might contain utf-8 strings
+            if not encoding or confidence < 0.6:
+                encoding = "utf-8"
+
+            # Second pass: Read file in chunks, decode, and filter
+            extracted_parts = []
+            total_size = 0
+            chunk_size = 1024 * 1024  # 1MB chunks
+
+            with open(file_path, "rb") as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+
+                    # specific error handling 'ignore' helps skipping invalid bytes in binaries
+                    text_chunk = chunk.decode(encoding, errors="ignore")
+
+                    # Filter for printable characters immediately to save memory/processing
+                    # This effectively acts like the 'strings' command
+                    clean_chunk = "".join(c for c in text_chunk if c.isprintable() or c.isspace())
+
+                    # Collapse multiple spaces? Maybe later. For now just raw extraction.
+
+                    if clean_chunk:
+                        extracted_parts.append(clean_chunk)
+                        total_size += len(clean_chunk)
+
+                    if total_size >= max_text_size:
+                        logger.info(f"Breaking extraction at limit ({max_text_size} bytes) for {file_path}")
+                        break
+
+            full_text = "".join(extracted_parts)
+
+            # Post-processing: cleanup excessive whitespace that often occurs in binaries
+            full_text = re.sub(r"\s+", " ", full_text).strip()
+
+            if len(full_text) < min_word_length:
                 return None
 
-            # Decode text
-            text = raw_data.decode(encoding, errors="ignore")
-
-            # Filter out control characters but keep whitespace
-            text = "".join(char for char in text if char.isprintable() or char.isspace())
-
-            # Check if text seems legitimate (ratio of alphanumeric to total)
-            if len(text) > 0:
-                alnum_ratio = sum(c.isalnum() or c.isspace() for c in text) / len(text)
-                if alnum_ratio < min_text_ratio:
-                    logger.debug(f"Low text ratio ({alnum_ratio:.2f}) for {file_path}")
-                    return None
-
-            # Extract words of reasonable length
-            words = re.findall(r"\b\w{" + str(min_word_length) + r",}\b", text)
-
-            if len(words) < 3:  # Reduced from 10 to 3 words
-                logger.debug(f"Too few words ({len(words)}) extracted from {file_path}")
-                return None
-
-            extracted_text = " ".join(words)
-            logger.info(f"Smart extraction successful: {len(extracted_text)} characters from {file_path}")
-            return extracted_text
+            logger.info(f"Smart text extraction successful: {len(full_text)} characters from {file_path}")
+            return full_text
 
         except Exception as e:
             logger.debug(f"Smart extraction failed for {file_path}: {e}")
@@ -299,32 +322,45 @@ class ContentExtractor:
 
     def _extract_basic(self, file_path: str) -> DocumentContent:
         """
-        Fallback basic extraction for unsupported files
-        DISABLED: Returns empty content immediately for performance
+        Fallback basic extraction using smart text detection.
         """
-        logger.info(f"Basic extraction disabled for: {file_path}")
+        logger.info(f"Attempting basic smart extraction for: {file_path}")
 
         try:
             # Get MIME type
             mime_type, _ = mimetypes.guess_type(file_path)
             file_stats = os.stat(file_path)
 
-            # Return empty content immediately (basic extraction disabled)
-            return DocumentContent(
-                content="",
-                metadata={
-                    "extraction_method": "disabled",
-                    "mime_type": mime_type,
-                    "file_size": file_stats.st_size,
-                    "reason": "Basic extraction disabled for performance",
-                },
-            )
+            # Attempt smart text extraction
+            extracted_text = self._extract_smart_text(file_path)
+
+            if extracted_text:
+                return DocumentContent(
+                    content=extracted_text,
+                    metadata={
+                        "extraction_method": "basic_smart_text",
+                        "mime_type": mime_type,
+                        "file_size": file_stats.st_size,
+                        "encoding_detection": "chardet",
+                    },
+                )
+            else:
+                # Return empty content if smart extraction failed (likely binary)
+                return DocumentContent(
+                    content="",
+                    metadata={
+                        "extraction_method": "failed_basic",
+                        "mime_type": mime_type,
+                        "file_size": file_stats.st_size,
+                        "reason": "Smart extraction failed or binary file detected",
+                    },
+                )
 
         except Exception as e:
             logger.error(f"Error in basic extraction: {e}")
             return DocumentContent(
                 content="",
-                metadata={"extraction_method": "no_content", "error": str(e)},
+                metadata={"extraction_method": "error", "error": str(e)},
             )
 
 

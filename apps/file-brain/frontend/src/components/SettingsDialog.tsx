@@ -4,6 +4,7 @@ import { Button } from 'primereact/button';
 import { DataView } from 'primereact/dataview';
 import { Toast } from 'primereact/toast';
 import { Fieldset } from 'primereact/fieldset';
+import { Message } from 'primereact/message';
 import { confirmDialog } from 'primereact/confirmdialog';
 import { listWatchPaths, addWatchPath, deleteWatchPath, clearIndexes, type WatchPath } from '../api/client';
 import { FolderSelectModal } from './FolderSelectModal';
@@ -211,9 +212,19 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                     toggleable
                 >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <Message 
+                            severity="info" 
+                            text={
+                                <span>
+                                    Enable the <strong>Monitor</strong> to automatically index changes in these folders.
+                                </span>
+                            }
+                            style={{ width: '100%' }}
+                        />
+                        
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <p style={{ color: 'var(--text-color-secondary)', margin: 0 }}>
-                                Manage the directories that File Brain monitors.
+                                Manage the directories that File Brain indexes.
                             </p>
                             <Button
                                 label="Add Folder"

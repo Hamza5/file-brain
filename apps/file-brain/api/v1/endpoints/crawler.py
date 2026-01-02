@@ -144,6 +144,76 @@ async def get_crawler_status(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/monitor/start", response_model=MessageResponse)
+async def start_file_monitoring(db: Session = Depends(get_db)):
+    """Start the file monitoring service"""
+    try:
+        from services.service_manager import require_service
+
+        # Check service readiness
+        require_service("crawl_manager")
+
+        crawl_manager = get_crawl_job_manager()
+
+        if crawl_manager.monitor.is_running():
+            return MessageResponse(
+                message="File monitoring is already running",
+                success=True,
+                timestamp=int(time.time() * 1000),
+            )
+
+        logger.info("Starting file monitoring via API...")
+
+        success = await crawl_manager.start_monitoring()
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to start file monitoring. Check logs for details.")
+
+        logger.info("File monitoring started successfully")
+
+        return MessageResponse(
+            message="File monitoring started successfully.",
+            success=True,
+            timestamp=int(time.time() * 1000),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting file monitoring: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/monitor/stop", response_model=MessageResponse)
+async def stop_file_monitoring(db: Session = Depends(get_db)):
+    """Stop the file monitoring service"""
+    try:
+        crawl_manager = get_crawl_job_manager()
+
+        if not crawl_manager.monitor.is_running():
+            return MessageResponse(
+                message="File monitoring is not running",
+                success=True,
+                timestamp=int(time.time() * 1000),
+            )
+
+        logger.info("Stopping file monitoring via API...")
+
+        await crawl_manager.stop_monitoring()
+
+        logger.info("File monitoring stopped successfully")
+
+        return MessageResponse(
+            message="File monitoring stopped successfully.",
+            success=True,
+            timestamp=int(time.time() * 1000),
+        )
+
+    except Exception as e:
+        logger.error(f"Error stopping file monitoring: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/stop", response_model=MessageResponse)
 async def stop_crawler(db: Session = Depends(get_db)):
     """Stop the current crawl job immediately"""

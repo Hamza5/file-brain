@@ -10,7 +10,7 @@ import { PreviewSidebar } from "./components/PreviewSidebar";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { InitializationOverlay } from "./components/InitializationOverlay";
 import { InitializationStatusBar } from "./components/InitializationStatusBar";
-import { connectStatusStream, startCrawler, stopCrawler } from "./api/client";
+import { connectStatusStream, startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring } from "./api/client";
 
 // Configure Typesense InstantSearch adapter
 const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
@@ -45,6 +45,7 @@ const searchClient = typesenseInstantsearchAdapter.searchClient;
 function AppContent() {
   const { stats, watchPaths } = useStatus();
   const [isCrawlerActive, setIsCrawlerActive] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(false);
   const [crawlerStatus, setCrawlerStatus] = useState<any>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -55,6 +56,7 @@ function AppContent() {
     const disconnect = connectStatusStream((payload) => {
       setCrawlerStatus(payload.status);
       setIsCrawlerActive(payload.status.running);
+      setIsMonitoring(payload.status.monitoring_active ?? false);
     });
     return () => disconnect();
   }, []);
@@ -71,6 +73,19 @@ function AppContent() {
     } catch (error) {
       console.error("Failed to toggle crawler:", error);
       // Revert on failure (optional, or let stream update fix it)
+    }
+  };
+
+  const handleToggleMonitoring = async (value: boolean) => {
+    try {
+        if (value) {
+            await startFileMonitoring();
+        } else {
+            await stopFileMonitoring();
+        }
+        setIsMonitoring(value);
+    } catch (error) {
+        console.error("Failed to toggle monitoring:", error);
     }
   };
 
@@ -104,6 +119,8 @@ function AppContent() {
           onSettingsClick={() => setSettingsVisible(true)}
           isCrawlerActive={isCrawlerActive}
           onToggleCrawler={handleToggleCrawler}
+          isMonitoring={isMonitoring}
+          onToggleMonitoring={handleToggleMonitoring}
           crawlerStatus={crawlerStatus}
           hasIndexedFiles={hasIndexedFiles}
           hasFoldersConfigured={hasFoldersConfigured}

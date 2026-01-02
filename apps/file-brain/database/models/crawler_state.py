@@ -19,6 +19,9 @@ class CrawlerState(Base):
     crawl_job_type = Column(String, nullable=True)  # "crawl"
     crawl_job_started_at = Column(DateTime, nullable=True)
 
+    # Monitoring state
+    monitoring_active = Column(Boolean, default=False, nullable=False)
+
     # Progress tracking
     files_discovered = Column(Integer, default=0, nullable=False)
     files_indexed = Column(Integer, default=0, nullable=False)

@@ -113,6 +113,15 @@ export async function stopCrawler(): Promise<{ message: string; success: boolean
   return requestJSON("/api/v1/crawler/stop", { method: "POST" });
 }
 
+export async function startFileMonitoring(): Promise<{ message: string; success: boolean; timestamp: number }> {
+    return requestJSON("/api/v1/crawler/monitor/start", { method: "POST" });
+}
+
+export async function stopFileMonitoring(): Promise<{ message: string; success: boolean; timestamp: number }> {
+    return requestJSON("/api/v1/crawler/monitor/stop", { method: "POST" });
+}
+
+
 export async function clearIndexes(): Promise<{ success: boolean; message: string; timestamp: number }> {
   return requestJSON("/api/v1/crawler/clear-indexes", { method: "POST" });
 }
