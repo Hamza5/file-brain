@@ -2,13 +2,14 @@
 Database base configuration and setup
 """
 
+import os
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 Base = declarative_base()
-
-import os
 
 # Database setup
 # Get the directory of this file
@@ -33,6 +34,23 @@ def init_db():
 
 def get_db():
     """Database session dependency"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def db_session():
+    """
+    Context manager for database sessions.
+
+    Usage:
+        with db_session() as db:
+            repo = SomeRepository(db)
+            # ... do work
+    """
     db = SessionLocal()
     try:
         yield db

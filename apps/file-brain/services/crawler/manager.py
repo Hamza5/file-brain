@@ -4,43 +4,20 @@ Crawl Job Manager - coordinates discovery and indexing
 
 import asyncio
 import time
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from api.models.operations import CrawlOperation
 from core.logging import logger
-from database.models import SessionLocal, WatchPath
+from database.models import WatchPath, db_session
 from database.repositories import CrawlerStateRepository
 from services.crawler.discoverer import FileDiscoverer
 from services.crawler.indexer import FileIndexer
 from services.crawler.monitor import FileMonitorService
+from services.crawler.progress import DiscoveryProgress, IndexingProgress
 from services.crawler.queue import DedupQueue
 from services.crawler.verification import IndexVerifier, VerificationProgress
 from services.typesense_client import get_typesense_client
-
-
-@dataclass
-class DiscoveryProgress:
-    """Progress tracking for file discovery"""
-
-    total_paths: int = 0
-    processed_paths: int = 0
-    files_found: int = 0
-    files_skipped: int = 0
-    current_path: Optional[str] = None
-    start_time: Optional[float] = None
-
-
-@dataclass
-class IndexingProgress:
-    """Progress tracking for file indexing"""
-
-    files_to_index: int = 0
-    files_indexed: int = 0
-    files_failed: int = 0
-    current_file: Optional[str] = None
-    start_time: Optional[float] = None
 
 
 class CrawlJobManager:
@@ -72,27 +49,25 @@ class CrawlJobManager:
 
     def _restore_monitoring_state(self):
         """Check DB and restart monitor if it was active"""
-        db = SessionLocal()
-        try:
-            repo = CrawlerStateRepository(db)
-            state = repo.get_state()
-            if state.monitoring_active:
-                # We need configured paths to start monitoring
-                # If watch_paths are not yet loaded (empty init), we might need to fetch them
-                if not self.watch_paths:
-                    from database.repositories import WatchPathRepository
+        with db_session() as db:
+            try:
+                repo = CrawlerStateRepository(db)
+                state = repo.get_state()
+                if state.monitoring_active:
+                    # We need configured paths to start monitoring
+                    # If watch_paths are not yet loaded (empty init), we might need to fetch them
+                    if not self.watch_paths:
+                        from database.repositories import WatchPathRepository
 
-                    wp_repo = WatchPathRepository(db)
-                    self.watch_paths = wp_repo.get_enabled()
-                    self.discoverer.watch_paths = self.watch_paths  # Sync discoverer too
+                        wp_repo = WatchPathRepository(db)
+                        self.watch_paths = wp_repo.get_enabled()
+                        self.discoverer.watch_paths = self.watch_paths  # Sync discoverer too
 
-                if self.watch_paths:
-                    logger.info("Restoring file monitor state: Active")
-                    self.monitor.start(self.watch_paths)
-        except Exception as e:
-            logger.error(f"Failed to restore monitoring state: {e}")
-        finally:
-            db.close()
+                    if self.watch_paths:
+                        logger.info("Restoring file monitor state: Active")
+                        self.monitor.start(self.watch_paths)
+            except Exception as e:
+                logger.error(f"Failed to restore monitoring state: {e}")
 
     def is_running(self) -> bool:
         return self._running
@@ -105,8 +80,7 @@ class CrawlJobManager:
             return self._get_live_status()
 
         # If not running, try to get last known state from DB
-        db = SessionLocal()
-        try:
+        with db_session() as db:
             repo = CrawlerStateRepository(db)
             state = repo.get_state()
 
@@ -134,8 +108,6 @@ class CrawlJobManager:
                 "monitoring_active": state.monitoring_active or False,
                 "estimated_completion": None,
             }
-        finally:
-            db.close()
 
     def _get_live_status(self) -> Dict[str, Any]:
         """Calculate status from internal counters"""
@@ -216,8 +188,7 @@ class CrawlJobManager:
         self.verification_progress = self.verifier.progress
 
         # Update DB state - explicitly reset counts
-        db = SessionLocal()
-        try:
+        with db_session() as db:
             repo = CrawlerStateRepository(db)
             repo.update_state(
                 crawl_job_running=True,
@@ -228,8 +199,6 @@ class CrawlJobManager:
                 files_discovered=0,
                 files_indexed=0,
             )
-        finally:
-            db.close()
 
         # Run in background
         asyncio.create_task(self._run_crawl())
@@ -324,8 +293,7 @@ class CrawlJobManager:
             final_status = self._get_live_status()
             self._running = False
 
-            db = SessionLocal()
-            try:
+            with db_session() as db:
                 repo = CrawlerStateRepository(db)
                 repo.update_state(
                     crawl_job_running=False,
@@ -336,12 +304,9 @@ class CrawlJobManager:
                     files_discovered=final_status["files_discovered"],
                     files_indexed=final_status["files_indexed"],
                 )
-            finally:
-                db.close()
 
     def _update_db_progress(self):
-        db = SessionLocal()
-        try:
+        with db_session() as db:
             repo = CrawlerStateRepository(db)
             status = self.get_status()
             repo.update_state(
@@ -350,8 +315,6 @@ class CrawlJobManager:
                 files_discovered=status["files_discovered"],
                 files_indexed=status["files_indexed"],
             )
-        finally:
-            db.close()
 
     async def stop_crawl(self):
         if not self._running:
@@ -370,30 +333,16 @@ class CrawlJobManager:
             typesense = get_typesense_client()
             await typesense.clear_all_documents()
 
-            db = SessionLocal()
-            try:
+            with db_session() as db:
                 # 2. Reset crawler statistics and state
                 state_repo = CrawlerStateRepository(db)
                 state_repo.reset_stats()
 
                 logger.info("✅ Indexes cleared and statistics reset")
-            finally:
-                db.close()
             return True
         except Exception as e:
             logger.error(f"Error clearing indexes: {e}")
             return False
-
-    async def verify_indexed_files(self, watch_paths: List[str]) -> Dict[str, int]:
-        """
-        Placeholder for index verification.
-        """
-        return {
-            "total_indexed": 0,
-            "verified_accessible": 0,
-            "orphaned_found": 0,
-            "verification_errors": 0,
-        }
 
     async def start_monitoring(self) -> bool:
         """Start file monitoring"""
@@ -401,16 +350,13 @@ class CrawlJobManager:
 
         # Get enabled paths
         if not self.watch_paths:
-            db = SessionLocal()
-            try:
+            with db_session() as db:
                 from database.repositories import WatchPathRepository
 
                 wp_repo = WatchPathRepository(db)
                 self.watch_paths = wp_repo.get_enabled()
                 # Update discoverer too
                 self.discoverer.watch_paths = self.watch_paths
-            finally:
-                db.close()
 
         if not self.watch_paths:
             logger.warning("No watch paths to monitor")
@@ -420,12 +366,9 @@ class CrawlJobManager:
             self.monitor.start(self.watch_paths)
 
             # Persist state
-            db = SessionLocal()
-            try:
+            with db_session() as db:
                 repo = CrawlerStateRepository(db)
                 repo.update_state(monitoring_active=True)
-            finally:
-                db.close()
 
             return True
         except Exception as e:
@@ -439,12 +382,9 @@ class CrawlJobManager:
             self.monitor.stop()
 
             # Persist state
-            db = SessionLocal()
-            try:
+            with db_session() as db:
                 repo = CrawlerStateRepository(db)
                 repo.update_state(monitoring_active=False)
-            finally:
-                db.close()
         except Exception as e:
             logger.error(f"Failed to stop monitoring: {e}")
 

@@ -2,7 +2,6 @@
 Enhanced operation queue with operation types
 """
 
-from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -38,24 +37,3 @@ class CrawlOperation(BaseModel):
 
     class Config:
         use_enum_values = True
-
-
-class BatchOperation(BaseModel):
-    """Batch operation for multiple files"""
-
-    operations: list[CrawlOperation]
-    batch_id: str
-    source: str = "batch"
-    created_at: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
-
-
-class OperationResult(BaseModel):
-    """Result of processing an operation"""
-
-    operation_id: str
-    success: bool
-    error_message: Optional[str] = None
-    processed_at: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
-    processing_time_ms: Optional[int] = None
-    file_path: str
-    operation: OperationType

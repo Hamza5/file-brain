@@ -2,8 +2,6 @@
 Application configuration using pydantic-settings
 """
 
-from typing import List
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -63,18 +61,6 @@ class Settings(BaseSettings):
     tika_protocol: str = Field(default="http")
     tika_enabled: bool = Field(default=True)
     tika_client_only: bool = Field(default=True)
-
-    @property
-    def watch_paths_list(self) -> List[str]:
-        """Get watch paths as list"""
-        if not self.watch_paths:
-            return []
-        return [p.strip() for p in self.watch_paths.split(",") if p.strip()]
-
-    @property
-    def max_file_size_bytes(self) -> int:
-        """Get max file size in bytes"""
-        return self.max_file_size_mb * 1024 * 1024
 
     @property
     def typesense_url(self) -> str:

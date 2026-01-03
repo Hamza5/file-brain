@@ -11,7 +11,7 @@ from typing import Tuple
 
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
-from services.extractor import get_extractor
+from services.extraction.extractor import get_extractor
 from services.typesense_client import get_typesense_client
 
 

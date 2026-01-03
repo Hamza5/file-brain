@@ -20,6 +20,7 @@ from watchdog.observers import Observer
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
 from database.models import WatchPath
+from services.crawler.path_utils import PathFilter
 from services.crawler.queue import DedupQueue
 
 
@@ -32,11 +33,11 @@ class FileEventHandler(FileSystemEventHandler):
         self,
         queue: DedupQueue[CrawlOperation],
         loop: asyncio.AbstractEventLoop,
-        excluded_paths: List[str] = None,
+        path_filter: PathFilter,
     ):
         self.queue = queue
         self.loop = loop
-        self.excluded_paths = excluded_paths or []
+        self.path_filter = path_filter
         self.last_event_time = {}
         self.cooldown_seconds = 1.0  # Debounce interval
 
@@ -46,11 +47,10 @@ class FileEventHandler(FileSystemEventHandler):
 
         file_path = event.src_path
 
-        # Check exclusion
-        for excluded in self.excluded_paths:
-            if file_path == excluded or file_path.startswith(excluded + os.sep):
-                logger.debug(f"Ignoring event in excluded path: {file_path}")
-                return
+        # Check exclusion using shared PathFilter
+        if self.path_filter.is_excluded(file_path):
+            logger.debug(f"Ignoring event in excluded path: {file_path}")
+            return
 
         # Debounce rapid firing events
         current_time = time.time()
@@ -148,9 +148,15 @@ class FileMonitorService:
 
         # Separate included and excluded
         included_paths = [wp for wp in watch_paths if not wp.is_excluded]
-        excluded_paths = [os.path.normpath(wp.path) for wp in watch_paths if wp.is_excluded]
+        excluded_paths = [wp.path for wp in watch_paths if wp.is_excluded]
 
-        self.handler = FileEventHandler(self.queue, loop, excluded_paths=excluded_paths)
+        # Create shared path filter
+        path_filter = PathFilter(
+            included_paths=[wp.path for wp in included_paths],
+            excluded_paths=excluded_paths,
+        )
+
+        self.handler = FileEventHandler(self.queue, loop, path_filter=path_filter)
 
         success_count = 0
         for wp in included_paths:

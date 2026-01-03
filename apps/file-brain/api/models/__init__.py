@@ -14,7 +14,7 @@ from .crawler import (
     JobControlRequest,
     MessageResponse,
 )
-from .file_event import FileDiscoveredEvent, FileEvent
+from .file_event import DocumentContent
 
 __all__ = [
     # Backward compatibility
@@ -27,7 +27,6 @@ __all__ = [
     "CrawlStatusResponse",
     "ClearIndexesResponse",
     "JobControlRequest",
-    # File event models
-    "FileDiscoveredEvent",
-    "FileEvent",
+    # Content models
+    "DocumentContent",
 ]

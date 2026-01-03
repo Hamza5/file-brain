@@ -10,6 +10,7 @@ from typing import List
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
 from database.models import WatchPath
+from services.crawler.path_utils import PathFilter
 
 
 class FileDiscoverer:
@@ -38,15 +39,13 @@ class FileDiscoverer:
 
         # Separate included and excluded paths
         included_paths = [wp for wp in self.watch_paths if not wp.is_excluded]
-        excluded_paths = [os.path.normpath(wp.path) for wp in self.watch_paths if wp.is_excluded]
+        excluded_paths = [wp.path for wp in self.watch_paths if wp.is_excluded]
 
-        def is_excluded(path: str) -> bool:
-            norm_path = os.path.normpath(path)
-            for excluded in excluded_paths:
-                # Check if path is the excluded path or inside it
-                if norm_path == excluded or norm_path.startswith(excluded + os.sep):
-                    return True
-            return False
+        # Create shared path filter
+        path_filter = PathFilter(
+            included_paths=[wp.path for wp in included_paths],
+            excluded_paths=excluded_paths,
+        )
 
         def scan_worker():
             """Blocking filesystem traversal run in a thread"""
@@ -63,16 +62,11 @@ class FileDiscoverer:
                         if self._sync_stop_event:
                             return
 
-                        # Prune excluded directories
-                        # We modify dirs in-place to prevent os.walk from visiting them
-                        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d))]
+                        # Prune excluded directories using shared PathFilter
+                        dirs[:] = [d for d in dirs if not path_filter.should_prune_directory(os.path.join(root, d))]
 
                         if not watch_path_model.include_subdirectories:
-                            # If not recursive, we still want to process files in root,
-                            # but we clear dirs so we don't go deeper.
-                            # We already checked for exclusions above, now check recursion setting.
-                            # Note: The original code cleared dirs[:] immediately.
-                            # We should probably do that AFTER pruning, effectively clearing it anyway.
+                            # If not recursive, clear dirs so we don't go deeper
                             dirs[:] = []
 
                         for filename in files:
