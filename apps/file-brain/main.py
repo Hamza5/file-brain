@@ -5,8 +5,11 @@ File Brain - Advanced file search engine powered by AI
 import asyncio
 import os
 import socket
+import subprocess
+import sys
 from contextlib import asynccontextmanager
 
+import aiohttp
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -227,6 +230,22 @@ async def lifespan(app: FastAPI):
     try:
         await critical_init()
         logger.info("🚀 Critical services ready - API starting immediately!")
+
+        # Start Vite Dev Server in Debug Mode
+        if settings.debug:
+            logger.info("🚧 Debug mode enabled: Starting Vite dev server...")
+            frontend_dir = os.path.join(os.path.dirname(__file__), "frontend")
+            # npm run dev -- --port 5173 --strictPort
+            # We use shell=False and pass list for security and reliability
+            vite_process = subprocess.Popen(
+                ["npm", "run", "dev", "--", "--port", "5173", "--strictPort"],
+                cwd=frontend_dir,
+                # Let's inherit stdout/stderr for dev visibility.
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            logger.info(f"✅ Vite dev server started (PID: {vite_process.pid})")
+
         asyncio.create_task(background_init())
         asyncio.create_task(health_monitoring_loop())
     except Exception as e:
@@ -235,8 +254,22 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    logger.info("Shutting down...")
     try:
+        if settings.debug:
+            logger.info("🛑 Stopping Vite dev server...")
+            # We can't easily access the process object here if it's local to lifespan
+            # But the lifespan generator keeps the scope alive.
+            # We'll use a variable defined in the outer scope of the try block if Python supported it clearly,
+            # but simpler: we can just terminate it if we have the reference.
+            # Python's asynccontextmanager keeps locals.
+            if "vite_process" in locals() and vite_process:
+                vite_process.terminate()
+                try:
+                    vite_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    vite_process.kill()
+                logger.info("✅ Vite dev server stopped")
+
         crawl_manager = get_crawl_job_manager()
         if crawl_manager.is_running():
             await crawl_manager.stop_crawl()
@@ -285,7 +318,10 @@ if os.path.exists(frontend_dist_path):
         return JSONResponse(status_code=404, content={"error": "Icon not found"})
 
     @app.get("/")
-    async def serve_frontend():
+    async def serve_frontend(request: Request):
+        if settings.debug:
+            return await proxy_to_vite(request, "")
+
         index_path = os.path.join(frontend_dist_path, "index.html")
         if os.path.exists(index_path):
             return FileResponse(index_path)
@@ -308,6 +344,10 @@ if os.path.exists(frontend_dist_path):
             # We can add a catch-all at the end of the router if we want a custom message.
             pass
 
+        # Proxy to Vite Dev Server if in debug mode
+        if settings.debug:
+            return await proxy_to_vite(request, full_path)
+
         index_path = os.path.join(frontend_dist_path, "index.html")
         if os.path.exists(index_path):
             return FileResponse(index_path)
@@ -320,6 +360,25 @@ if os.path.exists(frontend_dist_path):
                 "path": full_path,
             },
         )
+
+    async def proxy_to_vite(request: Request, full_path: str):
+        target_url = f"{settings.frontend_dev_url}/{full_path}"
+        if not full_path or full_path == "index.html":
+            target_url = settings.frontend_dev_url
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                # Forward query params
+                params = dict(request.query_params)
+                async with session.get(target_url, params=params) as resp:
+                    content = await resp.read()
+                    # Forward content type
+                    from fastapi import Response
+
+                    return Response(content=content, status_code=resp.status, media_type=resp.content_type)
+            except Exception as e:
+                logger.error(f"Vite proxy error for {full_path}: {e}")
+                return JSONResponse(status_code=502, content={"error": "Vite dev server not accessible"})
 
 
 def get_available_port(start_port: int, max_attempts: int = 100) -> int:
@@ -356,8 +415,46 @@ async def health_check():
 
 
 if __name__ == "__main__":
-    port = get_available_port(settings.app_port)
-    logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
+    import argparse
+
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=settings.debug, log_level="info")
+    parser = argparse.ArgumentParser(description="Run File Brain application")
+    parser.add_argument(
+        "--mode",
+        choices=["dev", "prod"],
+        default=None,
+        help="Force run mode (dev/prod). If not set, uses DEBUG env var.",
+    )
+    args = parser.parse_args()
+
+    # Only override settings if CLI argument is provided
+    if args.mode == "dev":
+        settings.debug = True
+        os.environ["DEBUG"] = "true"
+        logger.info("🔧 Mode forced to DEVELOPMENT via CLI")
+    elif args.mode == "prod":
+        settings.debug = False
+        os.environ["DEBUG"] = "false"
+        logger.info("🏭 Mode forced to PRODUCTION via CLI")
+    else:
+        # Fallback to existing settings (from env vars or .env)
+        mode_str = "DEVELOPMENT" if settings.debug else "PRODUCTION"
+        logger.info(f"ℹ️  Running in {mode_str} mode (from environment)")
+
+    port = get_available_port(settings.app_port)
+    logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
+
+    if settings.debug:
+        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True, log_level="info")
+    else:
+        from flaskwebgui import FlaskUI
+
+        # In production, we run the app in a standalone window
+        FlaskUI(
+            app=app,
+            server="fastapi",
+            port=port,
+            width=1200,
+            height=800,
+        ).run()

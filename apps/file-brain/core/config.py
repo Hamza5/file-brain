@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     watch_paths: str = Field(default="")  # Comma-separated paths
     max_file_size_mb: int = Field(default=100)
 
+    # Frontend Development
+    frontend_dev_url: str = Field(default="http://localhost:5173", description="URL for Vite dev server")
+
     # Index Verification Settings
     verify_index_on_crawl: bool = Field(
         default=True,

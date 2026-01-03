@@ -3,8 +3,6 @@ API models package
 """
 
 from .crawler import (
-    BatchWatchPathRequest,
-    BatchWatchPathResponse,
     ClearIndexesResponse,
     CrawlerStats,
     # Backward compatibility
@@ -27,8 +25,6 @@ __all__ = [
     # Enhanced models
     "CrawlStatus",
     "CrawlStatusResponse",
-    "BatchWatchPathRequest",
-    "BatchWatchPathResponse",
     "ClearIndexesResponse",
     "JobControlRequest",
     # File event models

@@ -10,6 +10,11 @@ export default defineConfig({
         target: 'http://localhost:8274',
         changeOrigin: true,
       }
+    },
+    cors: true,
+    hmr: {
+      clientPort: 5173,
+      host: 'localhost'
     }
   }
 })

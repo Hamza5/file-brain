@@ -585,12 +585,13 @@ export function FolderSelectModal({
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <Button
               label="Cancel"
-              severity="secondary"
+              severity="danger"
               onClick={onClose}
-              className="p-button-text"
+              outlined
+              icon="fa-solid fa-xmark"
             />
             <Button
-              label={isExcludedMode ? "Exclude This Folder" : "Add Watch Folder"}
+              label={isExcludedMode ? "Exclude Folder" : "Add Folder"}
               icon={isExcludedMode ? "fa-solid fa-ban" : "fa-solid fa-check"}
               onClick={handleConfirm}
               disabled={!selectedPath}

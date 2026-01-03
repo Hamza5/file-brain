@@ -118,21 +118,21 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '40px',
-                    height: '40px',
+                    width: '50px',
+                    height: '50px',
                     borderRadius: '8px',
                     backgroundColor: item.is_excluded ? 'var(--red-50)' : 'var(--primary-50)',
                     color: item.is_excluded ? 'var(--red-500)' : 'var(--primary-color)',
                     flexShrink: 0
                 }}>
-                    <i className={`fa-solid ${item.is_excluded ? 'fa-folder-minus' : 'fa-folder'}`} style={{ fontSize: '1.25rem' }} />
+                    <i className={`fa-solid ${item.is_excluded ? 'fa-folder-minus' : 'fa-folder-plus'}`} style={{ fontSize: '1.5rem' }} />
                 </div>
 
                 {/* Path and Status */}
                 <div style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.5rem',
+                    gap: '0.25rem',
                     overflow: 'hidden',
                     flex: 1,
                     minWidth: 0
@@ -148,27 +148,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                     }} title={item.path}>
                         {item.path}
                     </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <InputSwitch
-                                checked={item.enabled}
-                                onChange={async (e) => {
-                                    try {
-                                        await updateWatchPath(item.id, { enabled: e.value });
-                                        // Specific to Primereact InputSwitch onChange event value
-                                        await loadWatchPaths();
-                                    } catch (error) {
-                                        console.error("Failed to update watch path:", error);
-                                        toast.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to update watch path status' });
-                                    }
-                                }}
-                                tooltip={item.enabled ? "Disable watching" : "Enable watching"}
-                            />
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-color-secondary)' }}>
-                                {item.enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                        </div>
-
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                         {item.include_subdirectories && (
                             <span style={{
                                 fontSize: '0.75rem',
@@ -185,27 +165,43 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                                 Recursive
                             </span>
                         )}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {/* Enable/Disable Switch */}
+                            <InputSwitch
+                                checked={item.enabled}
+                                onChange={async (e) => {
+                                    try {
+                                        await updateWatchPath(item.id, { enabled: e.value });
+                                        // Specific to Primereact InputSwitch onChange event value
+                                        await loadWatchPaths();
+                                    } catch (error) {
+                                        console.error("Failed to update watch path:", error);
+                                        toast.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to update watch path status' });
+                                    }
+                                }}
+                            />
+
+                            {/* Delete Button */}
+                            <Button
+                                icon="fa-solid fa-trash"
+                                severity="danger"
+                                text
+                                rounded
+                                aria-label="Remove"
+                                tooltip="Remove folder"
+                                tooltipOptions={{ position: 'left' }}
+                                onClick={() => handleDeletePath(item.id)}
+                                style={{ flexShrink: 0 }}
+                            />
+                        </div>
                     </div>
                 </div>
-
-                {/* Delete Button */}
-                <Button
-                    icon="fa-solid fa-trash"
-                    severity="danger"
-                    text
-                    rounded
-                    aria-label="Remove"
-                    tooltip="Remove folder"
-                    tooltipOptions={{ position: 'left' }}
-                    onClick={() => handleDeletePath(item.id)}
-                    style={{ flexShrink: 0 }}
-                />
             </div>
         );
     };
 
     return (
-        <Dialog header="Settings" visible={visible} style={{ width: '50vw' }} onHide={onHide} breakpoints={{ '960px': '75vw', '641px': '100vw' }}>
+        <Dialog header="Settings" visible={visible} style={{ width: '50vw' }} onHide={onHide} breakpoints={{ '960px': '75vw', '641px': '100vw' }} maximizable>
             <Toast ref={toast} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 {/* Watched Folders Section */}
