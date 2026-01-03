@@ -29,7 +29,7 @@ export interface ServicePhase {
 export interface ServiceInitStatus {
   name: string;
   user_friendly_name: string;
-  state: 'not_started' | 'initializing' | 'ready' | 'failed' | 'disabled';
+  state: "not_started" | "initializing" | "ready" | "failed" | "disabled";
   current_phase?: ServicePhase;
   error?: string;
   logs: string[];
@@ -43,8 +43,8 @@ export interface InitializationStatus {
 
 // Generic JSON fetch helper
 const API_BASE_URL = "";
-  // In production behind the same origin, keep this empty and proxy /api to FastAPI.
-  // During Vite dev, configure server.proxy in vite.config.ts so that ^/api goes to FastAPI.
+// In production behind the same origin, keep this empty and proxy /api to FastAPI.
+// During Vite dev, configure server.proxy in vite.config.ts so that ^/api goes to FastAPI.
 
 async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
   const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
@@ -58,7 +58,9 @@ async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Request failed (${res.status}): ${text || res.statusText}`);
+    throw new Error(
+      `Request failed (${res.status}): ${text || res.statusText}`
+    );
   }
 
   if (res.status === 204) {
@@ -105,24 +107,43 @@ export interface CrawlerRunsResponse {
 }
 
 // Crawler control
-export async function startCrawler(): Promise<{ message: string; success: boolean; timestamp: number }> {
+export async function startCrawler(): Promise<{
+  message: string;
+  success: boolean;
+  timestamp: number;
+}> {
   return requestJSON("/api/v1/crawler/start", { method: "POST" });
 }
 
-export async function stopCrawler(): Promise<{ message: string; success: boolean; timestamp: number }> {
+export async function stopCrawler(): Promise<{
+  message: string;
+  success: boolean;
+  timestamp: number;
+}> {
   return requestJSON("/api/v1/crawler/stop", { method: "POST" });
 }
 
-export async function startFileMonitoring(): Promise<{ message: string; success: boolean; timestamp: number }> {
-    return requestJSON("/api/v1/crawler/monitor/start", { method: "POST" });
+export async function startFileMonitoring(): Promise<{
+  message: string;
+  success: boolean;
+  timestamp: number;
+}> {
+  return requestJSON("/api/v1/crawler/monitor/start", { method: "POST" });
 }
 
-export async function stopFileMonitoring(): Promise<{ message: string; success: boolean; timestamp: number }> {
-    return requestJSON("/api/v1/crawler/monitor/stop", { method: "POST" });
+export async function stopFileMonitoring(): Promise<{
+  message: string;
+  success: boolean;
+  timestamp: number;
+}> {
+  return requestJSON("/api/v1/crawler/monitor/stop", { method: "POST" });
 }
 
-
-export async function clearIndexes(): Promise<{ success: boolean; message: string; timestamp: number }> {
+export async function clearIndexes(): Promise<{
+  success: boolean;
+  message: string;
+  timestamp: number;
+}> {
   return requestJSON("/api/v1/crawler/clear-indexes", { method: "POST" });
 }
 
@@ -154,6 +175,7 @@ export interface WatchPath {
   path: string;
   enabled: boolean;
   include_subdirectories: boolean;
+  is_excluded: boolean;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -162,6 +184,7 @@ export interface BatchWatchPathsRequest {
   paths: string[];
   include_subdirectories?: boolean;
   enabled?: boolean;
+  is_excluded?: boolean;
 }
 
 export interface BatchWatchPathsResponse {
@@ -170,6 +193,7 @@ export interface BatchWatchPathsResponse {
     path: string;
     enabled: boolean;
     include_subdirectories: boolean;
+    is_excluded: boolean;
     created_at?: string | null;
     updated_at?: string | null;
   }[];
@@ -181,44 +205,30 @@ export interface BatchWatchPathsResponse {
   total_skipped: number;
 }
 
-export async function listWatchPaths(enabledOnly = false): Promise<WatchPath[]> {
+export async function listWatchPaths(
+  enabledOnly = false
+): Promise<WatchPath[]> {
   const qs = enabledOnly ? "?enabled_only=true" : "";
   return requestJSON(`/api/v1/config/watch-paths${qs}`);
 }
 
-export async function addWatchPath(path: string, includeSubdirectories: boolean = true): Promise<WatchPath> {
-  // Prefer batch API to leverage existing validation
-  const body: BatchWatchPathsRequest = { paths: [path], include_subdirectories: includeSubdirectories };
-  const res = await requestJSON<BatchWatchPathsResponse>(
-    "/api/v1/config/watch-paths/batch",
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    }
-  );
-  const added = res.added[0];
-  if (!added) {
-    throw new Error(
-      res.skipped[0]?.reason || "Failed to add watch path (see backend logs)."
-    );
-  }
-  return {
-    id: added.id,
-    path: added.path,
-    enabled: added.enabled,
-    include_subdirectories: added.include_subdirectories,
-    created_at: added.created_at,
-    updated_at: added.updated_at,
+export async function addWatchPath(
+  path: string,
+  includeSubdirectories: boolean = true,
+  isExcluded: boolean = false
+): Promise<WatchPath> {
+  const body = {
+    path,
+    include_subdirectories: includeSubdirectories,
+    is_excluded: isExcluded,
+    enabled: true,
   };
-}
-
-export async function replaceWatchPaths(paths: string[]): Promise<void> {
-  const body: BatchWatchPathsRequest = { paths };
-  await requestJSON("/api/v1/config/watch-paths", {
-    method: "PUT",
+  return requestJSON<WatchPath>("/api/v1/config/watch-paths", {
+    method: "POST",
     body: JSON.stringify(body),
   });
 }
+
 
 export async function clearWatchPaths(): Promise<void> {
   await requestJSON("/api/v1/config/watch-paths", {
@@ -309,14 +319,23 @@ export interface SystemInitialization {
   timestamp: number;
   overall_status: "healthy" | "degraded" | "critical";
   initialization_progress: number;
-  services: Record<string, {
-    status: "healthy" | "unhealthy" | "initializing" | "disabled" | "error" | "retry_scheduled";
-    message?: string;
-    error?: string;
-    timestamp?: number;
-    retry_in_seconds?: number;
-    [key: string]: unknown;
-  }>;
+  services: Record<
+    string,
+    {
+      status:
+        | "healthy"
+        | "unhealthy"
+        | "initializing"
+        | "disabled"
+        | "error"
+        | "retry_scheduled";
+      message?: string;
+      error?: string;
+      timestamp?: number;
+      retry_in_seconds?: number;
+      [key: string]: unknown;
+    }
+  >;
   summary: {
     total_services: number;
     healthy_services: number;
@@ -334,24 +353,27 @@ export interface SystemInitialization {
 
 export interface ServiceStatus {
   timestamp: number;
-  services: Record<string, {
-    state: string;
-    last_check: number | null;
-    last_success: number | null;
-    error_message: string | null;
-    retry_count: number;
-    max_retries: number;
-    next_retry: number | null;
-    dependencies: string[];
-    details: Record<string, unknown>;
-    health_check: {
-      status: string;
-      message?: string;
-      error?: string;
-      timestamp?: number;
-      [key: string]: unknown;
-    };
-  }>;
+  services: Record<
+    string,
+    {
+      state: string;
+      last_check: number | null;
+      last_success: number | null;
+      error_message: string | null;
+      retry_count: number;
+      max_retries: number;
+      next_retry: number | null;
+      dependencies: string[];
+      details: Record<string, unknown>;
+      health_check: {
+        status: string;
+        message?: string;
+        error?: string;
+        timestamp?: number;
+        [key: string]: unknown;
+      };
+    }
+  >;
 }
 
 export async function getSystemInitialization(): Promise<SystemInitialization> {
@@ -362,31 +384,35 @@ export async function getServicesStatus(): Promise<ServiceStatus> {
   return requestJSON("/api/v1/system/services");
 }
 
-export async function retryService(serviceName: string): Promise<{ message: string; timestamp: number }> {
-  return requestJSON(`/api/v1/system/services/${serviceName}/retry`, { method: "POST" });
+export async function retryService(
+  serviceName: string
+): Promise<{ message: string; timestamp: number }> {
+  return requestJSON(`/api/v1/system/services/${serviceName}/retry`, {
+    method: "POST",
+  });
 }
 
 export function connectInitializationStream(
   onUpdate: (status: InitializationStatus) => void,
   onError?: () => void
 ): () => void {
-  const eventSource = new EventSource('/api/v1/system/initialization/stream');
-  
+  const eventSource = new EventSource("/api/v1/system/initialization/stream");
+
   eventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data && typeof data === 'object') {
+      if (data && typeof data === "object") {
         onUpdate(data);
       }
     } catch (e) {
       console.error("Failed to parse init stream event", e);
     }
   };
-  
+
   eventSource.onerror = () => {
     eventSource.close();
     if (onError) onError();
   };
-  
+
   return () => eventSource.close();
 }

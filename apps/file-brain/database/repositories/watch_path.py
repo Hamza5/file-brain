@@ -25,9 +25,15 @@ class WatchPathRepository(BaseRepository[WatchPath]):
 
     def get_enabled(self) -> List[WatchPath]:
         """Get all enabled watch paths"""
-        return self.db.query(WatchPath).filter(WatchPath.enabled == True).all()
+        return self.db.query(WatchPath).filter(WatchPath.enabled).all()
 
-    def create_if_not_exists(self, path: str, enabled: bool = True, include_subdirectories: bool = True) -> WatchPath:
+    def create_if_not_exists(
+        self,
+        path: str,
+        enabled: bool = True,
+        include_subdirectories: bool = True,
+        is_excluded: bool = False,
+    ) -> WatchPath:
         """Create a watch path if it doesn't exist"""
         existing = self.get_by_path(path)
         if existing:
@@ -38,6 +44,7 @@ class WatchPathRepository(BaseRepository[WatchPath]):
                 "path": path,
                 "enabled": enabled,
                 "include_subdirectories": include_subdirectories,
+                "is_excluded": is_excluded,
             }
         )
 

@@ -5,8 +5,9 @@ import { DataView } from 'primereact/dataview';
 import { Toast } from 'primereact/toast';
 import { Fieldset } from 'primereact/fieldset';
 import { Message } from 'primereact/message';
+import { InputSwitch } from 'primereact/inputswitch';
 import { confirmDialog } from 'primereact/confirmdialog';
-import { listWatchPaths, addWatchPath, deleteWatchPath, clearIndexes, type WatchPath } from '../api/client';
+import { listWatchPaths, addWatchPath, deleteWatchPath, updateWatchPath, clearIndexes, type WatchPath } from '../api/client';
 import { FolderSelectModal } from './FolderSelectModal';
 
 interface SettingsDialogProps {
@@ -18,7 +19,7 @@ interface SettingsDialogProps {
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide, onRefreshStats }) => {
     const [watchPaths, setWatchPaths] = useState<WatchPath[]>([]);
     const [folderPickerVisible, setFolderPickerVisible] = useState(false);
-    const [includeSubdirectories, setIncludeSubdirectories] = useState(true);
+    const [isAddingExcluded, setIsAddingExcluded] = useState(false);
     const [clearingIndexes, setClearingIndexes] = useState(false);
     const toast = useRef<Toast>(null);
 
@@ -38,9 +39,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
         }
     }, [visible]);
 
-    const handleAddPath = async (path: string, includeSubdirectories: boolean) => {
+    const handleAddPath = async (path: string, includeSubdirectories: boolean, isExcluded: boolean) => {
         try {
-            await addWatchPath(path, includeSubdirectories);
+            await addWatchPath(path, includeSubdirectories, isExcluded);
             await loadWatchPaths();
             setFolderPickerVisible(false);
             toast.current?.show({ severity: 'success', summary: 'Success', detail: 'Watch path added' });
@@ -120,11 +121,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                     width: '40px',
                     height: '40px',
                     borderRadius: '8px',
-                    backgroundColor: 'var(--primary-50)',
-                    color: 'var(--primary-color)',
+                    backgroundColor: item.is_excluded ? 'var(--red-50)' : 'var(--primary-50)',
+                    color: item.is_excluded ? 'var(--red-500)' : 'var(--primary-color)',
                     flexShrink: 0
                 }}>
-                    <i className="fa-solid fa-folder" style={{ fontSize: '1.25rem' }} />
+                    <i className={`fa-solid ${item.is_excluded ? 'fa-folder-minus' : 'fa-folder'}`} style={{ fontSize: '1.25rem' }} />
                 </div>
 
                 {/* Path and Status */}
@@ -148,20 +149,26 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                         {item.path}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            padding: '0.25rem 0.625rem',
-                            borderRadius: '12px',
-                            backgroundColor: item.enabled ? 'var(--green-100)' : 'var(--orange-100)',
-                            color: item.enabled ? 'var(--green-700)' : 'var(--orange-700)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                        }}>
-                            <i className={`fa-solid fa-${item.enabled ? 'check-circle' : 'pause-circle'}`} style={{ fontSize: '0.7rem' }} />
-                            {item.enabled ? 'Enabled' : 'Disabled'}
-                        </span>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <InputSwitch
+                                checked={item.enabled}
+                                onChange={async (e) => {
+                                    try {
+                                        await updateWatchPath(item.id, { enabled: e.value });
+                                        // Specific to Primereact InputSwitch onChange event value
+                                        await loadWatchPaths();
+                                    } catch (error) {
+                                        console.error("Failed to update watch path:", error);
+                                        toast.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to update watch path status' });
+                                    }
+                                }}
+                                tooltip={item.enabled ? "Disable watching" : "Enable watching"}
+                            />
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-color-secondary)' }}>
+                                {item.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                        </div>
+
                         {item.include_subdirectories && (
                             <span style={{
                                 fontSize: '0.75rem',
@@ -222,17 +229,31 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                             style={{ width: '100%' }}
                         />
                         
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <p style={{ color: 'var(--text-color-secondary)', margin: 0 }}>
-                                Manage the directories that File Brain indexes.
-                            </p>
-                            <Button
-                                label="Add Folder"
-                                icon="fa-solid fa-plus"
-                                size="small"
-                                onClick={() => setFolderPickerVisible(true)}
-                            />
-                        </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <span className="p-text-secondary" style={{ fontSize: '0.9rem' }}>
+                        Manage the directories that File Brain indexes.
+                    </span>
+                    <div className="flex gap-2">
+                         <Button
+                            label="Add Folder"
+                            icon="fa-solid fa-plus"
+                            onClick={() => {
+                                setIsAddingExcluded(false);
+                                setFolderPickerVisible(true);
+                            }}
+                            className="p-button-sm"
+                        />
+                         <Button
+                            label="Add Excluded"
+                            icon="fa-solid fa-ban"
+                            onClick={() => {
+                                setIsAddingExcluded(true);
+                                setFolderPickerVisible(true);
+                            }}
+                            className="p-button-sm p-button-danger p-button-outlined"
+                        />
+                    </div>
+                </div>
 
                         <DataView
                             value={watchPaths}
@@ -273,9 +294,10 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
             <FolderSelectModal
                 isOpen={folderPickerVisible}
                 onClose={() => setFolderPickerVisible(false)}
-                onConfirm={handleAddPath}
-                includeSubdirectories={includeSubdirectories}
-                onIncludeSubdirectoriesChange={setIncludeSubdirectories}
+                onConfirm={(path, includeSubdirectories) => handleAddPath(path, includeSubdirectories, isAddingExcluded)}
+                includeSubdirectories={true}
+                onIncludeSubdirectoriesChange={() => { }}
+                isExcludedMode={isAddingExcluded}
             />
         </Dialog>
     );

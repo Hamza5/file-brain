@@ -20,3 +20,4 @@ class WatchPath(Base):
     include_subdirectories = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    is_excluded = Column(Boolean, default=False, nullable=False)

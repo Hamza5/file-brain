@@ -8,9 +8,10 @@ import { getFsRoots, listFs, type FsRoot, type FsEntry } from "../api/client";
 type FolderSelectModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (path: string, includeSubdirectories: boolean) => void;
+  onConfirm: (path: string, includeSubdirectories: boolean, isExcluded: boolean) => void;
   includeSubdirectories: boolean;
   onIncludeSubdirectoriesChange: (checked: boolean) => void;
+  isExcludedMode: boolean;
 };
 
 export function FolderSelectModal({
@@ -19,6 +20,7 @@ export function FolderSelectModal({
   onConfirm,
   includeSubdirectories,
   onIncludeSubdirectoriesChange,
+  isExcludedMode,
 }: FolderSelectModalProps) {
   const [roots, setRoots] = useState<FsRoot[]>([]);
   const [activeRoot, setActiveRoot] = useState<FsRoot | null>(null);
@@ -45,6 +47,8 @@ export function FolderSelectModal({
       setActiveRoot(null);
       setCurrentPath("");
       setEntries([]);
+      setFilter("");
+      setFilter("");
       setFilter("");
       setSelectedPath("");
       setLoading(false);
@@ -194,19 +198,17 @@ export function FolderSelectModal({
 
   function handleConfirm() {
     if (!selectedPath) return;
-    onConfirm(selectedPath, includeSubdirectories);
+    onConfirm(selectedPath, includeSubdirectories, isExcludedMode);
   }
 
   const breadcrumbSegments = getBreadcrumbSegments(currentPath);
 
   return (
     <Dialog
+      header={isExcludedMode ? "Exclude Folder from Indexing" : "Select Folder to Watch"}
       visible={isOpen}
+      style={{ width: "90vw", maxWidth: "800px", height: "80vh" }}
       onHide={onClose}
-      header="Select Folder to Watch"
-      modal
-      style={{ width: "90vw", maxWidth: "800px" }}
-      maximizable
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "500px" }}>
         {/* Breadcrumb */}
@@ -585,12 +587,14 @@ export function FolderSelectModal({
               label="Cancel"
               severity="secondary"
               onClick={onClose}
+              className="p-button-text"
             />
             <Button
-              label="Use This Folder"
+              label={isExcludedMode ? "Exclude This Folder" : "Add Watch Folder"}
+              icon={isExcludedMode ? "fa-solid fa-ban" : "fa-solid fa-check"}
               onClick={handleConfirm}
               disabled={!selectedPath}
-              icon="fas fa-check"
+              className={isExcludedMode ? "p-button-danger" : ""}
             />
           </div>
         </div>

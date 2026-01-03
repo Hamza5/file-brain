@@ -133,7 +133,11 @@ class ContentExtractor:
                 return self._extract_basic(file_path)
 
             # Extract content
-            content = parsed.get("content", "").strip()
+            # Extract content
+            content = parsed.get("content")
+            if content is None:
+                content = ""
+            content = content.strip()
 
             # If content is empty after Tika extraction, fall back to basic extraction
             if not content:
@@ -141,7 +145,10 @@ class ContentExtractor:
                 return self._extract_basic(file_path)
 
             # Extract and process metadata
-            raw_metadata = parsed.get("metadata", {})
+            raw_metadata = parsed.get("metadata")
+            if raw_metadata is None:
+                raw_metadata = {}
+
             metadata = self._process_tika_metadata(raw_metadata)
 
             # Add Tika endpoint information to metadata

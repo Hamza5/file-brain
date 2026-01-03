@@ -2,7 +2,7 @@
 API request/response models for crawl functionality
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -74,24 +74,16 @@ class CrawlStatusResponse(BaseModel):
     timestamp: int
 
 
-class BatchWatchPathRequest(BaseModel):
-    """Request to add multiple watch paths at once"""
+class WatchPathCreateRequest(BaseModel):
+    """Request to add a single watch path"""
 
-    paths: List[str] = Field(..., description="List of paths to add")
+    path: str = Field(..., description="Path to add")
     include_subdirectories: bool = Field(
         default=True,
-        description="Whether to include subdirectories for the given paths",
+        description="Whether to include subdirectories",
     )
-    enabled: bool = Field(default=True, description="Whether paths should be enabled")
-
-
-class BatchWatchPathResponse(BaseModel):
-    """Response for batch watch path operations"""
-
-    added: List[Dict[str, Any]] = Field(..., description="Successfully added paths")
-    skipped: List[Dict[str, str]] = Field(default_factory=list, description="Skipped paths with reasons")
-    total_added: int = 0
-    total_skipped: int = 0
+    enabled: bool = Field(default=True, description="Whether path should be enabled")
+    is_excluded: bool = Field(default=False, description="Whether path should be excluded from indexing")
 
 
 class ClearIndexesResponse(BaseModel):

@@ -10,9 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.models.crawler import (
-    BatchWatchPathRequest,
-    BatchWatchPathResponse,
     MessageResponse,
+    WatchPathCreateRequest,
 )
 from core.logging import logger
 from database.models import get_db
@@ -26,6 +25,7 @@ class WatchPathResponse(BaseModel):
     path: str
     enabled: bool
     include_subdirectories: bool
+    is_excluded: bool
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -33,6 +33,7 @@ class WatchPathResponse(BaseModel):
 class WatchPathUpdateRequest(BaseModel):
     enabled: bool | None = None
     include_subdirectories: bool | None = None
+    is_excluded: bool | None = None
 
 
 @router.get("", response_model=List[WatchPathResponse])
@@ -57,6 +58,7 @@ async def get_watch_paths(
             path=p.path,
             enabled=p.enabled,
             include_subdirectories=p.include_subdirectories,
+            is_excluded=p.is_excluded,
             created_at=p.created_at.isoformat() if p.created_at else None,
             updated_at=p.updated_at.isoformat() if p.updated_at else None,
         )
@@ -64,86 +66,44 @@ async def get_watch_paths(
     ]
 
 
-@router.post("/batch", response_model=BatchWatchPathResponse)
-async def add_watch_paths_batch(
-    request: BatchWatchPathRequest,
+@router.post("", response_model=WatchPathResponse)
+async def create_watch_path(
+    request: WatchPathCreateRequest,
     db: Session = Depends(get_db),
 ):
     """
-    Append multiple watch paths.
-
-    - Validates each path exists and is a directory.
-    - Skips duplicates or invalid paths.
+    Add a single watch path.
     """
     watch_path_repo = WatchPathRepository(db)
-    added_paths: List[dict] = []
-    skipped_paths: List[dict] = []
 
-    for path in request.paths:
-        if not os.path.exists(path):
-            skipped_paths.append({"path": path, "reason": "Path does not exist"})
-            continue
-        if not os.path.isdir(path):
-            skipped_paths.append({"path": path, "reason": "Path is not a directory"})
-            continue
-        try:
-            watch_path = watch_path_repo.create_if_not_exists(
-                path, include_subdirectories=request.include_subdirectories
-            )
-            added_paths.append(
-                WatchPathResponse(
-                    id=watch_path.id,
-                    path=watch_path.path,
-                    enabled=watch_path.enabled,
-                    include_subdirectories=watch_path.include_subdirectories,
-                    created_at=watch_path.created_at.isoformat() if watch_path.created_at else None,
-                    updated_at=watch_path.updated_at.isoformat() if watch_path.updated_at else None,
-                ).model_dump()
-            )
-            logger.info(f"Added watch path via batch API: {path}")
-        except ValueError as e:
-            skipped_paths.append({"path": path, "reason": str(e)})
+    if not os.path.exists(request.path):
+        raise HTTPException(status_code=400, detail=f"Path not found: {request.path}")
+    if not os.path.isdir(request.path):
+        raise HTTPException(status_code=400, detail=f"Path is not a directory: {request.path}")
 
-    return BatchWatchPathResponse(
-        added=added_paths,
-        skipped=skipped_paths,
-        total_added=len(added_paths),
-        total_skipped=len(skipped_paths),
-    )
+    try:
+        watch_path = watch_path_repo.create_if_not_exists(
+            request.path,
+            include_subdirectories=request.include_subdirectories,
+            is_excluded=request.is_excluded,
+        )
 
+        # Ensure enabled state matches request (create_if_not_exists might return existing disabled one)
+        if watch_path.enabled != request.enabled:
+            watch_path = watch_path_repo.update(watch_path.id, {"enabled": request.enabled})
 
-@router.put("", response_model=MessageResponse)
-async def replace_watch_paths(
-    request: BatchWatchPathRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Replace all watch paths with the provided set.
-
-    - Clears all existing watch paths.
-    - Adds all valid provided paths.
-    """
-    watch_path_repo = WatchPathRepository(db)
-    watch_path_repo.delete_all()
-
-    added_count = 0
-    for path in request.paths:
-        if not os.path.exists(path) or not os.path.isdir(path):
-            continue
-        try:
-            watch_path_repo.create_if_not_exists(path, include_subdirectories=True)
-            added_count += 1
-        except ValueError:
-            # Skip duplicates or invalid entries
-            continue
-
-    logger.info(f"Replaced watch paths via batch API: {added_count} added")
-
-    return MessageResponse(
-        message=f"Replaced all watch paths. Added {added_count} path(s).",
-        success=True,
-        timestamp=None,
-    )
+        logger.info(f"Added watch path: {request.path}")
+        return WatchPathResponse(
+            id=watch_path.id,
+            path=watch_path.path,
+            enabled=watch_path.enabled,
+            include_subdirectories=watch_path.include_subdirectories,
+            is_excluded=watch_path.is_excluded,
+            created_at=watch_path.created_at.isoformat() if watch_path.created_at else None,
+            updated_at=watch_path.updated_at.isoformat() if watch_path.updated_at else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("", response_model=MessageResponse)
@@ -192,6 +152,7 @@ async def update_watch_path_by_id(
         path=updated_path.path,
         enabled=updated_path.enabled,
         include_subdirectories=updated_path.include_subdirectories,
+        is_excluded=updated_path.is_excluded,
         created_at=updated_path.created_at.isoformat() if updated_path.created_at else None,
         updated_at=updated_path.updated_at.isoformat() if updated_path.updated_at else None,
     )
