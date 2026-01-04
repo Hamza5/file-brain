@@ -326,22 +326,23 @@ class CrawlJobManager:
         self.indexer.stop()
 
     async def clear_indexes(self) -> bool:
-        """Clear all files from Typesense and reset statistics (preserves watch paths)"""
-        logger.info("Clearing search indexes and resetting statistics...")
+        """Reset the collection (drop and recreate with latest schema) and reset statistics"""
+        logger.info("Resetting collection and statistics...")
         try:
-            # 1. Clear search index
+            # 1. Reset search collection (drop and recreate with latest schema)
             typesense = get_typesense_client()
-            await typesense.clear_all_documents()
+            logger.info("Dropping and recreating Typesense collection with latest schema...")
+            await typesense.reset_collection()
 
             with db_session() as db:
                 # 2. Reset crawler statistics and state
                 state_repo = CrawlerStateRepository(db)
                 state_repo.reset_stats()
 
-                logger.info("✅ Indexes cleared and statistics reset")
+                logger.info("✅ Collection reset and statistics cleared")
             return True
         except Exception as e:
-            logger.error(f"Error clearing indexes: {e}")
+            logger.error(f"Error resetting collection: {e}")
             return False
 
     async def start_monitoring(self) -> bool:

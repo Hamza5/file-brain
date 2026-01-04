@@ -29,14 +29,16 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
     connectionTimeoutSeconds: 30, // Extended timeout for slower queries
   },
   additionalSearchParameters: {
-    // Hybrid search defaults:
-    // - Lexical over file_name, file_path, content, title, description
-    // - Embeddings-backed semantic search via "embedding" field (server-side configured)
-    // - Exclude embedding vector from responses
-    query_by: "file_name,file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
+    // Search strategy:
+    // - Search all chunks (full content coverage)
+    // - Group by file_path to deduplicate (one result per file)
+    // - Relevance determines which chunk is shown (best match)
+    // - All chunks have essential metadata (file_extension, file_size, mime_type, modified_time)
+    query_by: "file_path,content,title,description,subject,keywords,author,comments,producer,application",
     exclude_fields: "embedding",
-    vector_query: "embedding:([], k:50)",
-    per_page: 24, // Increased per page for grid view
+    group_by: "file_path", // Deduplicate: show each file once
+    group_limit: 1, // Show the most relevant chunk per file
+    per_page: 24,
   },
 });
 

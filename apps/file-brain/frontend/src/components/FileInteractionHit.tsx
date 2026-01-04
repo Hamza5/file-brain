@@ -10,6 +10,7 @@ import { fileOperationsService } from '../services/fileOperations';
 import { useFileSelection } from '../context/FileSelectionContext';
 import { useNotification } from '../context/NotificationContext';
 
+import { getFileName } from '../utils/fileUtils';
 interface HitType {
   file_name: string;
   file_path: string;  // Backend field name
@@ -51,17 +52,17 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   const shortSnippet = snippet.length > 260 ? `${snippet.slice(0, 260)}…` : snippet;
 
   // Debug logging
-  console.log(`Hit component for: ${hit.file_name} (path: ${filePath}), selected: ${isSelected}`);
+  console.log(`Hit component for: ${getFileName(hit.file_path)} (path: ${filePath}), selected: ${isSelected}`);
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
 
     if (!filePath) {
-      console.warn('No file path available for:', hit.file_name);
+      console.warn('No file path available for:', getFileName(hit.file_path));
       return;
     }
 
-    console.log(`Click on file: ${hit.file_name} (path: ${filePath})`);
+    console.log(`Click on file: ${getFileName(hit.file_path)} (path: ${filePath})`);
 
     // Single click handling:
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
@@ -80,14 +81,14 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
     e.stopPropagation();
 
     if (!filePath) {
-      showError('Error', `Cannot open ${hit.file_name} - missing file path`);
+      showError('Error', `Cannot open ${getFileName(hit.file_path)} - missing file path`);
       return;
     }
 
     try {
       const result = await fileOperationsService.openFile(filePath);
       if (result.success) {
-        showSuccess('File Opened', `Successfully opened ${hit.file_name}`);
+        showSuccess('File Opened', `Successfully opened ${getFileName(hit.file_path)}`);
       } else {
         showError('Error', result.error || 'Failed to open file');
       }
@@ -121,7 +122,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
         case 'delete':
           // Confirm before deletion using PrimeReact ConfirmDialog
           confirmDialog({
-            message: `Are you sure you want to permanently delete "${hit.file_name}"? This action cannot be undone.`,
+            message: `Are you sure you want to permanently delete "${getFileName(hit.file_path)}"? This action cannot be undone.`,
             header: 'Confirm Deletion',
             icon: 'fa fa-info-circle',
             acceptClassName: 'p-button-danger',
@@ -151,7 +152,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
         case 'forget':
           // Confirm before removing from index using PrimeReact ConfirmDialog
           confirmDialog({
-            message: `Are you sure you want to remove "${hit.file_name}" from the search index? The file will remain on disk but won't appear in search results.`,
+            message: `Are you sure you want to remove "${getFileName(hit.file_path)}" from the search index? The file will remain on disk but won't appear in search results.`,
             header: 'Remove from Search Index',
             icon: 'fa fa-exclamation-triangle',
             acceptClassName: 'p-button-warning',
@@ -311,9 +312,9 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                   whiteSpace: "nowrap",
                   flex: 1
                 }}
-                title={hit.file_name}
+                title={getFileName(hit.file_path)}
               >
-                {hit.file_name}
+                {getFileName(hit.file_path)}
               </div>
 
               {hit.file_extension && (
@@ -499,7 +500,7 @@ function formatDate(ts?: number): string {
 function pickIconClass(hit: HitType): string {
   const ext = (hit.file_extension || "").toLowerCase();
   const mime = (hit.mime_type || "").toLowerCase();
-  const fileName = (hit.file_name || "").toLowerCase();
+  const fileName = (getFileName(hit.file_path) || "").toLowerCase();
 
   // 1. Specific Filenames
   if (fileName === "dockerfile") return "fab fa-docker";

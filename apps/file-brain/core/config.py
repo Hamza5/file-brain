@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     batch_size: int = Field(default=10)
     worker_queue_size: int = Field(default=1000)
 
+    # Chunking
+    chunk_size: int = Field(default=1000, description="Characters per chunk for indexing")
+    chunk_overlap: int = Field(default=200, description="Overlapping characters between chunks")
+
     # Tika Server (Docker-based)
     tika_host: str = Field(default="localhost")
     tika_port: int = Field(default=9998)

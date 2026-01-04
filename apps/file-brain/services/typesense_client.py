@@ -31,7 +31,7 @@ class TypesenseClient:
                     }
                 ],
                 "api_key": settings.typesense_api_key,
-                "connection_timeout_seconds": 10,
+                "connection_timeout_seconds": 10,  # Normal timeout for regular operations
             }
         )
         self.collection_name = settings.typesense_collection_name
@@ -100,14 +100,34 @@ class TypesenseClient:
                     service_manager.append_service_log(service_name, "Creating collection (may trigger model download)")
 
                     schema = get_collection_schema(self.collection_name)
-                    self.client.collections.create(schema)
 
+                    # Create a separate client with extended timeout ONLY for collection creation
+                    # This is a one-time operation that may download embedding models (can take 60-120s)
+                    collection_creation_client = typesense.Client(
+                        {
+                            "nodes": [
+                                {
+                                    "host": settings.typesense_host,
+                                    "port": settings.typesense_port,
+                                    "protocol": settings.typesense_protocol,
+                                }
+                            ],
+                            "api_key": settings.typesense_api_key,
+                            "connection_timeout_seconds": 120,  # Extended timeout for model downloads
+                        }
+                    )
+
+                    # Use the special client for collection creation
+                    collection_creation_client.collections.create(schema)
+
+                    # Log success
                     service_manager.append_service_log(
                         service_name,
                         f"Collection '{self.collection_name}' created successfully",
                     )
                     logger.info(
-                        f"Collection '{self.collection_name}' created successfully (attempt {attempt}/{max_attempts})"
+                        f"Collection '{self.collection_name}' created successfully with embedding models "
+                        f"(attempt {attempt}/{max_attempts})"
                     )
 
                     # 4. Finalizing
@@ -164,9 +184,21 @@ class TypesenseClient:
         self.collection_ready = False
 
     @staticmethod
-    def generate_doc_id(file_path: str) -> str:
-        """Generate document ID from file path"""
-        return hashlib.sha1(file_path.encode()).hexdigest()
+    def generate_doc_id(file_path: str, chunk_index: int | None = None) -> str:
+        """
+        Generate document ID from file path and optional chunk index.
+
+        Args:
+            file_path: Full path to the file
+            chunk_index: Optional chunk index for chunked files
+
+        Returns:
+            Document ID (SHA1 hash with optional chunk suffix)
+        """
+        base_hash = hashlib.sha1(file_path.encode()).hexdigest()
+        if chunk_index is not None:
+            return f"{base_hash}_chunk_{chunk_index}"
+        return base_hash
 
     async def is_file_indexed(self, file_path: str) -> bool:
         """Check if file is already indexed"""
@@ -182,13 +214,16 @@ class TypesenseClient:
 
     async def get_doc_by_path(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
-        Get an indexed file document by its file_path.
+        Get the first chunk (chunk 0) of an indexed file by its file_path.
+
+        Chunk 0 contains all file metadata, so this gives us complete file information.
 
         Returns:
             Document dict if found, otherwise None.
         """
         try:
-            doc_id = self.generate_doc_id(file_path)
+            # Get chunk 0 which has all the metadata
+            doc_id = self.generate_doc_id(file_path, chunk_index=0)
             return self.client.collections[self.collection_name].documents[doc_id].retrieve()
         except typesense.exceptions.ObjectNotFound:
             return None
@@ -199,85 +234,100 @@ class TypesenseClient:
     async def index_file(
         self,
         file_path: str,
-        file_name: str,
-        file_extension: str,
-        file_size: int,
-        mime_type: str,
         content: str,
-        modified_time: int,
-        created_time: int,
-        file_hash: str,
+        chunk_index: int,
+        chunk_total: int,
+        chunk_hash: str,
+        # Optional metadata (only provided for chunk 0)
+        file_extension: Optional[str] = None,
+        file_size: Optional[int] = None,
+        mime_type: Optional[str] = None,
+        modified_time: Optional[int] = None,
+        created_time: Optional[int] = None,
+        file_hash: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Index (upsert) a file in Typesense.
+        Index (upsert) a file chunk in Typesense.
 
-        Typesense is the single source of truth. This method always upserts the document with the
-        provided metadata and file_hash.
+        For storage efficiency, metadata is only included in chunk_index=0.
+        Other chunks contain only file_path, content, and chunk fields.
 
         Args:
             file_path: Full path to file
-            file_name: File name
-            file_extension: File extension
-            file_size: File size in bytes
-            mime_type: MIME type
-            content: Extracted content
-            modified_time: Modified timestamp (ms)
-            created_time: Created timestamp (ms)
-            metadata: Additional metadata
+            content: Extracted content for this chunk
+            chunk_index: Index of this chunk (0-based)
+            chunk_total: Total number of chunks for this file
+            chunk_hash: Unique hash for this chunk
+            file_extension: File extension (only for chunk 0)
+            file_size: File size in bytes (only for chunk 0)
+            mime_type: MIME type (only for chunk 0)
+            modified_time: Modified timestamp in ms (only for chunk 0)
+            created_time: Created timestamp in ms (only for chunk 0)
+            file_hash: File content hash (only for chunk 0)
+            metadata: Additional metadata from extraction (only for chunk 0)
         """
-        doc_id = self.generate_doc_id(file_path)
+        doc_id = self.generate_doc_id(file_path, chunk_index)
 
+        # Base document (all chunks have these fields)
         document: Dict[str, Any] = {
             "id": doc_id,
             "file_path": file_path,
-            "file_name": file_name,
-            "file_extension": file_extension,
-            "file_size": file_size,
-            "mime_type": mime_type,
             "content": content,
-            "modified_time": modified_time,
-            "created_time": created_time,
-            "indexed_at": int(time.time() * 1000),
-            "file_hash": file_hash,
+            "chunk_index": chunk_index,
+            "chunk_total": chunk_total,
+            "chunk_hash": chunk_hash,
         }
 
-        # Add only metadata fields that the frontend actually uses
-        if metadata:
-            # Fields used by FileInteractionHit.tsx
-            if title := metadata.get("title"):
-                document["title"] = title
-            if author := metadata.get("author"):
-                document["author"] = author
-            if subject := metadata.get("subject"):
-                document["subject"] = subject
-            if language := metadata.get("language"):
-                document["language"] = language
+        # Add essential metadata to ALL chunks (required for UI display)
+        if file_extension is not None:
+            document["file_extension"] = file_extension
+            document["file_size"] = file_size
+            document["mime_type"] = mime_type
+            document["modified_time"] = modified_time
 
-            # Keywords array
-            if keywords := metadata.get("keywords"):
-                if isinstance(keywords, list):
-                    document["keywords"] = keywords
-                elif isinstance(keywords, str):
-                    document["keywords"] = [k.strip() for k in keywords.split(",")]
+        # Add additional metadata only for chunk 0
+        if chunk_index == 0:
+            document["created_time"] = created_time
+            document["indexed_at"] = int(time.time() * 1000)
+            document["file_hash"] = file_hash
+
+            # Add Tika metadata fields
+            if metadata:
+                if title := metadata.get("title"):
+                    document["title"] = title
+                if author := metadata.get("author"):
+                    document["author"] = author
+                if subject := metadata.get("subject"):
+                    document["subject"] = subject
+                if language := metadata.get("language"):
+                    document["language"] = language
+
+                # Keywords array
+                if keywords := metadata.get("keywords"):
+                    if isinstance(keywords, list):
+                        document["keywords"] = keywords
+                    elif isinstance(keywords, str):
+                        document["keywords"] = [k.strip() for k in keywords.split(",")]
 
         try:
             # Use upsert to handle both create and update
             self.client.collections[self.collection_name].documents.upsert(document)
-            logger.info(f"Indexed: {file_name}")
+            logger.debug(f"Indexed chunk {chunk_index}/{chunk_total} of: {file_path}")
         except Exception as e:
-            logger.error(f"Error indexing {file_name}: {e}")
+            logger.error(f"Error indexing chunk {chunk_index} of {file_path}: {e}")
             raise
 
     async def remove_from_index(self, file_path: str) -> None:
-        """Remove file from index"""
-        doc_id = self.generate_doc_id(file_path)
+        """
+        Remove all chunks of a file from index.
 
+        Uses filter-based deletion to remove all documents with matching file_path.
+        """
         try:
-            self.client.collections[self.collection_name].documents[doc_id].delete()
-            logger.info(f"Removed from index: {file_path}")
-        except typesense.exceptions.ObjectNotFound:
-            logger.warning(f"File not in index: {file_path}")
+            # Delete all chunks for this file path
+            self.client.collections[self.collection_name].documents.delete({"filter_by": f"file_path:={file_path}"})
+            logger.info(f"Removed all chunks from index: {file_path}")
         except Exception as e:
             logger.error(f"Error removing {file_path}: {e}")
             raise
@@ -311,11 +361,25 @@ class TypesenseClient:
             raise
 
     async def get_collection_stats(self) -> Dict[str, Any]:
-        """Get collection statistics"""
+        """
+        Get collection statistics.
+
+        Returns file count (not chunk count) by filtering for chunk_index=0.
+        """
         try:
+            # Count only chunk 0 documents (one per file)
+            results = self.client.collections[self.collection_name].documents.search(
+                {
+                    "q": "*",
+                    "filter_by": "chunk_index:=0",
+                    "per_page": 1,
+                }
+            )
+            file_count = results.get("found", 0)
+
             collection = self.client.collections[self.collection_name].retrieve()
             return {
-                "num_documents": collection.get("num_documents", 0),
+                "num_documents": file_count,  # File count, not chunk count
                 "schema": collection,
             }
         except Exception as e:
@@ -326,14 +390,17 @@ class TypesenseClient:
         """
         Get distribution of indexed files by file extension via faceting.
 
+        Returns file count (not chunk count) by filtering for chunk_index=0.
+
         Returns:
             Dict mapping file_extension to count, e.g. {".pdf": 42, ".txt": 15}
         """
         try:
-            # Search with facet_by to get counts per file_extension
+            # Search only chunk 0 documents and facet by extension
             results = self.client.collections[self.collection_name].documents.search(
                 {
                     "q": "*",
+                    "filter_by": "chunk_index:=0",
                     "facet_by": "file_extension",
                     "max_facet_values": 100,
                     "per_page": 0,  # We only want facet counts, not documents
@@ -355,32 +422,61 @@ class TypesenseClient:
             logger.error(f"Error getting file type distribution: {e}")
             return {}
 
-    async def clear_all_documents(self) -> None:
-        """Clear all documents from the collection"""
+    async def reset_collection(self) -> None:
+        """
+        Reset the collection by dropping and recreating it.
+
+        This ensures schema changes are applied properly.
+        Use this instead of just clearing documents when schema has changed.
+        """
         try:
-            # Use filter_by with a condition that's always true to delete all documents
-            self.client.collections[self.collection_name].documents.delete(
-                dict(filter_by="id:!=null")  # This will match all documents
+            # Drop the existing collection
+            try:
+                self.client.collections[self.collection_name].delete()
+                logger.info(f"Dropped Typesense collection '{self.collection_name}'")
+            except typesense.exceptions.ObjectNotFound:
+                logger.info(f"Collection '{self.collection_name}' doesn't exist, nothing to drop")
+
+            # Recreate with latest schema
+            schema = get_collection_schema(self.collection_name)
+
+            # Use extended timeout for collection creation (model download)
+            collection_creation_client = typesense.Client(
+                {
+                    "nodes": [
+                        {
+                            "host": settings.typesense_host,
+                            "port": settings.typesense_port,
+                            "protocol": settings.typesense_protocol,
+                        }
+                    ],
+                    "api_key": settings.typesense_api_key,
+                    "connection_timeout_seconds": 120,
+                }
             )
-            logger.info("All documents cleared from Typesense collection")
+
+            collection_creation_client.collections.create(schema)
+            logger.info(f"Recreated Typesense collection '{self.collection_name}' with latest schema")
+            self.collection_ready = True
         except Exception as e:
-            logger.error(f"Error clearing documents: {e}")
+            logger.error(f"Error resetting collection: {e}")
             raise
 
     async def get_all_indexed_files(self, limit: int = 1000, offset: int = 0) -> List[Dict[str, Any]]:
         """
         Get all indexed files with pagination for verification.
 
-        Returns list of documents with file_path, file_hash, and other metadata.
+        Returns only chunk 0 documents (one per file) with metadata.
         Used to detect orphaned index entries by comparing with filesystem.
         """
         try:
             results = self.client.collections[self.collection_name].documents.search(
                 {
                     "q": "*",
+                    "filter_by": "chunk_index:=0",  # Only get chunk 0 (one per file)
                     "per_page": limit,
                     "page": (offset // limit) + 1,
-                    "include_fields": "file_path,file_hash,file_name,file_size,modified_time,indexed_at",
+                    "include_fields": "file_path,file_hash,file_size,modified_time,indexed_at",
                     "exclude_fields": "content,embedding",
                 }
             )
@@ -391,9 +487,19 @@ class TypesenseClient:
             return []
 
     async def get_indexed_files_count(self) -> int:
-        """Get total count of indexed files for verification progress tracking"""
+        """
+        Get total count of indexed files (not chunks) for verification progress tracking.
+
+        Counts only chunk_index=0 documents.
+        """
         try:
-            results = self.client.collections[self.collection_name].documents.search({"q": "*", "per_page": 1})
+            results = self.client.collections[self.collection_name].documents.search(
+                {
+                    "q": "*",
+                    "filter_by": "chunk_index:=0",
+                    "per_page": 1,
+                }
+            )
             return results.get("found", 0)
         except Exception as e:
             logger.error(f"Error getting indexed files count: {e}")

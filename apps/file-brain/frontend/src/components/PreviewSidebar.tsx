@@ -1,10 +1,11 @@
 import React from 'react';
+import { getFileName } from "../utils/fileUtils";
 import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
 import { fileOperationsService } from '../services/fileOperations';
 import { confirmDialog } from 'primereact/confirmdialog';
 import { formatSize, formatDate } from '../utils/fileUtils';
-import { Snippet } from 'react-instantsearch';
+import { Snippet, useInstantSearch } from 'react-instantsearch';
 
 interface PreviewSidebarProps {
     visible: boolean;
@@ -13,6 +14,7 @@ interface PreviewSidebarProps {
 }
 
 export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide, file }) => {
+    const { refresh } = useInstantSearch();
     if (!file) return null;
 
     const handleOpen = async () => {
@@ -31,7 +33,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
             accept: async () => {
                 await fileOperationsService.deleteFile(file.file_path);
                 onHide();
-                // TODO: Trigger search refresh
+                refresh();
             }
         });
     };
@@ -66,8 +68,8 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis'
-                    }} title={file.file_name}>
-                        {file.file_name}
+                    }} title={getFileName(file.file_path)}>
+                        {getFileName(file.file_path)}
                     </h2>
                 </div>
 

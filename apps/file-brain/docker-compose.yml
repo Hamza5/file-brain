@@ -20,7 +20,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Typesense Search Engine (with GPU support for embeddings)
+  # Typesense Search Engine (with GPU support)
   typesense:
     image: typesense/typesense:29.0
     container_name: file-brain-search-engine
@@ -29,7 +29,7 @@ services:
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}
       TYPESENSE_DATA_DIR: /data
     volumes:
-      - typesense-data:/data
+      - search-engine-data:/data
     command: >
       --data-dir /data --api-key=${TYPESENSE_API_KEY:-xyz-typesense-key}
     deploy:
@@ -54,5 +54,5 @@ services:
 
 # Named volumes for data persistence
 volumes:
-  typesense-data:
+  search-engine-data:
     driver: local

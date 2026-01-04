@@ -48,3 +48,14 @@ export function pickIconClass(fileType?: string, mimeType?: string, extension?: 
 
     return "far fa-file";
 }
+
+/**
+ * Extract filename from file path
+ * @param filePath - Full file path
+ * @returns Just the filename (last part after /)
+ */
+export const getFileName = (filePath: string): string => {
+  if (!filePath) return 'Unknown File';
+  const parts = filePath.split('/');
+  return parts[parts.length - 1] || 'Unknown File';
+};

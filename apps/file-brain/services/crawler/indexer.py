@@ -63,20 +63,51 @@ class FileIndexer:
             logger.debug(f"Skipping unchanged file: {file_path}")
             return True
 
+        # Extract document content
         document_content = self.extractor.extract(file_path)
 
-        await self.typesense.index_file(
-            file_path=file_path,
-            file_name=Path(file_path).name,
-            file_extension=Path(file_path).suffix.lower(),
-            file_size=operation.file_size,
-            mime_type=mimetypes.guess_type(file_path)[0] or "application/octet-stream",
-            content=document_content.content,
-            modified_time=int(operation.modified_time) if operation.modified_time is not None else None,
-            created_time=int(operation.created_time) if operation.created_time is not None else None,
-            file_hash=file_hash,
-            metadata=document_content.metadata,
-        )
+        # Import chunking utilities
+        from services.chunker import chunk_text, generate_chunk_hash, get_chunk_config
+
+        # Get chunking configuration
+        chunk_size, overlap = get_chunk_config()
+
+        # Split content into chunks
+        content_chunks = chunk_text(document_content.content, chunk_size, overlap)
+        total_chunks = len(content_chunks)
+
+        logger.info(f"Indexing {file_path} as {total_chunks} chunk(s)")
+
+        # Index each chunk
+        for chunk_index, chunk_content in enumerate(content_chunks):
+            chunk_hash = generate_chunk_hash(file_path, chunk_index, chunk_content)
+
+            # Essential metadata for ALL chunks (for UI display)
+            essential_metadata = {
+                "file_path": file_path,
+                "content": chunk_content,
+                "chunk_index": chunk_index,
+                "chunk_total": total_chunks,
+                "chunk_hash": chunk_hash,
+                "file_extension": Path(file_path).suffix.lower(),
+                "file_size": operation.file_size,
+                "mime_type": mimetypes.guess_type(file_path)[0] or "application/octet-stream",
+                "modified_time": int(operation.modified_time) if operation.modified_time is not None else None,
+            }
+
+            # Only chunk 0 gets additional metadata
+            if chunk_index == 0:
+                await self.typesense.index_file(
+                    **essential_metadata,
+                    # Additional metadata only in chunk 0
+                    created_time=int(operation.created_time) if operation.created_time is not None else None,
+                    file_hash=file_hash,
+                    metadata=document_content.metadata,
+                )
+            else:
+                # Other chunks: only essential metadata
+                await self.typesense.index_file(**essential_metadata)
+
         return True
 
     async def _handle_delete_operation(self, operation: CrawlOperation) -> bool:
