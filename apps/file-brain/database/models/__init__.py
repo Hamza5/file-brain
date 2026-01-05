@@ -6,6 +6,7 @@ from .base import Base, SessionLocal, db_session, engine, get_db, init_db, init_
 from .crawler_state import CrawlerState
 from .setting import Setting
 from .watch_path import WatchPath
+from .wizard_state import WizardState
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "WatchPath",
     "Setting",
     "CrawlerState",
+    "WizardState",
 ]

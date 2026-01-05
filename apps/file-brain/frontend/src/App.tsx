@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import TypesenseInstantSearchAdapter from "typesense-instantsearch-adapter";
 import { InstantSearch, Configure } from "react-instantsearch";
 import { StatusProvider, useStatus } from "./context/StatusContext";
@@ -8,9 +8,9 @@ import { Header } from "./components/Header";
 import { MainContent } from "./components/MainContent";
 import { PreviewSidebar } from "./components/PreviewSidebar";
 import { SettingsDialog } from "./components/SettingsDialog";
-import { InitializationOverlay } from "./components/InitializationOverlay";
+import { InitializationWizard } from "./components/InitializationWizard";
 import { InitializationStatusBar } from "./components/InitializationStatusBar";
-import { connectStatusStream, startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring } from "./api/client";
+import { connectStatusStream, startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus } from "./api/client";
 
 // Configure Typesense InstantSearch adapter
 const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
@@ -53,7 +53,7 @@ function AppContent() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
 
-  // Connect to crawler status stream
+  // Connect to crawler status stream (only after wizard completes)
   React.useEffect(() => {
     const disconnect = connectStatusStream((payload) => {
       setCrawlerStatus(payload.status);
@@ -101,7 +101,6 @@ function AppContent() {
   const hasFoldersConfigured = watchPaths.length > 0;
   const hasIndexedFiles = indexedCount > 0;
 
-
   return (
     <InstantSearch
       indexName="files"
@@ -147,14 +146,40 @@ function AppContent() {
 }
 
 export default function App() {
+  const [wizardCompleted, setWizardCompleted] = useState<boolean | null>(null);
+
+  // Check wizard status on mount
+  useEffect(() => {
+    const checkWizard = async () => {
+      try {
+        const status = await getWizardStatus();
+        setWizardCompleted(status.wizard_completed);
+      } catch (error) {
+        console.error("Failed to check wizard status:", error);
+        setWizardCompleted(false);
+      }
+    };
+    checkWizard();
+  }, []);
+
+  // Show loading while checking wizard status
+  if (wizardCompleted === null) {
+    return <div className="flex align-items-center justify-content-center h-screen">Loading...</div>;
+  }
+
+  // Show wizard if not completed
+  if (!wizardCompleted) {
+    return <InitializationWizard onComplete={() => setWizardCompleted(true)} />;
+  }
+
+  // Show main app only after wizard completion
   return (
-    <StatusProvider>
+    <StatusProvider enabled={wizardCompleted === true}>
       <NotificationProvider>
         <AppContent />
 
         {/* Global Confirm Dialog - Single instance for all delete operations */}
         <ConfirmDialog />
-        <InitializationOverlay />
         <InitializationStatusBar />
       </NotificationProvider>
     </StatusProvider>

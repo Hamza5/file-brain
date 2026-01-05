@@ -416,3 +416,174 @@ export function connectInitializationStream(
 
   return () => eventSource.close();
 }
+
+// Wizard API
+export interface WizardStatus {
+  wizard_completed: boolean;
+  docker_check_passed: boolean;
+  docker_services_started: boolean;
+  collection_created: boolean;
+  last_step_completed: number;
+  current_step: number;
+}
+
+export interface DockerCheckResult {
+  available: boolean;
+  command?: string;
+  version?: string;
+  error?: string;
+}
+
+export interface DockerService {
+  name: string;
+  service: string;
+  state: string;
+  status: string;
+  health: string;
+}
+
+export interface DockerStatusResult {
+  success: boolean;
+  running: boolean;
+  healthy: boolean;
+  services: DockerService[];
+  error?: string;
+}
+
+export async function getWizardStatus(): Promise<WizardStatus> {
+  return requestJSON("/api/v1/wizard/status");
+}
+export async function checkDockerInstallation(): Promise<DockerCheckResult> {
+  return requestJSON("/api/v1/wizard/docker-check");
+}
+
+export async function startDockerServices(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  return requestJSON("/api/v1/wizard/docker-start", { method: "POST" });
+}
+
+export async function getDockerStatus(): Promise<DockerStatusResult> {
+  return requestJSON("/api/v1/wizard/docker-status");
+}
+
+export interface DockerPullProgress {
+  image?: string;
+  layer_id?: string;
+  status?: string;
+  current?: number;
+  total?: number;
+  progress_percent?: number;
+  image_percent?: number;
+  overall_percent?: number;
+  progress_text?: string;
+  message?: string;
+  complete?: boolean;
+  error?: string;
+  heartbeat?: boolean;
+  timestamp?: number;
+}
+
+export function connectDockerPullStream(
+  onProgress: (data: DockerPullProgress) => void,
+  onError?: (error: string) => void,
+  onComplete?: () => void
+): () => void {
+  // Use GET for SSE (EventSource only supports GET)
+  const eventSource = new EventSource("/api/v1/wizard/docker-pull");
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data: DockerPullProgress = JSON.parse(event.data);
+      
+      if (data.error) {
+        if (onError) onError(data.error);
+        eventSource.close();
+      } else if (data.complete) {
+        onProgress(data);
+        if (onComplete) onComplete();
+        eventSource.close();
+      } else if (!data.heartbeat) {
+        onProgress(data);
+      }
+    } catch (e) {
+      console.error("Failed to parse docker pull event", e);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError("Connection lost");
+  };
+
+  return () => eventSource.close();
+}
+
+export function connectDockerLogsStream(
+  onLog: (log: string, timestamp: number) => void,
+  onError?: (error: string) => void
+): () => void {
+  const eventSource = new EventSource("/api/v1/wizard/docker-logs");
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.error) {
+        if (onError) onError(data.error);
+      } else if (data.log) {
+        onLog(data.log, data.timestamp);
+      }
+    } catch (e) {
+      console.error("Failed to parse docker log event", e);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError("Connection lost");
+  };
+
+  return () => eventSource.close();
+}
+
+export async function createTypesenseCollection(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  return requestJSON("/api/v1/wizard/collection-create", { method: "POST" });
+}
+
+export async function getCollectionStatus(): Promise<{
+  exists: boolean;
+  ready: boolean;
+  document_count?: number;
+  error?: string;
+}> {
+  return requestJSON("/api/v1/wizard/collection-status");
+}
+
+export async function restartTypesense(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  return requestJSON("/api/v1/wizard/restart-typesense", { method: "POST" });
+}
+
+export async function completeWizard(): Promise<{
+  success: boolean;
+  message?: string;
+}> {
+  return requestJSON("/api/v1/wizard/complete", { method: "POST" });
+}
+
+export async function resetWizard(): Promise<{
+  success: boolean;
+  message: string;
+  timestamp: number;
+}> {
+  return requestJSON("/api/v1/wizard/reset", { method: "POST" });
+}

@@ -8,12 +8,6 @@ services:
       # Tika runs on port 9998 by default
       TIKA_PORT: 9998
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9998/version"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     logging:
       driver: "json-file"
       options:
@@ -40,12 +34,6 @@ services:
               count: all
               capabilities: [ gpu ]
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8108/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
     logging:
       driver: "json-file"
       options:

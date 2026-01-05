@@ -40,7 +40,7 @@ interface StatusContextValue {
 
 const StatusContext = createContext<StatusContextValue | undefined>(undefined);
 
-export function StatusProvider({ children }: { children: ReactNode }) {
+export function StatusProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
   const [status, setStatus] = useState<CrawlStatus["status"] | null>(null);
   const [stats, setStats] = useState<CrawlStats | null>(null);
   const [systemInitialization, setSystemInitialization] = useState<SystemInitialization | null>(null);
@@ -78,6 +78,12 @@ export function StatusProvider({ children }: { children: ReactNode }) {
 
   // Initial snapshot + SSE subscription with polling fallback
   useEffect(() => {
+    // Skip everything if not enabled (wizard not completed)
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     let stopStream: (() => void) | null = null;
     let stopInitStream: (() => void) | null = null;
     let pollTimer: number | null = null;
@@ -232,7 +238,7 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       if (stopInitStream) stopInitStream();
       stopPolling();
     };
-  }, [applySnapshot]);
+  }, [applySnapshot, enabled]); // Add enabled to dependencies
 
   const value = useMemo<StatusContextValue>(
     () => ({

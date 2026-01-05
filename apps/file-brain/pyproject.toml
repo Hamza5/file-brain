@@ -22,6 +22,8 @@ dependencies = [
     "rarfile (>=4.2,<5.0)",
     "flaskwebgui (>=1.1.8,<2.0.0)",
     "watchdog (>=6.0.0,<7.0.0)",
+    "docker (>=7.1.0,<8.0.0)",
+    "podman (>=5.6.0,<6.0.0)",
 ]
 
 

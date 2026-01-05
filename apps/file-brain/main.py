@@ -19,7 +19,6 @@ from core.config import settings
 from core.factory import create_app
 from core.frontend import setup_frontend_routes
 from core.initialization import (
-    background_init,
     critical_init,
     health_monitoring_loop,
 )
@@ -38,7 +37,7 @@ async def lifespan(app: FastAPI):
 
     try:
         await critical_init()
-        logger.info("🚀 Critical services ready - API starting immediately!")
+        logger.info("🚀 Database ready - API starting immediately!")
 
         # Start Vite Dev Server in Debug Mode
         if settings.debug:
@@ -52,8 +51,9 @@ async def lifespan(app: FastAPI):
             )
             logger.info(f"✅ Vite dev server started (PID: {vite_process.pid})")
 
-        asyncio.create_task(background_init())
+        # Start health monitoring loop (no automatic service initialization)
         asyncio.create_task(health_monitoring_loop())
+        logger.info("ℹ️  Complete the initialization wizard to set up remaining services")
     except Exception as e:
         logger.error(f"❌ Critical initialization failed: {e}")
         raise
@@ -62,6 +62,18 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     try:
+        # Stop docker containers if configured
+        from services.docker_manager import get_docker_manager
+
+        docker_manager = get_docker_manager()
+        if docker_manager.is_docker_available():
+            logger.info("🛑 Stopping docker containers...")
+            result = await docker_manager.stop_services()
+            if result.get("success"):
+                logger.info("✅ Docker containers stopped")
+            else:
+                logger.warning(f"⚠️ Failed to stop docker containers: {result.get('error')}")
+
         if vite_process:
             logger.info("🛑 Stopping Vite dev server...")
             vite_process.terminate()
