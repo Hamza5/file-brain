@@ -112,6 +112,79 @@ class DockerManager:
             logger.error(f"Error parsing docker-compose.yml: {e}")
             return []
 
+    async def check_required_images(self) -> Dict[str, any]:
+        """
+        Check if all required images from docker-compose are present locally
+
+        Returns:
+            Dictionary with status of images
+        """
+        if not self.docker_cmd:
+            return {"success": False, "error": "Docker/Podman not found"}
+
+        images = self._get_images_from_compose()
+        if not images:
+            return {"success": False, "error": "No images found in docker-compose.yml"}
+
+        missing_images = []
+        present_images = []
+
+        try:
+            # Get list of local images
+            # format: repository:tag
+            if self.docker_cmd == "docker":
+                cmd = [self.docker_cmd, "images", "--format", "{{.Repository}}:{{.Tag}}"]
+            else:
+                cmd = ["podman", "images", "--format", "{{.Repository}}:{{.Tag}}"]
+
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                logger.error(f"Failed to list images: {stderr.decode()}")
+                return {"success": False, "error": f"Failed to list images: {stderr.decode()}"}
+
+            local_images = set(stdout.decode().strip().split("\n"))
+
+            # Also add "latest" tag implicit handling if needed, but safer to match exactly what's in compose
+            # Some compose files use short names, docker images might output fulll names.
+            # We'll do a basic check.
+
+            for required_image in images:
+                # Handle cases where :latest might be implicit in one place but explicit in another
+                # But typically docker-compose pulls what is specified.
+
+                # Check for exact match first
+                found = False
+                if required_image in local_images:
+                    found = True
+
+                # If not found, try to match loosely (e.g. if image has no tag, assume latest)
+                if not found and ":" not in required_image:
+                    if f"{required_image}:latest" in local_images:
+                        found = True
+
+                if found:
+                    present_images.append(required_image)
+                else:
+                    missing_images.append(required_image)
+
+            return {
+                "success": True,
+                "all_present": len(missing_images) == 0,
+                "missing": missing_images,
+                "present": present_images,
+                "total_required": len(images),
+            }
+
+        except Exception as e:
+            logger.error(f"Error checking required images: {e}")
+            return {"success": False, "error": str(e)}
+
     async def pull_images_with_progress(self, progress_callback=None):
         """
         Pull docker images with real progress tracking using Docker SDK

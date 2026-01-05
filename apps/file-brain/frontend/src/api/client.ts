@@ -229,7 +229,6 @@ export async function addWatchPath(
   });
 }
 
-
 export async function clearWatchPaths(): Promise<void> {
   await requestJSON("/api/v1/config/watch-paths", {
     method: "DELETE",
@@ -457,6 +456,19 @@ export async function checkDockerInstallation(): Promise<DockerCheckResult> {
   return requestJSON("/api/v1/wizard/docker-check");
 }
 
+export interface DockerImagesCheckResult {
+  success: boolean;
+  all_present: boolean;
+  missing: string[];
+  present: string[];
+  total_required: number;
+  error?: string;
+}
+
+export async function checkDockerImages(): Promise<DockerImagesCheckResult> {
+  return requestJSON("/api/v1/wizard/docker-images-check");
+}
+
 export async function startDockerServices(): Promise<{
   success: boolean;
   message?: string;
@@ -497,7 +509,7 @@ export function connectDockerPullStream(
   eventSource.onmessage = (event) => {
     try {
       const data: DockerPullProgress = JSON.parse(event.data);
-      
+
       if (data.error) {
         if (onError) onError(data.error);
         eventSource.close();

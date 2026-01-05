@@ -7,7 +7,7 @@ import { Fieldset } from 'primereact/fieldset';
 import { Message } from 'primereact/message';
 import { InputSwitch } from 'primereact/inputswitch';
 import { confirmDialog } from 'primereact/confirmdialog';
-import { listWatchPaths, addWatchPath, deleteWatchPath, updateWatchPath, clearIndexes, type WatchPath } from '../api/client';
+import { listWatchPaths, addWatchPath, deleteWatchPath, updateWatchPath, clearIndexes, resetWizard, type WatchPath } from '../api/client';
 import { FolderSelectModal } from './FolderSelectModal';
 
 interface SettingsDialogProps {
@@ -21,6 +21,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
     const [folderPickerVisible, setFolderPickerVisible] = useState(false);
     const [isAddingExcluded, setIsAddingExcluded] = useState(false);
     const [clearingIndexes, setClearingIndexes] = useState(false);
+    const [resettingWizard, setResettingWizard] = useState(false);
     const toast = useRef<Toast>(null);
 
     const loadWatchPaths = async () => {
@@ -93,6 +94,43 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                     });
                 } finally {
                     setClearingIndexes(false);
+                }
+            }
+        });
+    };
+
+    const handleResetWizard = () => {
+        confirmDialog({
+            message: 'Are you sure you want to restart the configuration wizard? This will reset your setup progress, but your data and indexes will be preserved unless you choose to clear them separately.',
+            header: 'Restart Configuration Wizard',
+            icon: 'fa-solid fa-redo',
+            acceptClassName: 'p-button-warning',
+            rejectClassName: 'p-button-secondary',
+            acceptIcon: 'fa-solid fa-check',
+            rejectIcon: 'fa-solid fa-times',
+            accept: async () => {
+                setResettingWizard(true);
+                try {
+                    await resetWizard();
+                    toast.current?.show({
+                        severity: 'success',
+                        summary: 'Success',
+                        detail: 'Wizard reset successfully. Reloading...',
+                        life: 2000
+                    });
+                    // Reload page to start wizard
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } catch (error) {
+                    console.error("Failed to reset wizard:", error);
+                    toast.current?.show({
+                        severity: 'error',
+                        summary: 'Error',
+                        detail: 'Failed to reset wizard.',
+                        life: 5000
+                    });
+                    setResettingWizard(false);
                 }
             }
         });
@@ -281,6 +319,36 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                                 severity="danger"
                                 loading={clearingIndexes}
                                 onClick={handleClearIndexes}
+                            />
+                        </div>
+                    </div>
+                </Fieldset>
+
+                {/* System Reset Section */}
+                 <Fieldset
+                    legend={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <i className="fa-solid fa-power-off" style={{ color: 'var(--primary-color)' }} />
+                            <span>System Reset</span>
+                        </div>
+                    }
+                    toggleable
+                >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div className="flex align-items-center justify-content-between">
+                            <div>
+                                <h4 className="m-0 mb-1">Restart Wizard</h4>
+                                <p style={{ color: 'var(--text-color-secondary)', margin: 0, fontSize: '0.9rem' }}>
+                                    Reset the setup wizard to re-configure Docker services and collections.
+                                </p>
+                            </div>
+                            <Button
+                                label="Restart Wizard"
+                                icon="fa-solid fa-redo"
+                                severity="warning"
+                                outlined
+                                loading={resettingWizard}
+                                onClick={handleResetWizard}
                             />
                         </div>
                     </div>

@@ -131,6 +131,17 @@ async def check_docker():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/docker-images-check")
+async def check_docker_images():
+    """Check if required docker images are present locally"""
+    try:
+        docker_manager = get_docker_manager()
+        return await docker_manager.check_required_images()
+    except Exception as e:
+        logger.error(f"Error checking docker images: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/docker-pull")
 async def pull_docker_images():
     """Pull docker images with real progress updates via SSE"""
@@ -346,8 +357,9 @@ async def get_collection_status():
     try:
         typesense = get_typesense_client()
 
-        # Check if collection is ready (collection_ready property tells us if it exists and is ready)
-        ready = typesense.collection_ready
+        # Check if collection exists
+        # We explicitly check against Typesense instead of relying on the local flag
+        ready = await typesense.check_collection_exists()
 
         # Get document count if available
         doc_count = None
@@ -359,7 +371,7 @@ async def get_collection_status():
                 pass
 
         return CollectionStatusResponse(
-            exists=ready,  # If ready, it exists
+            exists=ready,
             ready=ready,
             document_count=doc_count,
         )

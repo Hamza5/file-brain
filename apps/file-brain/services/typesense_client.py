@@ -38,6 +38,18 @@ class TypesenseClient:
         # Flag to indicate whether the collection is confirmed ready.
         self.collection_ready = False
 
+    async def check_collection_exists(self) -> bool:
+        """Check if collection exists in Typesense"""
+        try:
+            self.client.collections[self.collection_name].retrieve()
+            self.collection_ready = True
+            return True
+        except typesense.exceptions.ObjectNotFound:
+            return False
+        except Exception as e:
+            logger.warning(f"Error checking if collection exists: {e}")
+            return False
+
     async def initialize_collection(
         self,
         max_attempts: int = 5,

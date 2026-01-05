@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Steps } from 'primereact/steps';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { Message } from 'primereact/message';
 import { Tag } from 'primereact/tag';
+import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog';
 import {
   checkDockerInstallation,
   startDockerServices,
@@ -76,6 +77,46 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
   };
 
   // Step 1: Pull Docker Images with real progress
+  
+  const checkImages = useCallback(async () => {
+     // Only check if we haven't already completed pulling (to avoid double skipping or issues)
+     if (pullComplete) return;
+
+     setLoading(true);
+     try {
+       const { checkDockerImages } = await import('../api/client');
+       const result = await checkDockerImages();
+       
+       if (result.success && result.all_present) {
+          console.log('Images already present, skipping pull...');
+          setPullState({
+            image: '',
+            status: 'Images found locally',
+            imagePercent: 100,
+            overallPercent: 100,
+            progressText: 'All required images are already present on this system.',
+          });
+          setPullComplete(true);
+          setLoading(false);
+          // Auto-advance
+          setTimeout(() => setActiveStep(2), 1500);
+       } else {
+         // Images missing, wait for user to click pull
+         setLoading(false);
+       }
+     } catch (err) {
+       console.error('Failed to check images:', err);
+       setLoading(false);
+     }
+  }, [pullComplete]);
+
+  // Check for existing images when step 1 becomes active
+  useEffect(() => {
+    if (activeStep === 1) {
+      checkImages();
+    }
+  }, [activeStep, checkImages]);
+
   const handlePullImages = () => {
     setLoading(true);
     setError(null);
@@ -127,6 +168,35 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
   };
 
   // Step 2: Start Docker Services
+
+  const checkExistingServices = useCallback(async () => {
+    // Avoid re-checking if we already know it's healthy
+    if (dockerStatus?.healthy) return;
+
+    setLoading(true);
+    try {
+      const status = await getDockerStatus();
+      setDockerStatus(status);
+      
+      if (status.healthy) {
+        console.log('Services already running and healthy, auto-advancing...');
+        setLoading(false);
+        setTimeout(() => setActiveStep(3), 1500);
+      } else {
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Failed to check existing services:', err);
+      setLoading(false);
+    }
+  }, [dockerStatus?.healthy]);
+
+  useEffect(() => {
+    if (activeStep === 2) {
+      checkExistingServices();
+    }
+  }, [activeStep, checkExistingServices]);
+
   const handleStartDockerServices = async () => {
     setLoading(true);
     setError(null);
@@ -184,6 +254,28 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
   };
 
   // Step 3: Create Typesense Collection
+  
+  const checkExistingCollection = useCallback(async () => {
+    // If we already know the status, don't re-fetch unless force check needed
+    if (collectionStatus) return;
+
+    setLoading(true);
+    try {
+      const status = await getCollectionStatus();
+      setCollectionStatus(status);
+      setLoading(false);
+    } catch (err) {
+      console.error('Failed to check collection status:', err);
+      setLoading(false);
+    }
+  }, [collectionStatus]);
+
+  useEffect(() => {
+    if (activeStep === 3) {
+      checkExistingCollection();
+    }
+  }, [activeStep, checkExistingCollection]);
+
   const handleCreateCollection = async () => {
     setLoading(true);
     setError(null);
@@ -247,28 +339,40 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
     }
   };
 
-  // Restart Typesense only (don't auto-trigger collection creation)
-  const handleRestartTypesense = async () => {
-    setLoading(true);
-    setError(null);
-    setCollectionStatus(null);
+  const handleResetCollection = () => {
+    confirmDialog({
+        message: 'Are you sure you want to reset the collection? This will DELETE all indexed data and start with a fresh index.',
+        header: 'Reset & Delete Data',
+        icon: 'fas fa-exclamation-triangle',
+        acceptClassName: 'p-button-warning',
+        rejectClassName: 'p-button-secondary',
+        acceptIcon: 'fas fa-trash',
+        rejectIcon: 'fas fa-times',
+        defaultFocus: 'reject',
+        accept: async () => {
+            setLoading(true);
+            setError(null);
+            setCollectionStatus(null);
+            
+            try {
+                // First restart/wipe typesense
+                const restartResult = await restartTypesense();
+                if (!restartResult.success) {
+                   throw new Error(restartResult.error || 'Failed to restart Typesense');
+                }
+                
+                // Wait for it to come back up slightly
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Then trigger creation
+                await handleCreateCollection();
 
-    try {
-      const restartResult = await restartTypesense();
-      if (!restartResult.success) {
-        setError(restartResult.error || 'Failed to restart Typesense');
-        setLoading(false);
-        return;
-      }
-
-      // Wait a bit for Typesense to be ready, then stop loading
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      setLoading(false);
-      // User can manually click "Create Collection" button now
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to restart Typesense');
-      setLoading(false);
-    }
+            } catch (err) {
+                 setError(err instanceof Error ? err.message : 'Failed to reset collection');
+                 setLoading(false);
+            }
+        }
+    });
   };
 
   // Step 4: Complete Wizard
@@ -487,7 +591,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                     </div>
                   </>
                 )}
-                {!loading && !dockerStatus && !error && (
+                {!loading && !error && (
                   <Button
                     label="Start Docker Services"
                     icon="fas fa-play"
@@ -520,14 +624,28 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
               model if configured.
             </p>
 
-            {collectionStatus?.ready ? (
+            {collectionStatus?.ready || collectionStatus?.exists ? (
               <>
-                <Message severity="success" text="Collection created successfully!" />
+                <Message severity="success" text="A search collection already exists." />
                 {collectionStatus.document_count !== undefined && (
-                  <div className="text-sm text-600">
-                    <strong>Documents:</strong> {collectionStatus.document_count}
+                  <div className="text-sm text-600 mb-2">
+                    <strong>Current Document Count:</strong> {collectionStatus.document_count}
                   </div>
                 )}
+                <div className="flex gap-3 justify-content-end">
+                    <Button
+                      label="Reset & Re-create"
+                      icon="fas fa-redo"
+                      onClick={handleResetCollection}
+                      severity="warning"
+                      outlined
+                    />
+                     <Button
+                      label="Skip & Continue"
+                      icon="fas fa-arrow-right"
+                      onClick={() => setActiveStep(4)}
+                    />
+                </div>
               </>
             ) : (
               <>
@@ -554,7 +672,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                     )}
                   </>
                 )}
-                {!loading && !collectionStatus && !error && (
+                {!loading && !error && (
                   <Button
                     label="Create Collection"
                     icon="fas fa-database"
@@ -566,10 +684,9 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                   <div className="flex flex-column gap-2">
                     <Message severity="error" text={error} />
                     <Button
-                      label="Restart Typesense"
+                      label="Retry Creation"
                       icon="fas fa-redo"
-                      onClick={handleRestartTypesense}
-                      severity="warning"
+                      onClick={handleCreateCollection}
                       size="large"
                     />
                   </div>
@@ -617,6 +734,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
 
         <Steps model={steps} activeIndex={activeStep} className="mb-5" />
 
+        <ConfirmDialog />
         <div className="mt-4">{renderStepContent()}</div>
       </Card>
     </div>
