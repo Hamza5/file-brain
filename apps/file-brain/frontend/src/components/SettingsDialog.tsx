@@ -242,12 +242,12 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
         <Dialog header="Settings" visible={visible} style={{ width: '50vw' }} onHide={onHide} breakpoints={{ '960px': '75vw', '641px': '100vw' }} maximizable>
             <Toast ref={toast} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                {/* Watched Folders Section */}
+                {/* Indexed Folders Section */}
                 <Fieldset
                     legend={
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <i className="fa-solid fa-folder-open" style={{ color: 'var(--primary-color)' }} />
-                            <span>Watched Folders</span>
+                            <span>Indexed Folders</span>
                         </div>
                     }
                     toggleable
@@ -293,7 +293,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ visible, onHide,
                             value={watchPaths}
                             itemTemplate={itemTemplate}
                             layout="list"
-                            emptyMessage="No folders watched yet."
+                            emptyMessage="No folders to index yet."
                         />
                     </div>
                 </Fieldset>

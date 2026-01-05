@@ -65,22 +65,22 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
             {"name": "keywords", "type": "string[]", "facet": True, "optional": True},
             # Content type information (optional - only in chunk 0)
             {"name": "content_type", "type": "string", "facet": True, "optional": True},
-            #            # Embedding for semantic search (required for all chunks)
-            #            {
-            #                "name": "embedding",
-            #                "type": "float[]",
-            #                "embed": {
-            #                    "from": [
-            #                        "title",
-            #                        "description",
-            #                        "subject",
-            #                        "keywords",
-            #                        "author",
-            #                        "content",
-            #                    ],
-            #                    "model_config": {"model_name": "ts/paraphrase-multilingual-mpnet-base-v2"},
-            #                },
-            #            },
+            # Embedding for semantic search (required for all chunks)
+            {
+                "name": "embedding",
+                "type": "float[]",
+                "embed": {
+                    "from": [
+                        "title",
+                        "description",
+                        "subject",
+                        "keywords",
+                        "author",
+                        "content",
+                    ],
+                    "model_config": {"model_name": "ts/paraphrase-multilingual-mpnet-base-v2"},
+                },
+            },
         ],
         "default_sorting_field": "chunk_index",
     }

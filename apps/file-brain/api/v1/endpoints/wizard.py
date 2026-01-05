@@ -421,17 +421,51 @@ async def restart_typesense():
             "typesense",
         ]
 
+        # Stop container first
         logger.info("Stopping Typesense...")
         proc = await asyncio.create_subprocess_exec(
             *stop_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         await proc.communicate()
 
-        logger.info("Removing Typesense container and volume...")
+        # Remove container
+        logger.info("Removing Typesense container...")
         proc = await asyncio.create_subprocess_exec(
             *rm_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         await proc.communicate()
+
+        # Explicitly remove the named volume
+        # We need to find the actual volume name first since it might be prefixed with project name
+        # Default project name is usually folder name (file-brain), so volume is file-brain_search-engine-data
+        # But to be safe we can inspect the volume or just try both common variants
+
+        # We'll use docker volume ls to find it
+        volume_name_filter = "search-engine-data"
+        find_vol_cmd = [
+            docker_manager.docker_cmd,
+            "volume",
+            "ls",
+            "--format",
+            "{{.Name}}",
+            "--filter",
+            f"name={volume_name_filter}",
+        ]
+
+        proc = await asyncio.create_subprocess_exec(
+            *find_vol_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        volumes = stdout.decode().strip().split("\n")
+
+        for vol in volumes:
+            if "search-engine-data" in vol:
+                logger.info(f"Removing named volume: {vol}")
+                rm_vol_cmd = [docker_manager.docker_cmd, "volume", "rm", "-f", vol]
+                proc = await asyncio.create_subprocess_exec(
+                    *rm_vol_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                )
+                await proc.communicate()
 
         logger.info("Starting fresh Typesense...")
         proc = await asyncio.create_subprocess_exec(

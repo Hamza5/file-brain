@@ -255,9 +255,16 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
 
   // Step 3: Create Typesense Collection
   
+  const [resetting, setResetting] = useState(false);
+
+  // ...
+
+  // Step 3: Create Typesense Collection
+  
   const checkExistingCollection = useCallback(async () => {
     // If we already know the status, don't re-fetch unless force check needed
-    if (collectionStatus) return;
+    // Also protect against race conditions if we are currently loading/resetting
+    if (collectionStatus || loading || resetting) return;
 
     setLoading(true);
     try {
@@ -268,7 +275,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
       console.error('Failed to check collection status:', err);
       setLoading(false);
     }
-  }, [collectionStatus]);
+  }, [collectionStatus, loading, resetting]);
 
   useEffect(() => {
     if (activeStep === 3) {
@@ -351,6 +358,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
         defaultFocus: 'reject',
         accept: async () => {
             setLoading(true);
+            setResetting(true);
             setError(null);
             setCollectionStatus(null);
             
@@ -370,6 +378,8 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
             } catch (err) {
                  setError(err instanceof Error ? err.message : 'Failed to reset collection');
                  setLoading(false);
+            } finally {
+                 setResetting(false);
             }
         }
     });
@@ -654,7 +664,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                 <ProgressBar mode="indeterminate" />
                 <div className="flex align-items-center gap-2 text-sm text-600">
                   <i className="fas fa-spinner fa-spin" />
-                  <span>Creating collection...</span>
+                  <span>{resetting ? 'Resetting & Re-creating collection...' : 'Creating collection...'}</span>
                 </div>
 
                     {/* Typesense logs viewer */}
