@@ -319,6 +319,126 @@ async def stream_docker_logs():
     )
 
 
+class ModelStatusResponse(BaseModel):
+    """Response model for model status"""
+
+    exists: bool
+    path: str
+    files: list
+    missing_files: list
+
+
+@router.get("/model-status", response_model=ModelStatusResponse)
+async def get_model_status():
+    """Check if embedding model is already downloaded"""
+    try:
+        from services.model_downloader import get_model_downloader
+
+        downloader = get_model_downloader()
+        status = downloader.check_model_exists()
+
+        return ModelStatusResponse(
+            exists=status["exists"],
+            path=status["path"],
+            files=status["files"],
+            missing_files=status["missing_files"],
+        )
+    except Exception as e:
+        logger.error(f"Error checking model status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/model-download")
+async def download_model():
+    """Download embedding model with progress updates via SSE"""
+    import json
+    from asyncio import Queue
+
+    from services.model_downloader import get_model_downloader
+
+    downloader = get_model_downloader()
+
+    async def event_generator():
+        """Generate SSE events from model download progress"""
+
+        # First check if model already exists
+        status = downloader.check_model_exists()
+        if status["exists"]:
+            yield (
+                "data: "
+                + json.dumps(
+                    {
+                        "status": "complete",
+                        "message": "Model already downloaded",
+                        "complete": True,
+                        "progress_percent": 100,
+                    }
+                )
+                + "\n\n"
+            )
+            return
+
+        # Use a queue to collect progress events
+        progress_queue: Queue = Queue()
+        download_complete = False
+        download_error = None
+
+        async def progress_callback(data: dict):
+            """Callback for each progress event"""
+            logger.debug(f"Model download progress: {data}")
+            await progress_queue.put(data)
+
+        # Start download in background task
+        import asyncio
+
+        async def do_download():
+            nonlocal download_complete, download_error
+            try:
+                logger.info("Starting model download...")
+                result = await downloader.download_model_with_progress(progress_callback)
+                logger.info(f"Model download completed: {result}")
+                if not result.get("success"):
+                    download_error = result.get("error")
+                download_complete = True
+                await progress_queue.put(None)  # Signal completion
+            except Exception as e:
+                logger.error(f"Model download error: {e}", exc_info=True)
+                download_error = str(e)
+                download_complete = True
+                await progress_queue.put(None)
+
+        asyncio.create_task(do_download())
+
+        # Stream progress events
+        logger.info("Starting model download SSE stream...")
+        while True:
+            try:
+                data = await asyncio.wait_for(progress_queue.get(), timeout=120.0)
+                if data is None:  # Completion signal
+                    logger.info("Model download complete signal received")
+                    if download_error:
+                        yield "data: " + json.dumps({"error": download_error}) + "\n\n"
+                    break
+                logger.debug(f"Sending model progress event: {data}")
+                yield "data: " + json.dumps({**data, "timestamp": time.time()}) + "\n\n"
+            except asyncio.TimeoutError:
+                logger.debug("Model download: sending heartbeat")
+                yield "data: " + json.dumps({"heartbeat": True}) + "\n\n"
+            except Exception as e:
+                logger.error(f"Error streaming model download: {e}")
+                yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @router.post("/collection-create", response_model=CollectionCreateResponse)
 async def create_collection():
     """Create Typesense collection (non-blocking - runs in background)"""

@@ -48,3 +48,6 @@ out/
 *.db
 *.db-shm
 *.db-wal
+
+# Typesense data
+typesense-data/

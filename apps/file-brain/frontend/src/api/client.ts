@@ -603,6 +603,72 @@ export function connectCollectionLogsStream(
   return () => eventSource.close();
 }
 
+// Model download API
+export interface ModelStatusResult {
+  exists: boolean;
+  path: string;
+  files: string[];
+  missing_files: string[];
+}
+
+export async function getModelStatus(): Promise<ModelStatusResult> {
+  return requestJSON("/api/v1/wizard/model-status");
+}
+
+export interface ModelDownloadProgress {
+  status?: string;
+  message?: string;
+  file?: string;
+  progress_percent?: number;
+  // Byte-level progress
+  file_percent?: number;
+  file_downloaded?: number;
+  file_total?: number;
+  total_downloaded?: number;
+  total_size?: number;
+  // Legacy fields
+  total_files?: number;
+  completed_files?: number;
+  complete?: boolean;
+  error?: string;
+  heartbeat?: boolean;
+  timestamp?: number;
+}
+
+export function connectModelDownloadStream(
+  onProgress: (data: ModelDownloadProgress) => void,
+  onError?: (error: string) => void,
+  onComplete?: () => void
+): () => void {
+  const eventSource = new EventSource("/api/v1/wizard/model-download");
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data: ModelDownloadProgress = JSON.parse(event.data);
+
+      if (data.error) {
+        if (onError) onError(data.error);
+        eventSource.close();
+      } else if (data.complete) {
+        onProgress(data);
+        if (onComplete) onComplete();
+        eventSource.close();
+      } else if (!data.heartbeat) {
+        onProgress(data);
+      }
+    } catch (e) {
+      console.error("Failed to parse model download event", e);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError("Connection lost");
+  };
+
+  return () => eventSource.close();
+}
+
 export async function createTypesenseCollection(): Promise<{
   success: boolean;
   message?: string;

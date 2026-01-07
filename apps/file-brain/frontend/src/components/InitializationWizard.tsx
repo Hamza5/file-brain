@@ -16,9 +16,13 @@ import {
   completeWizard,
   connectDockerPullStream,
   connectCollectionLogsStream,
+  getModelStatus,
+  connectModelDownloadStream,
   type DockerCheckResult,
   type DockerStatusResult,
   type DockerPullProgress,
+  type ModelStatusResult,
+  type ModelDownloadProgress,
 } from '../api/client';
 
 interface InitializationWizardProps {
@@ -33,6 +37,16 @@ interface PullState {
   progressText: string;
 }
 
+// Helper function to format bytes to human-readable string
+function formatBytes(bytes: number, decimals = 2): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
 export function InitializationWizard({ onComplete }: InitializationWizardProps) {
   const [activeStep, setActiveStep] = useState(0);
   const [dockerCheck, setDockerCheck] = useState<DockerCheckResult | null>(null);
@@ -44,11 +58,17 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
   const [pullLogs, setPullLogs] = useState<string[]>([]);
   const [pullComplete, setPullComplete] = useState(false);
   const [collectionLogs, setCollectionLogs] = useState<string[]>([]);
+  
+  // Model download state
+  const [modelStatus, setModelStatus] = useState<ModelStatusResult | null>(null);
+  const [modelDownloadProgress, setModelDownloadProgress] = useState<ModelDownloadProgress | null>(null);
+  const [modelDownloadComplete, setModelDownloadComplete] = useState(false);
 
   const steps = [
     { label: 'Docker Check' },
     { label: 'Pull Images' },
     { label: 'Start Services' },
+    { label: 'Download Model' },
     { label: 'Create Collection' },
     { label: 'Complete' },
   ];
@@ -99,7 +119,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
           });
           setPullComplete(true);
           setLoading(false);
-          // Auto-advance
+          // Auto-advance to Start Services step
           setTimeout(() => setActiveStep(2), 1500);
        } else {
          // Images missing, wait for user to click pull
@@ -258,9 +278,80 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
   
   const [resetting, setResetting] = useState(false);
 
-  // ...
+  // Step 3: Download Embedding Model
+  
+  const checkExistingModel = useCallback(async () => {
+    if (modelDownloadComplete) return;
 
-  // Step 3: Create Typesense Collection
+    setLoading(true);
+    try {
+      const status = await getModelStatus();
+      setModelStatus(status);
+      
+      if (status.exists) {
+        console.log('Model already downloaded, auto-advancing...');
+        setModelDownloadComplete(true);
+        setLoading(false);
+        setTimeout(() => setActiveStep(4), 1500);
+      } else {
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Failed to check model status:', err);
+      setLoading(false);
+    }
+  }, [modelDownloadComplete]);
+
+  useEffect(() => {
+    if (activeStep === 3) {
+      checkExistingModel();
+    }
+  }, [activeStep, checkExistingModel]);
+
+  const handleDownloadModel = () => {
+    setLoading(true);
+    setError(null);
+    // Set initial progress immediately to show "Connecting..." in UI
+    setModelDownloadProgress({
+      status: 'connecting',
+      message: 'Connecting to HuggingFace...',
+      progress_percent: 0,
+    });
+    setModelDownloadComplete(false);
+
+    console.log('Starting model download...');
+
+    const disconnect = connectModelDownloadStream(
+      (data: ModelDownloadProgress) => {
+        console.log('Model download progress:', data);
+
+        setModelDownloadProgress(data);
+
+        if (data.complete) {
+          console.log('Model download complete!');
+          setModelDownloadComplete(true);
+          setLoading(false);
+          setTimeout(() => setActiveStep(4), 1000);
+        }
+      },
+      (errorMsg: string) => {
+        console.error('Model download error:', errorMsg);
+        setError(errorMsg);
+        setLoading(false);
+      },
+      () => {
+        console.log('Model download stream closed');
+        setModelDownloadComplete(true);
+        setLoading(false);
+        setTimeout(() => setActiveStep(4), 1000);
+      }
+    );
+
+    // Cleanup on unmount
+    return () => disconnect();
+  };
+
+  // Step 4: Create Typesense Collection
   
   const checkExistingCollection = useCallback(async () => {
     // If we already know the status, don't re-fetch unless force check needed
@@ -279,7 +370,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
   }, [collectionStatus, loading, resetting]);
 
   useEffect(() => {
-    if (activeStep === 3) {
+    if (activeStep === 4) {
       checkExistingCollection();
     }
   }, [activeStep, checkExistingCollection]);
@@ -322,7 +413,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
             if (pollInterval) clearInterval(pollInterval);
             if (logsEventSource) logsEventSource();
             setLoading(false);
-            setTimeout(() => setActiveStep(4), 1000);
+            setTimeout(() => setActiveStep(5), 1000);
           }
         }, 1500);
       } else {
@@ -381,7 +472,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
     });
   };
 
-  // Step 4: Complete Wizard
+  // Step 5: Complete Wizard
   const handleComplete = async () => {
     setLoading(true);
     setError(null);
@@ -624,10 +715,99 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
       case 3:
         return (
           <div className="flex flex-column gap-3">
+            <h3 className="mt-0">Downloading Embedding Model</h3>
+            <p className="text-600 mt-0">
+              Downloading the AI embedding model from HuggingFace. This enables semantic search capabilities.
+              The model is approximately 1.1 GB.
+            </p>
+
+            {modelDownloadComplete ? (
+              <Message severity="success" text="Embedding model downloaded successfully!" />
+            ) : (
+              <>
+                {loading && modelDownloadProgress && (
+                  <>
+                    {/* Overall progress bar */}
+                    <div className="flex flex-column gap-2">
+                      <div className="flex justify-content-between align-items-center">
+                        <span className="font-semibold">Overall Progress</span>
+                        <span className="text-primary font-bold">{modelDownloadProgress.progress_percent || 0}%</span>
+                      </div>
+                      <ProgressBar value={modelDownloadProgress.progress_percent || 0} showValue={false} />
+                      {modelDownloadProgress.total_size && (
+                        <div className="text-xs text-500">
+                          {formatBytes(modelDownloadProgress.total_downloaded || 0)} / {formatBytes(modelDownloadProgress.total_size)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Current file info with file-level progress */}
+                    {modelDownloadProgress.file && (
+                      <div className="p-3 surface-100 border-round">
+                        <div className="flex justify-content-between align-items-center">
+                          <div className="flex align-items-center gap-2">
+                            <i className="fas fa-file text-primary" />
+                            <span className="font-semibold text-sm">{modelDownloadProgress.file}</span>
+                          </div>
+                          <span className="text-sm text-primary font-bold">{modelDownloadProgress.file_percent || 0}%</span>
+                        </div>
+                        {modelDownloadProgress.file_total && (
+                          <div className="mt-2">
+                            <ProgressBar value={modelDownloadProgress.file_percent || 0} showValue={false} style={{ height: '6px' }} />
+                            <div className="text-xs text-500 mt-1">
+                              {formatBytes(modelDownloadProgress.file_downloaded || 0)} / {formatBytes(modelDownloadProgress.file_total)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Status message */}
+                    {modelDownloadProgress.message && !modelDownloadProgress.file && (
+                      <div className="flex align-items-center gap-2 text-sm text-600">
+                        <i className="fas fa-spinner fa-spin" />
+                        <span>{modelDownloadProgress.message}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                {loading && !modelDownloadProgress && (
+                  <div className="flex align-items-center gap-2">
+                    <i className="fas fa-spinner fa-spin" />
+                    <span>Checking model status...</span>
+                  </div>
+                )}
+                {!loading && !modelDownloadComplete && modelStatus?.exists && (
+                  <>
+                    <Message severity="success" text="Model already downloaded!" />
+                    <Button
+                      label="Continue"
+                      icon="fas fa-arrow-right"
+                      onClick={() => setActiveStep(4)}
+                      size="large"
+                    />
+                  </>
+                )}
+                {!loading && !modelDownloadComplete && !modelStatus?.exists && (
+                  <Button
+                    label="Download Model"
+                    icon="fas fa-download"
+                    onClick={handleDownloadModel}
+                    size="large"
+                  />
+                )}
+              </>
+            )}
+            {error && <Message severity="error" text={error} />}
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="flex flex-column gap-3">
             <h3 className="mt-0">Creating Search Collection</h3>
             <p className="text-600 mt-0">
-              Setting up the Typesense search collection for indexing your files. This includes downloading the embedding
-              model if configured.
+              Setting up the Typesense search collection for indexing your files.
             </p>
 
             {collectionStatus?.ready || collectionStatus?.exists ? (
@@ -649,7 +829,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                      <Button
                       label="Skip & Continue"
                       icon="fas fa-arrow-right"
-                      onClick={() => setActiveStep(4)}
+                      onClick={() => setActiveStep(5)}
                     />
                 </div>
               </>
@@ -717,7 +897,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
           </div>
         );
 
-      case 4:
+      case 5:
         return (
           <div className="flex flex-column gap-3 align-items-center text-center">
             <i className="fas fa-check-circle text-6xl text-green-500" />
