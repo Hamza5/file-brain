@@ -333,7 +333,7 @@ export function FolderSelectModal({
                   }}
                 >
                   <i
-                    className="fas fa-hdd"
+                    className={`fas ${root.icon || "fa-hdd"}`}
                     aria-hidden="true"
                     style={{ fontSize: "1rem" }}
                   />

@@ -8,6 +8,8 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from core.paths import app_paths
+
 router = APIRouter(prefix="/fs", tags=["filesystem"])
 
 
@@ -16,6 +18,7 @@ class FsRoot(BaseModel):
     path: str
     type: str = "directory"
     isDefault: bool = False
+    icon: str | None = None
 
 
 class FsEntry(BaseModel):
@@ -68,8 +71,35 @@ def get_roots() -> list[FsRoot]:
                 name="Home",
                 path=str(home),
                 isDefault=True,
+                icon="fa-home",
             )
         )
+
+    # Add user media directories with icons
+    media_dirs = [
+        ("Documents", app_paths.user_documents_dir, "fa-file-lines"),
+        ("Downloads", app_paths.user_downloads_dir, "fa-download"),
+        ("Music", app_paths.user_music_dir, "fa-music"),
+        ("Pictures", app_paths.user_pictures_dir, "fa-image"),
+        ("Videos", app_paths.user_videos_dir, "fa-film"),
+    ]
+
+    for name, path_obj, icon in media_dirs:
+        try:
+            if path_obj.exists():
+                path_str = str(path_obj)
+                # Avoid duplicates
+                if not any(r.path == path_str for r in roots):
+                    roots.append(
+                        FsRoot(
+                            name=name,
+                            path=path_str,
+                            icon=icon,
+                        )
+                    )
+        except Exception:
+            # Platformdirs might return non-existent paths on some systems or error out
+            continue
 
     if _is_windows():
         drives = _list_windows_drives()
@@ -81,6 +111,7 @@ def get_roots() -> list[FsRoot]:
                     FsRoot(
                         name=path_str,
                         path=path_str,
+                        icon="fa-hdd",
                     )
                 )
     else:
@@ -91,6 +122,7 @@ def get_roots() -> list[FsRoot]:
                 FsRoot(
                     name="/",
                     path=str(root_path),
+                    icon="fa-hdd",
                 )
             )
 
@@ -101,6 +133,7 @@ def get_roots() -> list[FsRoot]:
                 name="/",
                 path="/",
                 isDefault=True,
+                icon="fa-hdd",
             )
         )
 

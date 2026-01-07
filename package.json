@@ -21,8 +21,8 @@
     "clean:images": "cd apps/file-brain && docker compose down --rmi local && echo '✅ Images removed (project only)'",
     "clean:images-full": "cd apps/file-brain && docker compose down --rmi local && docker image prune -af && echo '✅ Images and dependencies removed (shows realistic pull progress)'",
     "clean:docker": "cd apps/file-brain && docker compose down -v --rmi local && echo '✅ Docker cleaned: containers, volumes, and images removed (project only)'",
-    "clean:db": "rm -f apps/file-brain/file_brain.db && echo '✅ Database removed'",
-    "clean:typesense": "rm -rf apps/file-brain/typesense-data && echo '✅ Typesense data removed'",
+    "clean:db": "rm -f ~/.local/share/file-brain/file_brain.db && echo '✅ Database removed'",
+    "clean:typesense": "rm -rf ~/.local/share/file-brain/typesense-data && echo '✅ Typesense data removed'",
     "clean:all": "npm run clean:docker && npm run clean:db && npm run clean:typesense && echo '✅ Full cleanup complete - ready for fresh wizard test'",
     "clean:all-full": "npm run clean:images-full && npm run clean:volumes && npm run clean:db && npm run clean:typesense && echo '✅ Complete cleanup with dependencies - realistic wizard test'"
   },

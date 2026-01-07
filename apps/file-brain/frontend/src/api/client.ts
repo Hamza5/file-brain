@@ -257,6 +257,7 @@ export interface FsRoot {
   path: string;
   type: "directory";
   isDefault?: boolean;
+  icon?: string;
 }
 
 export interface FsEntry {

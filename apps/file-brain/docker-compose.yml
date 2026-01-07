@@ -26,7 +26,7 @@ services:
       TYPESENSE_HEALTHY_WRITE_LAG: 5000
     volumes:
       - search-engine-data:/data
-      - ./typesense-data/models:/data/models
+      - ${TYPESENSE_MODELS_DIR}:/data/models
     deploy:
       resources:
         reservations:

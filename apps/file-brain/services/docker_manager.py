@@ -3,6 +3,7 @@ Docker Manager Service - Manages docker-compose lifecycle and container monitori
 """
 
 import asyncio
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -524,11 +525,18 @@ class DockerManager:
                 # Podman uses podman-compose
                 cmd = ["podman-compose", "-f", str(self.compose_file), "up", "-d"]
 
+            # Inject environment variables from app_paths
+            from core.paths import app_paths
+
+            env = os.environ.copy()
+            env.update(app_paths.get_env_vars())
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=self.compose_file.parent,
+                env=env,
             )
 
             stdout, stderr = await process.communicate()
@@ -576,11 +584,18 @@ class DockerManager:
             else:
                 cmd = ["podman-compose", "-f", str(self.compose_file), "down"]
 
+            # Inject environment variables from app_paths
+            from core.paths import app_paths
+
+            env = os.environ.copy()
+            env.update(app_paths.get_env_vars())
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=self.compose_file.parent,
+                env=env,
             )
 
             stdout, stderr = await process.communicate()
@@ -622,11 +637,18 @@ class DockerManager:
             else:
                 cmd = ["podman-compose", "-f", str(self.compose_file), "ps"]
 
+            # Inject environment variables from app_paths
+            from core.paths import app_paths
+
+            env = os.environ.copy()
+            env.update(app_paths.get_env_vars())
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=self.compose_file.parent,
+                env=env,
             )
 
             stdout, stderr = await process.communicate()

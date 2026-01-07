@@ -37,9 +37,10 @@ class ModelDownloader:
         if models_dir:
             self.models_dir = Path(models_dir)
         else:
-            # Default to typesense-data/models relative to app directory
-            app_dir = Path(__file__).parent.parent
-            self.models_dir = app_dir / "typesense-data" / "models"
+            # Default to platform-specific app data directory
+            from core.paths import app_paths
+
+            self.models_dir = app_paths.models_dir
 
     def get_model_path(self) -> Path:
         """Get the full path to the model directory"""

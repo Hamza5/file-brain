@@ -2,21 +2,21 @@
 Database base configuration and setup
 """
 
-import os
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+from core.paths import app_paths
+
 Base = declarative_base()
 
 # Database setup
-# Get the directory of this file
-_current_dir = os.path.dirname(os.path.abspath(__file__))
-# Navigate up to the app root (apps/file-brain)
-_app_root = os.path.abspath(os.path.join(_current_dir, "..", ".."))
-DATABASE_PATH = os.path.join(_app_root, "file_brain.db")
+
+
+# Database setup
+DATABASE_PATH = str(app_paths.database_file)
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 engine = create_engine(
