@@ -152,15 +152,6 @@ async def init_typesense_for_wizard():
         logger.info("Initializing Typesense...")
         typesense = get_typesense_client()
 
-        async def typesense_health_check():
-            try:
-                await typesense.get_collection_stats()
-                return {"healthy": True, "collection": typesense.collection_name}
-            except Exception as e:
-                return {"healthy": False, "error": str(e)}
-
-        service_manager.register_health_checker("typesense", typesense_health_check)
-
         await typesense.initialize_collection()
         if typesense.collection_ready:
             service_manager.set_ready(
@@ -198,30 +189,6 @@ async def init_tika_for_wizard():
 
     try:
         logger.info("Initializing Tika...")
-
-        async def tika_health_check():
-            try:
-                import aiohttp
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        f"{settings.tika_url}/version",
-                        timeout=aiohttp.ClientTimeout(total=5),
-                    ) as response:
-                        if response.status == 200:
-                            return {
-                                "healthy": True,
-                                "endpoint": settings.tika_url,
-                                "client_only": settings.tika_client_only,
-                            }
-                        return {
-                            "healthy": False,
-                            "error": f"Tika server returned status {response.status}",
-                        }
-            except Exception as e:
-                return {"healthy": False, "error": str(e)}
-
-        service_manager.register_health_checker("tika", tika_health_check)
 
         service_manager.set_ready(
             "tika",

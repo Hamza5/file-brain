@@ -165,7 +165,6 @@ async def pull_docker_images():
 
         async def progress_callback(data: dict):
             """Callback for each progress event"""
-            logger.debug(f"Progress callback received: {data}")
             await progress_queue.put(data)
 
         # Start pull in background task
@@ -195,14 +194,11 @@ async def pull_docker_images():
             try:
                 data = await asyncio.wait_for(progress_queue.get(), timeout=60.0)
                 if data is None:  # Completion signal
-                    logger.info("Pull complete signal received")
                     if pull_error:
                         yield "data: " + json.dumps({"error": pull_error}) + "\n\n"
                     break
-                logger.debug(f"Sending progress event: {data}")
                 yield "data: " + json.dumps({**data, "timestamp": time.time()}) + "\n\n"
             except asyncio.TimeoutError:
-                logger.debug("Sending heartbeat")
                 yield "data: " + json.dumps({"heartbeat": True}) + "\n\n"
             except Exception as e:
                 logger.error(f"Error streaming docker pull: {e}")
@@ -385,7 +381,6 @@ async def download_model():
 
         async def progress_callback(data: dict):
             """Callback for each progress event"""
-            logger.debug(f"Model download progress: {data}")
             await progress_queue.put(data)
 
         # Start download in background task
@@ -415,14 +410,11 @@ async def download_model():
             try:
                 data = await asyncio.wait_for(progress_queue.get(), timeout=120.0)
                 if data is None:  # Completion signal
-                    logger.info("Model download complete signal received")
                     if download_error:
                         yield "data: " + json.dumps({"error": download_error}) + "\n\n"
                     break
-                logger.debug(f"Sending model progress event: {data}")
                 yield "data: " + json.dumps({**data, "timestamp": time.time()}) + "\n\n"
             except asyncio.TimeoutError:
-                logger.debug("Model download: sending heartbeat")
                 yield "data: " + json.dumps({"heartbeat": True}) + "\n\n"
             except Exception as e:
                 logger.error(f"Error streaming model download: {e}")
@@ -615,63 +607,6 @@ async def restart_typesense():
     except Exception as e:
         logger.error(f"Error restarting Typesense: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/typesense-logs")
-async def stream_typesense_logs():
-    """Stream Typesense container logs via Server-Sent Events"""
-    import asyncio
-    import json
-
-    async def event_generator():
-        """Generate SSE events from Typesense container logs"""
-        docker_manager = get_docker_manager()
-
-        try:
-            # Check if docker is available
-            if not docker_manager.is_docker_available():
-                yield f"data: {json.dumps({'error': 'Docker/Podman not found'})}\n\n"
-                return
-
-            # Build logs command for typesense service
-            logs_cmd = [
-                docker_manager.docker_cmd,
-                "compose",
-                "-f",
-                str(docker_manager.compose_file),
-                "logs",
-                "-f",
-                "--tail=50",
-                "typesense",
-            ]
-
-            # Start streaming logs
-            proc = await asyncio.create_subprocess_exec(
-                *logs_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
-            )
-
-            # Stream output line by line
-            while True:
-                line = await proc.stdout.readline()
-                if not line:
-                    break
-
-                log_line = line.decode().strip()
-                if log_line:
-                    yield f"data: {json.dumps({'log': log_line, 'timestamp': time.time()})}\n\n"
-
-        except Exception as e:
-            logger.error(f"Error streaming Typesense logs: {e}")
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
 
 
 @router.get("/collection-logs")

@@ -34,7 +34,7 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
     // - Group by file_path to deduplicate (one result per file)
     // - Relevance determines which chunk is shown (best match)
     // - All chunks have essential metadata (file_extension, file_size, mime_type, modified_time)
-    query_by: "file_path,content,title,description,subject,keywords,author,comments,producer,application",
+    query_by: "file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
     exclude_fields: "embedding",
     group_by: "file_path", // Deduplicate: show each file once
     group_limit: 1, // Show the most relevant chunk per file

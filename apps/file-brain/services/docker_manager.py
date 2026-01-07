@@ -683,21 +683,15 @@ class DockerManager:
                     "typesense", "http://localhost:8108/debug", headers={"X-TYPESENSE-API-KEY": "xyz-typesense-key"}
                 )
 
-                logger.info(f"Service health results: tika={tika_healthy}, typesense={typesense_healthy}")
-                logger.info(f"Services before health update: {services}")
-
                 # Update services with actual health status
                 for service in services:
                     service_name = service.get("service", "").lower()
                     if "tika" in service_name:
                         service["health"] = "healthy" if tika_healthy else "unhealthy"
-                        logger.info(f"Set {service_name} health to {service['health']}")
                     elif "typesense" in service_name:
                         service["health"] = "healthy" if typesense_healthy else "unhealthy"
-                        logger.info(f"Set {service_name} health to {service['health']}")
 
                 overall_healthy = all(s.get("health") == "healthy" for s in services) if services else False
-                logger.info(f"Overall healthy status: {overall_healthy}, services: {services}")
 
                 return {
                     "success": True,

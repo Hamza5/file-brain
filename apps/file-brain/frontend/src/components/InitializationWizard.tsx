@@ -109,7 +109,6 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
        const result = await checkDockerImages();
        
        if (result.success && result.all_present) {
-          console.log('Images already present, skipping pull...');
           setPullState({
             image: '',
             status: 'Images found locally',
@@ -125,8 +124,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
          // Images missing, wait for user to click pull
          setLoading(false);
        }
-     } catch (err) {
-       console.error('Failed to check images:', err);
+     } catch {
        setLoading(false);
      }
   }, [pullComplete]);
@@ -145,12 +143,8 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
     setPullLogs([]);
     setPullComplete(false);
 
-    console.log('Starting Docker pull...');
-
     const disconnect = connectDockerPullStream(
       (data: DockerPullProgress) => {
-        console.log('Progress event received:', data);
-        
         // Add to logs
         const logMessage = data.status || data.message || JSON.stringify(data);
         setPullLogs(prev => [...prev, logMessage]);
@@ -165,19 +159,16 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
         });
 
         if (data.complete) {
-          console.log('Pull complete!');
           setPullComplete(true);
           setLoading(false);
           setTimeout(() => setActiveStep(2), 1000);
         }
       },
       (errorMsg: string) => {
-        console.error('Pull error:', errorMsg);
         setError(errorMsg);
         setLoading(false);
       },
       () => {
-        console.log('Pull stream closed');
         setPullComplete(true);
         setLoading(false);
         setTimeout(() => setActiveStep(2), 1000);
@@ -200,14 +191,12 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
       setDockerStatus(status);
       
       if (status.healthy) {
-        console.log('Services already running and healthy, auto-advancing...');
         setLoading(false);
         setTimeout(() => setActiveStep(3), 1500);
       } else {
         setLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to check existing services:', err);
+    } catch {
       setLoading(false);
     }
   }, [dockerStatus?.healthy]);
@@ -229,28 +218,15 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
         // Poll for docker status
         const pollInterval = setInterval(async () => {
           const status = await getDockerStatus();
-          console.log('===== DOCKER STATUS POLL =====');
-          console.log('Status object:', status);
-          console.log('status.healthy:', status.healthy);
-          console.log('status.running:', status.running);
-          console.log('services:', status.services);
-          console.log('==============================');
-          
           setDockerStatus(status);
 
           // Auto-proceed after services become healthy
           if (status.healthy) {
-            console.log('🎉 Services are healthy! Auto-progressing in 2 seconds...');
-            // Clear all intervals
             intervals.forEach(clearInterval);
             setLoading(false);
-            // Auto-advance after 2 seconds to show success state
             setTimeout(() => {
-              console.log('✅ Auto-progressing to step 3 NOW');
               setActiveStep(3);
             }, 2000);
-          } else {
-            console.log('⏳ Services not healthy yet, will retry in 2s');
           }
         }, 2000);
         intervals.push(pollInterval);
@@ -289,15 +265,13 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
       setModelStatus(status);
       
       if (status.exists) {
-        console.log('Model already downloaded, auto-advancing...');
         setModelDownloadComplete(true);
         setLoading(false);
         setTimeout(() => setActiveStep(4), 1500);
       } else {
         setLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to check model status:', err);
+    } catch {
       setLoading(false);
     }
   }, [modelDownloadComplete]);
@@ -319,28 +293,21 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
     });
     setModelDownloadComplete(false);
 
-    console.log('Starting model download...');
-
     const disconnect = connectModelDownloadStream(
       (data: ModelDownloadProgress) => {
-        console.log('Model download progress:', data);
-
         setModelDownloadProgress(data);
 
         if (data.complete) {
-          console.log('Model download complete!');
           setModelDownloadComplete(true);
           setLoading(false);
           setTimeout(() => setActiveStep(4), 1000);
         }
       },
       (errorMsg: string) => {
-        console.error('Model download error:', errorMsg);
         setError(errorMsg);
         setLoading(false);
       },
       () => {
-        console.log('Model download stream closed');
         setModelDownloadComplete(true);
         setLoading(false);
         setTimeout(() => setActiveStep(4), 1000);
@@ -363,8 +330,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
       const status = await getCollectionStatus();
       setCollectionStatus(status);
       setLoading(false);
-    } catch (err) {
-      console.error('Failed to check collection status:', err);
+    } catch {
       setLoading(false);
     }
   }, [collectionStatus, loading, resetting]);
@@ -386,18 +352,17 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
     try {
       logsEventSource = connectCollectionLogsStream(
         (log) => {
-          setCollectionLogs(prev => [...prev.slice(-100), log]); // Keep last 100 lines
+          setCollectionLogs(prev => [...prev.slice(-100), log]);
         },
-        (status) => {
+        () => {
           // Stream completed
-          console.log('Collection creation completed with status:', status);
         },
-        (error) => {
-          console.error('Collection logs stream error:', error);
+        () => {
+          // Log stream error
         }
       );
-    } catch (e) {
-      console.error('Error connecting to collection logs stream:', e);
+    } catch {
+      // Error connecting to logs stream
     }
 
     try {
