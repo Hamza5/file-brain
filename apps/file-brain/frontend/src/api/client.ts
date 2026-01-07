@@ -560,6 +560,49 @@ export function connectDockerLogsStream(
   return () => eventSource.close();
 }
 
+export interface CollectionLogEvent {
+  log?: string;
+  status?: string;
+  complete?: boolean;
+  heartbeat?: boolean;
+  error?: string;
+  timestamp: number;
+}
+
+export function connectCollectionLogsStream(
+  onLog: (log: string, timestamp: number) => void,
+  onComplete?: (status: string) => void,
+  onError?: (error: string) => void
+): () => void {
+  const eventSource = new EventSource("/api/v1/wizard/collection-logs");
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data: CollectionLogEvent = JSON.parse(event.data);
+      
+      if (data.error) {
+        if (onError) onError(data.error);
+        eventSource.close();
+      } else if (data.complete) {
+        if (onComplete && data.status) onComplete(data.status);
+        eventSource.close();
+      } else if (data.log) {
+        onLog(data.log, data.timestamp);
+      }
+      // Ignore heartbeat messages
+    } catch (e) {
+      console.error("Failed to parse collection log event", e);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError("Connection lost");
+  };
+
+  return () => eventSource.close();
+}
+
 export async function createTypesenseCollection(): Promise<{
   success: boolean;
   message?: string;

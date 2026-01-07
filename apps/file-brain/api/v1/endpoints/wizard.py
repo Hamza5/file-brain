@@ -321,34 +321,45 @@ async def stream_docker_logs():
 
 @router.post("/collection-create", response_model=CollectionCreateResponse)
 async def create_collection():
-    """Create Typesense collection"""
-    try:
-        typesense = get_typesense_client()
+    """Create Typesense collection (non-blocking - runs in background)"""
+    import asyncio
 
-        # Initialize collection
-        await typesense.initialize_collection()
+    async def _create_collection_task():
+        """Background task to create collection"""
+        from services.service_manager import get_service_manager
 
-        # Check if collection is ready
-        if typesense.collection_ready:
-            # Update wizard state
-            with db_session() as db:
-                repo = WizardStateRepository(db)
-                repo.update_collection_created(True)
-                repo.update_last_step(2)
+        # Reset service state and clear logs for fresh start
+        service_manager = get_service_manager()
+        service_manager.reset_service_for_retry("typesense")
 
-            return CollectionCreateResponse(
-                success=True,
-                message="Collection created successfully",
-            )
-        else:
-            return CollectionCreateResponse(
-                success=False,
-                error="Collection creation failed",
-            )
+        try:
+            typesense = get_typesense_client()
 
-    except Exception as e:
-        logger.error(f"Error creating collection: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+            # Initialize collection
+            await typesense.initialize_collection()
+
+            # Check if collection is ready
+            if typesense.collection_ready:
+                # Update wizard state
+                with db_session() as db:
+                    repo = WizardStateRepository(db)
+                    repo.update_collection_created(True)
+                    repo.update_last_step(2)
+                logger.info("Collection creation completed successfully")
+            else:
+                logger.error("Collection creation failed")
+
+        except Exception as e:
+            logger.error(f"Error creating collection: {e}", exc_info=True)
+
+    # Start the background task
+    asyncio.create_task(_create_collection_task())
+
+    # Return immediately
+    return CollectionCreateResponse(
+        success=True,
+        message="Collection creation started in background",
+    )
 
 
 @router.get("/collection-status", response_model=CollectionStatusResponse)
@@ -539,6 +550,70 @@ async def stream_typesense_logs():
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+        },
+    )
+
+
+@router.get("/collection-logs")
+async def stream_collection_logs():
+    """Stream Typesense Docker container logs via SSE"""
+    import asyncio
+    import json
+
+    async def event_generator():
+        """Generate SSE events from Typesense container logs"""
+        docker_manager = get_docker_manager()
+
+        try:
+            # Check if docker is available
+            if not docker_manager.is_docker_available():
+                yield f"data: {json.dumps({'error': 'Docker/Podman not found'})}\n\n"
+                return
+
+            # Build logs command for typesense service
+            logs_cmd = [
+                docker_manager.docker_cmd,
+                "compose",
+                "-f",
+                str(docker_manager.compose_file),
+                "logs",
+                "-f",
+                "--tail=50",
+                "typesense",
+            ]
+
+            # Start streaming logs
+            proc = await asyncio.create_subprocess_exec(
+                *logs_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
+            )
+
+            # Stream output line by line
+            while True:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+
+                log_line = line.decode().strip()
+                if log_line:
+                    yield f"data: {json.dumps({'log': log_line, 'timestamp': time.time()})}\n\n"
+
+        except asyncio.CancelledError:
+            logger.info("Collection logs stream cancelled")
+            if proc:
+                proc.terminate()
+                await proc.wait()
+            raise
+        except Exception as e:
+            logger.error(f"Error streaming collection logs: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         },
     )
 

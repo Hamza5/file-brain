@@ -15,6 +15,7 @@ import {
   restartTypesense,
   completeWizard,
   connectDockerPullStream,
+  connectCollectionLogsStream,
   type DockerCheckResult,
   type DockerStatusResult,
   type DockerPullProgress,
@@ -288,62 +289,57 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
     setError(null);
     setCollectionLogs([]);
     let pollInterval: NodeJS.Timeout | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
-    let logsEventSource: EventSource | null = null;
+    let logsEventSource: (() => void) | null = null;
 
-    // Start logs stream
+    // Connect to collection logs stream FIRST
     try {
-      logsEventSource = new EventSource('/api/v1/wizard/typesense-logs');
-      logsEventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.log) {
-            setCollectionLogs(prev => [...prev.slice(-100), data.log]); // Keep last 100 lines
-          }
-        } catch (e) {
-          console.error('Error parsing log event:', e);
+      logsEventSource = connectCollectionLogsStream(
+        (log) => {
+          setCollectionLogs(prev => [...prev.slice(-100), log]); // Keep last 100 lines
+        },
+        (status) => {
+          // Stream completed
+          console.log('Collection creation completed with status:', status);
+        },
+        (error) => {
+          console.error('Collection logs stream error:', error);
         }
-      };
+      );
     } catch (e) {
-      console.error('Error connecting to logs stream:', e);
+      console.error('Error connecting to collection logs stream:', e);
     }
 
     try {
+      // Now trigger collection creation (non-blocking)
       const result = await createTypesenseCollection();
       if (result.success) {
-        // Poll for collection status
+        // Poll for collection status (no timeout - let it run until complete)
         pollInterval = setInterval(async () => {
           const status = await getCollectionStatus();
           setCollectionStatus(status);
 
           if (status.ready) {
             if (pollInterval) clearInterval(pollInterval);
-            if (timeoutId) clearTimeout(timeoutId);
-            if (logsEventSource) logsEventSource.close();
-            setLoading(false); // Set loading to false here when ready
+            if (logsEventSource) logsEventSource();
+            setLoading(false);
             setTimeout(() => setActiveStep(4), 1000);
           }
         }, 1500);
-
-        // Timeout after 1 minute
-        timeoutId = setTimeout(() => {
-          if (pollInterval) {
-            clearInterval(pollInterval); // Stop polling
-            if (logsEventSource) logsEventSource.close();
-            setError('Collection creation timed out. Typesense might not be running or accessible.');
-            setLoading(false);
-          }
-        }, 60000);
       } else {
-        if (logsEventSource) logsEventSource.close();
+        if (logsEventSource) logsEventSource();
         setError(result.error || 'Failed to create collection');
         setLoading(false);
       }
     } catch (err) {
-      if (logsEventSource) logsEventSource.close();
+      if (logsEventSource) logsEventSource();
       setError(err instanceof Error ? err.message : 'Failed to create collection');
       setLoading(false);
     }
+  };
+
+  const handleStopCollectionCreation = () => {
+    setLoading(false);
+    setError('Collection creation stopped by user');
   };
 
   const handleResetCollection = () => {
@@ -680,6 +676,21 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                         </code>
                       </div>
                     )}
+
+                    {/* Stop button during creation */}
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        label="Stop Creation"
+                        icon="fas fa-stop"
+                        onClick={handleStopCollectionCreation}
+                        severity="secondary"
+                        outlined
+                      />
+                      <div className="text-sm text-600 flex align-items-center">
+                        <i className="fas fa-info-circle mr-2" />
+                        Model downloads can take 5-10 minutes. Check logs for progress.
+                      </div>
+                    </div>
                   </>
                 )}
                 {!loading && !error && (

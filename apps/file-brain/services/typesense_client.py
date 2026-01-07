@@ -94,7 +94,8 @@ class TypesenseClient:
                     "Checking if search collection exists",
                 )
 
-                self.client.collections[self.collection_name].retrieve()
+                # Run blocking SDK call in thread to avoid blocking event loop
+                await asyncio.to_thread(self.client.collections[self.collection_name].retrieve)
 
                 service_manager.append_service_log(service_name, f"Collection '{self.collection_name}' already exists")
                 logger.info(f"Collection '{self.collection_name}' already exists (attempt {attempt}/{max_attempts})")
@@ -130,7 +131,8 @@ class TypesenseClient:
                     )
 
                     # Use the special client for collection creation
-                    collection_creation_client.collections.create(schema)
+                    # Run blocking SDK call in thread to avoid blocking event loop
+                    await asyncio.to_thread(collection_creation_client.collections.create, schema)
 
                     # Log success
                     service_manager.append_service_log(

@@ -198,7 +198,8 @@ class ServiceManager:
                     status.next_retry = None  # Max retries reached
                     self.append_service_log(service_name, f"Permanently failed: {error_message}")
                     logger.error(
-                        f"Service {service_name} failed permanently after {status.max_retries} attempts: {error_message}"
+                        f"Service {service_name} failed permanently after "
+                        f"{status.max_retries} attempts: {error_message}"
                     )
 
             elif state == ServiceState.INITIALIZING:
@@ -229,6 +230,19 @@ class ServiceManager:
         """Mark service as disabled"""
         details = {"disabled_reason": reason} if reason else {}
         self.update_service_state(service_name, ServiceState.DISABLED, details=details)
+
+    def reset_service_for_retry(self, service_name: str):
+        """Reset service state and clear logs for a fresh retry attempt"""
+        with self._lock:
+            if service_name in self._services:
+                status = self._services[service_name]
+                # Clear logs
+                status.initialization_log.clear()
+                # Reset state to NOT_STARTED
+                status.state = ServiceState.NOT_STARTED
+                status.current_phase = None
+                status.error_message = None
+                logger.info(f"Service {service_name} reset for retry")
 
     async def check_service_health(self, service_name: str) -> Dict[str, Any]:
         """Perform health check for a specific service"""

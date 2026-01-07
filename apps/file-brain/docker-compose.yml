@@ -16,16 +16,16 @@ services:
 
   # Typesense Search Engine (with GPU support)
   typesense:
-    image: typesense/typesense:29.0
+    image: hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
     container_name: file-brain-search-engine
     network_mode: "host"
     environment:
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}
       TYPESENSE_DATA_DIR: /data
+      TYPESENSE_HEALTHY_READ_LAG: 5000
+      TYPESENSE_HEALTHY_WRITE_LAG: 5000
     volumes:
       - search-engine-data:/data
-    command: >
-      --data-dir /data --api-key=${TYPESENSE_API_KEY:-xyz-typesense-key}
     deploy:
       resources:
         reservations:
