@@ -68,7 +68,7 @@ export function ServiceStatusCard({ service }: ServiceStatusCardProps) {
         <div className="mb-2">
           <div className="flex justify-content-between text-sm mb-1 text-700">
             <span>{service.current_phase?.message || service.error || "Waiting..."}</span>
-            <span>{progress.toFixed(0)}%</span>
+            <span>{progress.toFixed(2)}%</span>
           </div>
           <ProgressBar 
             value={progress} 

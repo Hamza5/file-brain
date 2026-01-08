@@ -3,7 +3,6 @@ Crawl Job Manager - coordinates discovery and indexing
 """
 
 import asyncio
-import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -14,9 +13,9 @@ from database.repositories import CrawlerStateRepository
 from services.crawler.discoverer import FileDiscoverer
 from services.crawler.indexer import FileIndexer
 from services.crawler.monitor import FileMonitorService
-from services.crawler.progress import DiscoveryProgress, IndexingProgress
+from services.crawler.progress import CrawlProgressTracker
 from services.crawler.queue import DedupQueue
-from services.crawler.verification import IndexVerifier, VerificationProgress
+from services.crawler.verification import IndexVerifier
 from services.typesense_client import get_typesense_client
 
 
@@ -39,9 +38,10 @@ class CrawlJobManager:
         self._indexing_task = asyncio.create_task(self._process_queue())
 
         # Progress tracking
-        self.discovery_progress = DiscoveryProgress()
-        self.indexing_progress = IndexingProgress()
-        self.verification_progress = VerificationProgress()
+        self.tracker = CrawlProgressTracker()
+        self.discovery_progress = self.tracker.discovery
+        self.indexing_progress = self.tracker.indexing
+        self.verification_progress = self.tracker.verification
         self._start_time: Optional[datetime] = None
 
         # Restore monitoring state on init
@@ -139,10 +139,7 @@ class CrawlJobManager:
             files_indexed,
         )
 
-        indexing_pct = 0
-        if total_known > 0:
-            indexing_pct = int((files_indexed / total_known) * 100)
-            indexing_pct = min(indexing_pct, 100)
+        indexing_pct = self.tracker.get_indexing_percent(total_known)
 
         current_phase = "discovering" if discovery_pct < 100 else "indexing"
         if not self.verification_progress.is_complete:
@@ -180,8 +177,11 @@ class CrawlJobManager:
 
         # Reset progress
         self.discoverer.files_found = 0
-        self.discovery_progress = DiscoveryProgress(total_paths=len(self.watch_paths), start_time=time.time())
-        self.indexing_progress = IndexingProgress(start_time=time.time())
+        self.tracker.reset(len(self.watch_paths))
+        # Re-bind aliases after reset creates new objects
+        self.discovery_progress = self.tracker.discovery
+        self.indexing_progress = self.tracker.indexing
+        self.verification_progress = self.tracker.verification
 
         # Reset verifier
         self.verifier = IndexVerifier()  # Re-instantiate to reset progress
@@ -219,8 +219,12 @@ class CrawlJobManager:
 
                 self.indexing_progress.files_to_index += 1
 
+                def progress_cb(chunk_idx, chunk_total):
+                    self.indexing_progress.current_chunk_index = chunk_idx
+                    self.indexing_progress.current_chunk_total = chunk_total
+
                 # Process the operation
-                success = await self.indexer.index_file(operation)
+                success = await self.indexer.index_file(operation, progress_callback=progress_cb)
 
                 if success:
                     self.indexing_progress.files_indexed += 1
@@ -310,8 +314,8 @@ class CrawlJobManager:
             repo = CrawlerStateRepository(db)
             status = self.get_status()
             repo.update_state(
-                discovery_progress=status["discovery_progress"],
-                indexing_progress=status["indexing_progress"],
+                discovery_progress=int(status["discovery_progress"]),
+                indexing_progress=int(status["indexing_progress"]),
                 files_discovered=status["files_discovered"],
                 files_indexed=status["files_indexed"],
             )

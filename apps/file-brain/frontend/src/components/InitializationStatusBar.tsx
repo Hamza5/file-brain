@@ -36,7 +36,7 @@ export function InitializationStatusBar() {
         <span className="font-medium text-700 text-sm">
           {isInitializationComplete 
            ? "System operating in degraded mode" 
-           : `Initializing background services... ${systemInitialization.initialization_progress.toFixed(0)}%`
+           : `Initializing background services... ${systemInitialization.initialization_progress.toFixed(2)}%`
           }
         </span>
       </div>

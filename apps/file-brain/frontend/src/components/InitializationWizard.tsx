@@ -525,7 +525,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                     <div className="flex flex-column gap-2">
                       <div className="flex justify-content-between align-items-center">
                         <span className="font-semibold">Overall Progress</span>
-                        <span className="text-primary font-bold">{pullState.overallPercent}%</span>
+                        <span className="text-primary font-bold">{(pullState.overallPercent || 0).toFixed(2)}%</span>
                       </div>
                       <ProgressBar value={pullState.overallPercent} showValue={false} />
                     </div>
@@ -541,7 +541,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                           <div className="flex justify-content-between align-items-center text-sm">
                             <span className="text-600">{pullState.status}</span>
                             {pullState.imagePercent > 0 && (
-                              <span className="text-primary">{pullState.imagePercent}%</span>
+                              <span className="text-primary">{(pullState.imagePercent || 0).toFixed(2)}%</span>
                             )}
                           </div>
                           {pullState.imagePercent > 0 && (
@@ -696,7 +696,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                     <div className="flex flex-column gap-2">
                       <div className="flex justify-content-between align-items-center">
                         <span className="font-semibold">Overall Progress</span>
-                        <span className="text-primary font-bold">{modelDownloadProgress.progress_percent || 0}%</span>
+                        <span className="text-primary font-bold">{(modelDownloadProgress.progress_percent || 0).toFixed(2)}%</span>
                       </div>
                       <ProgressBar value={modelDownloadProgress.progress_percent || 0} showValue={false} />
                       {modelDownloadProgress.total_size && (
@@ -714,7 +714,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
                             <i className="fas fa-file text-primary" />
                             <span className="font-semibold text-sm">{modelDownloadProgress.file}</span>
                           </div>
-                          <span className="text-sm text-primary font-bold">{modelDownloadProgress.file_percent || 0}%</span>
+                          <span className="text-sm text-primary font-bold">{(modelDownloadProgress.file_percent || 0).toFixed(2)}%</span>
                         </div>
                         {modelDownloadProgress.file_total && (
                           <div className="mt-2">

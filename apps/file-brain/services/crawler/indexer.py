@@ -7,7 +7,7 @@ import hashlib
 import mimetypes
 import os
 from pathlib import Path
-from typing import Tuple
+from typing import Callable, Optional, Tuple
 
 from api.models.operations import CrawlOperation, OperationType
 from core.logging import logger
@@ -29,7 +29,9 @@ class FileIndexer:
         """Signal the indexing process to stop."""
         self._stop_event.set()
 
-    async def index_file(self, operation: CrawlOperation) -> bool:
+    async def index_file(
+        self, operation: CrawlOperation, progress_callback: Optional[Callable[[int, int], None]] = None
+    ) -> bool:
         """
         Index a single file.
         """
@@ -39,9 +41,11 @@ class FileIndexer:
         if operation.operation == OperationType.DELETE:
             return await self._handle_delete_operation(operation)
         else:
-            return await self._handle_create_edit_operation(operation)
+            return await self._handle_create_edit_operation(operation, progress_callback)
 
-    async def _handle_create_edit_operation(self, operation: CrawlOperation) -> bool:
+    async def _handle_create_edit_operation(
+        self, operation: CrawlOperation, progress_callback: Optional[Callable[[int, int], None]] = None
+    ) -> bool:
         file_path = operation.file_path
 
         if not self._check_file_accessibility(file_path)[0]:
@@ -80,6 +84,9 @@ class FileIndexer:
 
         # Index each chunk
         for chunk_index, chunk_content in enumerate(content_chunks):
+            if progress_callback:
+                progress_callback(chunk_index, total_chunks)
+
             chunk_hash = generate_chunk_hash(file_path, chunk_index, chunk_content)
 
             # Essential metadata for ALL chunks (for UI display)

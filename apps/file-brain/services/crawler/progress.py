@@ -30,6 +30,9 @@ class IndexingProgress:
     files_indexed: int = 0
     files_failed: int = 0
     current_file: Optional[str] = None
+    # Chunk-level progress
+    current_chunk_index: int = 0
+    current_chunk_total: int = 0
     start_time: Optional[float] = None
 
 
@@ -67,25 +70,25 @@ class CrawlProgressTracker:
         self.indexing = IndexingProgress(start_time=time.time())
         self.verification = VerificationProgress()
 
-    def get_discovery_percent(self) -> int:
+    def get_discovery_percent(self) -> float:
         """Calculate discovery progress percentage."""
         if self.discovery.total_paths == 0:
-            return 0
-        pct = int((self.discovery.processed_paths / self.discovery.total_paths) * 100)
-        return min(pct, 100)
+            return 0.0
+        pct = (self.discovery.processed_paths / self.discovery.total_paths) * 100
+        return round(min(pct, 100.0), 2)
 
-    def get_verification_percent(self) -> int:
+    def get_verification_percent(self) -> float:
         """Calculate verification progress percentage."""
         if self.verification.is_complete:
-            return 100
+            return 100.0
         if self.verification.total_indexed == 0:
-            return 0
-        pct = int((self.verification.processed_count / self.verification.total_indexed) * 100)
-        return min(pct, 100)
+            return 0.0
+        pct = (self.verification.processed_count / self.verification.total_indexed) * 100
+        return round(min(pct, 100.0), 2)
 
-    def get_indexing_percent(self, discovered_files: int = 0) -> int:
+    def get_indexing_percent(self, discovered_files: int = 0) -> float:
         """
-        Calculate indexing progress percentage.
+        Calculate indexing progress percentage per chunk.
 
         Args:
             discovered_files: Number of files discovered (from discoverer)
@@ -99,10 +102,22 @@ class CrawlProgressTracker:
         )
 
         if total_known == 0:
-            return 0
+            return 0.0
 
-        pct = int((files_indexed / total_known) * 100)
-        return min(pct, 100)
+        # Calculate base progress from completed files
+        progress_files = files_indexed
+
+        # Add fractional progress from current file chunks
+        if self.indexing.current_chunk_total > 0:
+            # Chunk index is 0-based, so completed chunks is essentially current_chunk_index
+            # (or maybe current_chunk_index + 1 if we want to show current work)
+            # Let's assume current_chunk_index is the one BEING processed.
+            # So completed is current_chunk_index.
+            chunk_fraction = self.indexing.current_chunk_index / self.indexing.current_chunk_total
+            progress_files += chunk_fraction
+
+        pct = (progress_files / total_known) * 100
+        return round(min(pct, 100.0), 2)
 
     def get_current_phase(self, discovered_files: int = 0) -> str:
         """Determine the current phase based on progress."""
