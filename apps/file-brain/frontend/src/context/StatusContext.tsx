@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import equal from "fast-deep-equal";
 import {
   type CrawlStats,
   type CrawlStatus,
@@ -51,29 +52,56 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs for current state to use in applySnapshot without dependency cycles
+  const statusRef = useRef(status);
+  const statsRef = useRef(stats);
+  const watchPathsRef = useRef(watchPaths);
+  const systemInitRef = useRef(systemInitialization);
+
+  useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => { statsRef.current = stats; }, [stats]);
+  useEffect(() => { watchPathsRef.current = watchPaths; }, [watchPaths]);
+  useEffect(() => { systemInitRef.current = systemInitialization; }, [systemInitialization]);
+
   const updateLiveStatus = useCallback((live: boolean) => {
-    setIsLive(live);
-    isLiveRef.current = live;
+    // Only update if changed to avoid renders
+    if (isLiveRef.current !== live) {
+        setIsLive(live);
+        isLiveRef.current = live;
+    }
   }, []);
 
   const applySnapshot = useCallback(
     (nextStatus: CrawlStatus["status"] | null, nextStats: CrawlStats | null, nextWatchPaths?: WatchPath[], nextSystemInit?: SystemInitialization | null) => {
-      if (nextStatus) {
+      let changed = false;
+
+      if (nextStatus && !equal(nextStatus, statusRef.current)) {
         setStatus(nextStatus);
+        changed = true;
       }
-      if (nextStats) {
+      if (nextStats && !equal(nextStats, statsRef.current)) {
         setStats(nextStats);
+        changed = true;
       }
-      if (nextWatchPaths !== undefined) {
+      
+      // For watch paths, array order might matter or not, but usually we just want content equality
+      if (nextWatchPaths !== undefined && !equal(nextWatchPaths, watchPathsRef.current)) {
         setWatchPaths(nextWatchPaths);
+        changed = true;
       }
-      if (nextSystemInit !== undefined) {
+      
+      if (nextSystemInit !== undefined && !equal(nextSystemInit, systemInitRef.current)) {
         setSystemInitialization(nextSystemInit);
+        changed = true;
       }
-      setLastUpdate(Date.now());
-      setError(null);
+
+      if (changed) {
+          setLastUpdate(Date.now());
+      }
+      // Always clear error on successful snapshot
+      if (error) setError(null);
     },
-    []
+    [error]
   );
 
   // Initial snapshot + SSE subscription with polling fallback
@@ -87,6 +115,8 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
     let stopStream: (() => void) | null = null;
     let stopInitStream: (() => void) | null = null;
     let pollTimer: number | null = null;
+    let retryTimer: NodeJS.Timeout | null = null;
+    let isUnmounted = false;
 
     async function loadInitial() {
       try {
@@ -106,20 +136,25 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
         const initialSystemInit =
           systemInitRes.status === "fulfilled" ? systemInitRes.value : null;
 
-        applySnapshot(initialStatus, initialStats, initialWatchPaths, initialSystemInit);
+        if (!isUnmounted) {
+            applySnapshot(initialStatus, initialStats, initialWatchPaths, initialSystemInit);
+        }
       } catch (e) {
         console.error("Failed to load initial crawler state", e);
-        setError(
-          "Failed to load crawler status. Some features may be temporarily unavailable."
-        );
+        if (!isUnmounted) {
+            setError(
+            "Failed to load crawler status. Some features may be temporarily unavailable."
+            );
+        }
       } finally {
-        setIsLoading(false);
+        if (!isUnmounted) setIsLoading(false);
       }
     }
 
     function startPolling() {
       if (pollTimer !== null) return;
       
+      console.debug("Starting polling fallback...");
       // Only poll if SSE is not active
       const intervalMs = 5000;
       pollTimer = window.setInterval(async () => {
@@ -142,12 +177,16 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
           const nextSystemInit =
             systemInitRes.status === "fulfilled" ? systemInitRes.value : null;
 
-          applySnapshot(nextStatus, nextStats, nextWatchPaths, nextSystemInit);
+           if (!isUnmounted) {
+               applySnapshot(nextStatus, nextStats, nextWatchPaths, nextSystemInit);
+           }
         } catch (e) {
           console.error("Polling error", e);
-          setError(
-            "Lost connection to crawler status. Some information may be out of date."
-          );
+          if (!isUnmounted) {
+              setError(
+                "Lost connection to crawler status. Some information may be out of date."
+              );
+          }
         }
       }, intervalMs);
     }
@@ -156,21 +195,47 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
       if (pollTimer !== null) {
         window.clearInterval(pollTimer);
         pollTimer = null;
+        console.debug("Stopped polling (SSE connected)");
       }
     }
 
     function startStream() {
+      if (isUnmounted) return;
+
+      // Clean up previous streams if any (e.g. from a retry)
+      if (stopStream) stopStream();
+      if (stopInitStream) stopInitStream();
+
       try {
         // Connect to crawler status stream
         stopStream = connectStatusStream(
           (payload: { status: CrawlStatus["status"]; stats?: CrawlStats | undefined; watch_paths?: WatchPath[]; timestamp: number }) => {
             updateLiveStatus(true);
+            stopPolling(); // Connection successful, strictly stop polling
+            
+            // Clear any pending retry since we are successful
+            if (retryTimer) {
+                clearTimeout(retryTimer);
+                retryTimer = null;
+            }
+
             applySnapshot(payload.status, payload.stats ?? null, payload.watch_paths, undefined);
           },
           () => {
+            // On error
             updateLiveStatus(false);
-            if (!pollTimer) startPolling();
-            console.debug("SSE status stream disconnected");
+            // Fallback to polling immediately
+            startPolling();
+            console.debug("SSE status stream disconnected/error, scheduling retry...");
+            
+            // Schedule reconnection attempt
+            if (!retryTimer) {
+                retryTimer = setTimeout(() => {
+                    retryTimer = null;
+                    console.debug("Retrying SSE connection...");
+                    startStream();
+                }, 10000); // Retry after 10s
+            }
           }
         );
         
@@ -180,7 +245,7 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
             // Map the streaming init status to our SystemInitialization type
             const systemInit: SystemInitialization = {
               timestamp: initStatus.timestamp,
-              overall_status: initStatus.overall_progress === 100 ? "healthy" : "degraded", // Stream doesn't send "critical" yet, assume degraded if not 100% or healthy
+              overall_status: initStatus.overall_progress === 100 ? "healthy" : "degraded",
               initialization_progress: initStatus.overall_progress,
               services: Object.entries(initStatus.services).reduce((acc, [name, s]) => {
                 let status: "healthy" | "unhealthy" | "initializing" | "disabled" | "error" | "retry_scheduled" = 'initializing';
@@ -215,10 +280,11 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
               message: `Initialization progress: ${initStatus.overall_progress.toFixed(0)}%`
             };
             
-            setSystemInitialization(systemInit);
+            applySnapshot(null, null, undefined, systemInit);
           },
           () => {
              console.debug("SSE init stream disconnected");
+             // Note: We don't trigger polling/retry just for init stream as main status stream is primary
           }
         );
         
@@ -226,6 +292,13 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
         console.warn("Failed to start SSE streams", e);
         setIsLive(false);
         startPolling();
+        // Schedule retry
+        if (!retryTimer) {
+             retryTimer = setTimeout(() => {
+                retryTimer = null;
+                startStream();
+             }, 10000);
+        }
       }
     }
 
@@ -234,9 +307,11 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
     });
 
     return () => {
+      isUnmounted = true;
       if (stopStream) stopStream();
       if (stopInitStream) stopInitStream();
       stopPolling();
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [applySnapshot, enabled]); // Add enabled to dependencies
 
