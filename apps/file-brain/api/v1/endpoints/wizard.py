@@ -510,6 +510,11 @@ async def get_collection_status():
 @router.post("/restart-typesense")
 async def restart_typesense():
     """Restart Typesense container with fresh volume to recover from errors"""
+    import asyncio
+    import shutil
+
+    from core.paths import app_paths
+
     try:
         docker_manager = get_docker_manager()
 
@@ -519,8 +524,6 @@ async def restart_typesense():
                 status_code=400,
                 detail="Docker/Podman not found",
             )
-
-        import asyncio
 
         # Build commands
         stop_cmd = [docker_manager.docker_cmd, "compose", "-f", str(docker_manager.compose_file), "stop", "typesense"]
@@ -558,37 +561,25 @@ async def restart_typesense():
         )
         await proc.communicate()
 
-        # Explicitly remove the named volume
-        # We need to find the actual volume name first since it might be prefixed with project name
-        # Default project name is usually folder name (file-brain), so volume is file-brain_search-engine-data
-        # But to be safe we can inspect the volume or just try both common variants
+        # Clear the bind-mounted data directory (except models)
+        # Since we now use a bind mount, we need to clear the host directory
+        typesense_data_dir = app_paths.typesense_data_dir
+        models_dir = app_paths.models_dir
 
-        # We'll use docker volume ls to find it
-        volume_name_filter = "search-engine-data"
-        find_vol_cmd = [
-            docker_manager.docker_cmd,
-            "volume",
-            "ls",
-            "--format",
-            "{{.Name}}",
-            "--filter",
-            f"name={volume_name_filter}",
-        ]
+        logger.info(f"Clearing Typesense data directory: {typesense_data_dir}")
 
-        proc = await asyncio.create_subprocess_exec(
-            *find_vol_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, _ = await proc.communicate()
-        volumes = stdout.decode().strip().split("\n")
-
-        for vol in volumes:
-            if "search-engine-data" in vol:
-                logger.info(f"Removing named volume: {vol}")
-                rm_vol_cmd = [docker_manager.docker_cmd, "volume", "rm", "-f", vol]
-                proc = await asyncio.create_subprocess_exec(
-                    *rm_vol_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-                )
-                await proc.communicate()
+        # Remove all contents except the models directory
+        if typesense_data_dir.exists():
+            for item in typesense_data_dir.iterdir():
+                if item != models_dir:
+                    try:
+                        if item.is_dir():
+                            shutil.rmtree(item)
+                        else:
+                            item.unlink()
+                        logger.info(f"Removed: {item}")
+                    except Exception as e:
+                        logger.warning(f"Failed to remove {item}: {e}")
 
         logger.info("Starting fresh Typesense...")
         proc = await asyncio.create_subprocess_exec(
@@ -601,8 +592,8 @@ async def restart_typesense():
             logger.error(f"Failed to restart Typesense: {error_msg}")
             return {"success": False, "error": error_msg}
 
-        logger.info("Typesense restarted successfully with fresh volume")
-        return {"success": True, "message": "Typesense restarted with fresh volume"}
+        logger.info("Typesense restarted successfully with cleared data")
+        return {"success": True, "message": "Typesense restarted with cleared data"}
 
     except Exception as e:
         logger.error(f"Error restarting Typesense: {e}", exc_info=True)

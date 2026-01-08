@@ -62,6 +62,19 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     try:
+        # Trigger Typesense snapshot before shutdown
+        try:
+            from services.typesense_client import get_typesense_client
+
+            logger.info("📸 Creating Typesense snapshot before shutdown...")
+            typesense = get_typesense_client()
+            if typesense.collection_ready:
+                # Trigger snapshot via API (uses Typesense default behavior)
+                await asyncio.to_thread(typesense.client.operations.perform, "snapshot", {})
+                logger.info("✅ Snapshot created successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to create snapshot on shutdown: {e}")
+
         # Stop docker containers if configured
         from services.docker_manager import get_docker_manager
 

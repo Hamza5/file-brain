@@ -22,11 +22,11 @@ services:
     environment:
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}
       TYPESENSE_DATA_DIR: /data
+      TYPESENSE_SNAPSHOT_INTERVAL_SECONDS: 1800
       TYPESENSE_HEALTHY_READ_LAG: 5000
       TYPESENSE_HEALTHY_WRITE_LAG: 5000
     volumes:
-      - search-engine-data:/data
-      - ${TYPESENSE_MODELS_DIR}:/data/models
+      - ${TYPESENSE_DATA_DIR}:/data
     deploy:
       resources:
         reservations:
@@ -40,8 +40,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-# Named volumes for data persistence
-volumes:
-  search-engine-data:
-    driver: local
