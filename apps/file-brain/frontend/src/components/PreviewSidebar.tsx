@@ -4,6 +4,7 @@ import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
 import { fileOperationsService } from '../services/fileOperations';
 import { confirmDialog } from 'primereact/confirmdialog';
+import { Tooltip } from 'primereact/tooltip';
 import { formatSize, formatDate } from '../utils/fileUtils';
 import { Snippet, useInstantSearch } from 'react-instantsearch';
 
@@ -68,8 +69,11 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis'
-                    }} title={getFileName(file.file_path)}>
-                        {getFileName(file.file_path)}
+                    }}>
+                        <Tooltip target=".preview-filename-tooltip" position="bottom" />
+                        <span className="preview-filename-tooltip" data-pr-tooltip={getFileName(file.file_path)}>
+                            {getFileName(file.file_path)}
+                        </span>
                     </h2>
                 </div>
 
@@ -175,8 +179,11 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                     <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.75rem' }}>Properties</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem', rowGap: '0.75rem' }}>
                         <div style={{ color: 'var(--text-color-secondary)' }}>Path</div>
-                        <div style={{ color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis' }} title={file.file_path}>
-                            {file.file_path}
+                        <div style={{ color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                             <Tooltip target=".preview-path-tooltip" position="top" />
+                             <span className="preview-path-tooltip" data-pr-tooltip={file.file_path}>
+                                {file.file_path}
+                             </span>
                         </div>
 
                         <div style={{ color: 'var(--text-color-secondary)' }}>Size</div>

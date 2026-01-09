@@ -709,3 +709,113 @@ export async function resetWizard(): Promise<{
 }> {
   return requestJSON("/api/v1/wizard/reset", { method: "POST" });
 }
+
+// Extended Stats API types
+export interface RecentFile {
+  file_path: string;
+  file_extension: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  modified_time: number | null;
+  indexed_at: number | null;
+}
+
+export interface RecentFilesResponse {
+  files: RecentFile[];
+  total: number;
+}
+
+export interface IndexingActivityPoint {
+  timestamp: number;
+  count: number;
+}
+
+export interface IndexingActivityResponse {
+  range: "24h" | "7d";
+  activity: IndexingActivityPoint[];
+  total: number;
+}
+
+export interface FilesByTypeResponse {
+  files: RecentFile[];
+  total: number;
+  page: number;
+  per_page: number;
+  extension: string;
+}
+
+export interface FilesByAgeResponse {
+  files: RecentFile[];
+  total: number;
+  page: number;
+  per_page: number;
+  age_range: "30d" | "90d" | "1y" | "older";
+}
+
+export interface FileAgeDistribution {
+  "30d": number;
+  "90d": number;
+  "1y": number;
+  older: number;
+}
+
+export interface FileAgeDistributionResponse {
+  distribution: FileAgeDistribution;
+}
+
+export interface StorageByTypeResponse {
+  storage: Record<string, number>;
+}
+
+// Extended Stats API functions
+export async function getRecentFiles(
+  limit: number = 10
+): Promise<RecentFilesResponse> {
+  return requestJSON(`/api/v1/stats/recent-files?limit=${limit}`);
+}
+
+export async function getIndexingActivity(
+  range: "24h" | "7d" = "24h"
+): Promise<IndexingActivityResponse> {
+  return requestJSON(`/api/v1/stats/indexing-activity?range=${range}`);
+}
+
+export async function getFilesByType(
+  ext: string,
+  page: number = 1,
+  perPage: number = 20
+): Promise<FilesByTypeResponse> {
+  return requestJSON(
+    `/api/v1/stats/files-by-type?ext=${encodeURIComponent(ext)}&page=${page}&per_page=${perPage}`
+  );
+}
+
+export async function getFilesByAge(
+  ageRange: "30d" | "90d" | "1y" | "older",
+  page: number = 1,
+  perPage: number = 20
+): Promise<FilesByAgeResponse> {
+  return requestJSON(
+    `/api/v1/stats/files-by-age?age_range=${ageRange}&page=${page}&per_page=${perPage}`
+  );
+}
+
+export async function getFileAgeDistribution(): Promise<FileAgeDistributionResponse> {
+  return requestJSON("/api/v1/stats/file-age-distribution");
+}
+
+export async function getStorageByType(): Promise<StorageByTypeResponse> {
+  return requestJSON("/api/v1/stats/storage-by-type");
+}
+
+export interface IndexStorageResponse {
+  num_documents: number;
+  collection_name: string;
+  index_memory_bytes: number;
+  resident_memory_bytes: number;
+  fragmentation_ratio: number;
+}
+
+export async function getIndexStorage(): Promise<IndexStorageResponse> {
+  return requestJSON("/api/v1/stats/index-storage");
+}

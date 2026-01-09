@@ -1,23 +1,44 @@
 import React, { useState } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
-import { Badge } from 'primereact/badge';
+import { Tag } from 'primereact/tag';
 import { InputSwitch } from 'primereact/inputswitch';
+import { Tooltip } from 'primereact/tooltip';
 import { useSearchBox } from 'react-instantsearch';
 
 interface HeaderProps {
-    onSettingsClick: () => void;
     isCrawlerActive: boolean;
     onToggleCrawler: (value: boolean) => void;
     isMonitoring?: boolean;
     onToggleMonitoring?: (value: boolean) => void;
-    crawlerStatus?: any;
+    crawlerStatus?: {
+        current_phase?: string;
+        verification_progress?: number;
+        indexing_progress?: number;
+    };
     hasIndexedFiles?: boolean;
     hasFoldersConfigured?: boolean;
 }
 
+// Helper to get user-friendly phase label
+function getPhaseLabel(crawlerStatus?: HeaderProps['crawlerStatus']): string {
+    if (!crawlerStatus) return "Active";
+    const phase = crawlerStatus.current_phase;
+    switch (phase) {
+        case 'verifying':
+            return `Checking ${crawlerStatus.verification_progress || 0}%`;
+        case 'discovering':
+            return "Scanning...";
+        case 'indexing':
+            return `Processing ${(crawlerStatus.indexing_progress || 0).toFixed(0)}%`;
+        case 'idle':
+            return "Ready";
+        default:
+            return "Active";
+    }
+}
+
 export const Header: React.FC<HeaderProps> = ({
-    onSettingsClick,
     isCrawlerActive,
     onToggleCrawler,
     isMonitoring = false,
@@ -31,17 +52,14 @@ export const Header: React.FC<HeaderProps> = ({
     const [isTogglingCrawler, setIsTogglingCrawler] = useState(false);
     const [isTogglingMonitor, setIsTogglingMonitor] = useState(false);
 
-    // Sync local state with instant search query when it changes externally
     React.useEffect(() => {
-        if (query !== searchValue && query === '') {
+        if (query === '' && searchValue !== '') {
             setSearchValue('');
         }
-    }, [query]);
+    }, [query]); // Only depend on query, not searchValue
 
     const handleSearch = () => {
-        if (hasIndexedFiles) {
-            refine(searchValue);
-        }
+        if (hasIndexedFiles) refine(searchValue);
     };
 
     const handleClear = () => {
@@ -50,281 +68,175 @@ export const Header: React.FC<HeaderProps> = ({
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            handleSearch();
-        }
+        if (e.key === 'Enter') handleSearch();
     };
 
-    // Determine the appropriate message based on state
     const getPlaceholder = () => {
-        if (hasIndexedFiles) {
-            return "Search files...";
-        }
-        if (hasFoldersConfigured) {
-            return "Start the crawler to begin indexing";
-        }
-        return "Add folders in settings to start searching";
+        if (hasIndexedFiles) return "Search your files...";
+        if (hasFoldersConfigured) return "Start indexer to search";
+        return "Add folders via the dashboard first";
     };
 
-    const searchDisabledMessage = !hasIndexedFiles
-        ? (hasFoldersConfigured
-            ? 'Folders configured but not indexed yet. Enable the crawler toggle to start indexing.'
-            : 'No files indexed yet. Click the settings icon to add folders to watch, then start the crawler.')
-        : undefined;
+
 
     return (
-        <header style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 50,
-            backgroundColor: 'var(--surface-card)',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            borderBottom: '1px solid var(--surface-border)',
-            padding: '0.75rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem'
-        }}>
-            {/* Logo Area */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 'max-content' }}>
-                <img src="/icon.svg" alt="File Brain Logo" style={{ height: '32px', width: '32px' }} />
-                <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-color)' }}>File Brain</span>
-            </div>
+        <header className="sticky top-0 z-5 surface-card shadow-2 surface-border px-3 py-2">
+            {/* Tooltips */}
+            <Tooltip target=".help-auto-index" position="bottom" className="text-sm" style={{ maxWidth: '250px' }}>
+                When enabled, File Brain automatically detects when files are added, modified, or deleted in your watched folders and updates the search index accordingly.
+            </Tooltip>
 
-            {/* Search Bar with Clear Button */}
-            <div style={{ flex: 1, maxWidth: '30rem', position: 'relative' }}>
-                <span
-                    style={{ position: 'relative', display: 'block' }}
-                    title={searchDisabledMessage}
-                >
-                    <i
-                        className="fa-solid fa-magnifying-glass"
-                        style={{
-                            position: 'absolute',
-                            left: '0.75rem',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            color: hasIndexedFiles ? 'var(--text-color-secondary)' : 'var(--surface-400)',
-                            fontSize: '0.875rem',
-                            zIndex: 1
-                        }}
-                    />
-                    <InputText
-                        value={searchValue}
-                        onChange={(e) => {
-                            if (hasIndexedFiles) {
-                                setSearchValue(e.target.value);
-                            }
-                        }}
-                        onKeyPress={handleKeyPress}
-                        placeholder={getPlaceholder()}
-                        disabled={!hasIndexedFiles}
-                        style={{
-                            width: '100%',
-                            paddingLeft: '2.5rem',
-                            paddingRight: searchValue && hasIndexedFiles ? '5.5rem' : '3rem',
-                            cursor: hasIndexedFiles ? 'text' : 'not-allowed',
-                            opacity: hasIndexedFiles ? 1 : 0.6
-                        }}
-                        tooltip={searchDisabledMessage}
-                        tooltipOptions={{
-                            position: 'bottom',
-                            showDelay: 300
-                        }}
-                    />
-                    {hasIndexedFiles && (
-                        <Button
-                            icon="fa-solid fa-search"
-                            rounded
-                            onClick={handleSearch}
-                            className="p-button-text"
+            <div className="flex align-items-center justify-content-between gap-3">
+                {/* Logo */}
+                <div className="flex align-items-center gap-2 flex-shrink-0">
+                    <img src="/icon.svg" alt="File Brain" className="w-2rem h-2rem" />
+                    <span className="text-xl font-bold text-color hidden md:block">File Brain</span>
+                </div>
+
+                {/* Search */}
+                <div style={{ flex: 1, maxWidth: '30rem', position: 'relative' }}>
+                    <span style={{ position: 'relative', display: 'block' }}>
+                        <i
+                            className="fa-solid fa-magnifying-glass"
                             style={{
                                 position: 'absolute',
-                                right: searchValue ? '2.5rem' : '0.25rem',
+                                left: '0.75rem',
                                 top: '50%',
                                 transform: 'translateY(-50%)',
-                                width: '2rem',
-                                height: '2rem',
-                                minWidth: '2rem',
-                                padding: 0,
-                                color: 'var(--primary-color)',
-                                backgroundColor: 'transparent',
-                                transition: 'all 0.2s ease',
+                                color: hasIndexedFiles ? 'var(--text-color-secondary)' : 'var(--surface-400)',
+                                fontSize: '0.875rem',
                                 zIndex: 1
                             }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.color = 'var(--primary-color-text)';
-                                e.currentTarget.style.backgroundColor = 'var(--primary-color)';
+                        />
+                        <InputText
+                            value={searchValue}
+                            onChange={(e) => {
+                                if (hasIndexedFiles) {
+                                    setSearchValue(e.target.value);
+                                }
                             }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.color = 'var(--primary-color)';
-                                e.currentTarget.style.backgroundColor = 'transparent';
+                            onKeyPress={handleKeyPress}
+                            placeholder={getPlaceholder()}
+                            disabled={!hasIndexedFiles}
+                            style={{
+                                width: '100%',
+                                paddingLeft: '2.5rem',
+                                paddingRight: searchValue && hasIndexedFiles ? '5.5rem' : '3rem',
+                                cursor: hasIndexedFiles ? 'text' : 'not-allowed',
+                                opacity: hasIndexedFiles ? 1 : 0.6
                             }}
-                            aria-label="Search"
                             tooltip="Search (or press Enter)"
                             tooltipOptions={{
                                 position: 'bottom',
                                 showDelay: 500
                             }}
                         />
-                    )}
-                    {searchValue && hasIndexedFiles && (
-                        <Button
-                            icon="fa-solid fa-times"
-                            rounded
-                            onClick={handleClear}
-                            className="p-button-text"
-                            style={{
-                                position: 'absolute',
-                                right: '0.25rem',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                width: '2rem',
-                                height: '2rem',
-                                minWidth: '2rem',
-                                padding: 0,
-                                color: 'var(--text-color-secondary)',
-                                backgroundColor: 'transparent',
-                                transition: 'all 0.2s ease',
-                                zIndex: 1
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.color = 'var(--text-color)';
-                                e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.color = 'var(--text-color-secondary)';
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                            aria-label="Clear search"
-                        />
-                    )}
-                </span>
-            </div>
+                        {hasIndexedFiles && (
+                            <Button
+                                icon="fa-solid fa-search"
+                                rounded
+                                onClick={handleSearch}
+                                className="p-button-text"
+                                aria-label="Search"
+                                tooltip="Search"
+                                tooltipOptions={{ position: 'bottom' }}
+                                style={{
+                                    position: 'absolute',
+                                    right: searchValue ? '2.5rem' : '0.5rem',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    width: '2rem',
+                                    height: '2rem',
+                                    color: 'var(--primary-color)',
+                                }}
+                            />
+                        )}
+                        {searchValue && hasIndexedFiles && (
+                            <Button
+                                icon="fa-solid fa-times"
+                                rounded
+                                onClick={handleClear}
+                                className="p-button-text"
+                                aria-label="Clear search"
+                                tooltip="Clear search"
+                                tooltipOptions={{ position: 'bottom' }}
+                                style={{
+                                    position: 'absolute',
+                                    right: '0.25rem',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    width: '2rem',
+                                    height: '2rem',
+                                    color: 'var(--text-color-secondary)',
+                                }}
+                            />
+                        )}
+                    </span>
+                </div>
 
-            {/* Actions Area */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 'max-content' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    
-                    {/* Monitor Switch */}
+                {/* Controls */}
+                <div className="flex align-items-center gap-3 flex-shrink-0">
+                    {/* Auto-Index Toggle */}
                     {onToggleMonitoring && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '1rem' }}>
-                             <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-color)' }}>Monitor</span>
-                            <div style={{ position: 'relative', width: '3rem', height: '1.75rem' }}>
-                                 {isTogglingMonitor && (
-                                    <i className="pi pi-spin pi-spinner" style={{ 
-                                        position: 'absolute', 
-                                        left: '50%', 
-                                        top: '50%', 
-                                        transform: 'translate(-50%, -50%)', 
-                                        zIndex: 10,
-                                        fontSize: '0.8rem'
-                                    }} />
-                                )}
-                                <InputSwitch 
-                                    checked={isMonitoring} 
-                                    onChange={async (e) => {
+                        <div className="p-inputgroup">
+                            <div className="p-inputgroup-addon p-2 flex align-items-center gap-2">
+                            <InputSwitch
+                                checked={isMonitoring}
+                                onChange={
+                                    async (e) => {
                                         setIsTogglingMonitor(true);
                                         try {
                                             await onToggleMonitoring(e.value);
                                         } finally {
                                             setIsTogglingMonitor(false);
                                         }
-                                    }}
-                                    disabled={isTogglingMonitor}
-                                    style={{ opacity: isTogglingMonitor ? 0.7 : 1 }}
-                                    tooltip={isMonitoring ? "File Monitoring Active" : "Enable File Monitoring"}
+                                    }
+                                }
+                                disabled={isTogglingMonitor}
+                                tooltip={isMonitoring ? "Auto-indexing is active" : "Enable auto-indexing"}
+                                tooltipOptions={{ position: 'bottom' }}
                                 />
+                                {isTogglingMonitor && (
+                                    <i className="fa-solid fa-spinner fa-spin" />
+                                )}
+                                <label className="flex align-items-center gap-2">
+                                    <span className="text-sm font-medium text-color hidden lg:block">Auto-Index</span>
+                                    <i className="fa-solid fa-circle-question text-color-secondary text-xs cursor-help help-auto-index hidden lg:inline" />
+                                </label>
                             </div>
                         </div>
                     )}
 
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Crawler</span>
-                    <Button
-                        label={isCrawlerActive ? "Stop" : "Start"}
-                        icon={isTogglingCrawler ? "fas fa-spinner fa-spin" : (isCrawlerActive ? "fa-solid fa-stop" : "fa-solid fa-play")}
-                        onClick={async () => {
-                            setIsTogglingCrawler(true);
-                            try {
-                                await onToggleCrawler(!isCrawlerActive);
-                            } finally {
-                                setIsTogglingCrawler(false);
-                            }
-                        }}
-                        disabled={isTogglingCrawler}
-                        size="small"
-                        severity={isCrawlerActive ? "danger" : "success"}
-                        tooltip={
-                            isTogglingCrawler
-                                ? "Processing..."
-                                : (isCrawlerActive ? "Stop Crawler" : "Start Crawler")
-                        }
-                    />
+                    {/* Indexer Control */}
+                    <div className="flex align-items-center gap-2">
+                        <Button
+                            label={isCrawlerActive ? "Stop" : "Index"}
+                            icon={isTogglingCrawler ? "fas fa-spinner fa-spin" : (isCrawlerActive ? "fa-solid fa-stop" : "fa-solid fa-play")}
+                            onClick={async () => {
+                                setIsTogglingCrawler(true);
+                                try {
+                                    await onToggleCrawler(!isCrawlerActive);
+                                } finally {
+                                    setIsTogglingCrawler(false);
+                                }
+                            }}
+                            disabled={isTogglingCrawler}
+                            size="small"
+                            severity={isCrawlerActive ? "danger" : "success"}
+                            tooltip="The indexer scans your watched folders and processes file contents to make them searchable. Start it to begin indexing, or stop it to pause."
+                            tooltipOptions={{ position: 'bottom', showDelay: 500 }}
+                            className=""
+                        />
+                        <Tag
+                            value={isTogglingCrawler ? "..." : (isCrawlerActive ? getPhaseLabel(crawlerStatus) : "Stopped")}
+                            severity={isTogglingCrawler ? "info" : (isCrawlerActive ? "success" : "secondary")}
+                            className="text-xs"
+                        />
+                    </div>
 
-                    <Badge
-                        value={
-                            isTogglingCrawler
-                                ? "Processing..."
-                                : (isCrawlerActive
-                                    ? getCrawlerPhaseLabel(crawlerStatus)
-                                    : "Stopped")
-                        }
-                        severity={
-                            isTogglingCrawler
-                                ? "info"
-                                : (isCrawlerActive ? "warning" : "danger")
-                        }
-                    />
                 </div>
-
-                <Button
-                    icon="fa-solid fa-gear"
-                    rounded
-                    text
-                    severity="secondary"
-                    aria-label="Settings"
-                    onClick={onSettingsClick}
-                    tooltip="Settings"
-                    tooltipOptions={
-                        {
-                            position: 'left',
-                        }
-                    }
-                    style={{
-                        transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
-                        e.currentTarget.style.transform = 'rotate(45deg)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '';
-                        e.currentTarget.style.transform = 'rotate(0deg)';
-                    }}
-                />
             </div>
         </header>
     );
 };
 
-// Helper function to get crawler phase label
-function getCrawlerPhaseLabel(crawlerStatus?: any): string {
-    if (!crawlerStatus) return "Active";
-    
-    const phase = crawlerStatus.current_phase;
-    switch (phase) {
-        case 'verifying':
-            const vProgress = crawlerStatus.verification_progress || 0;
-            return `Verifying (${vProgress}%)`;
-        case 'discovering':
-            return "Discovering...";
-        case 'indexing':
-            return "Indexing...";
-
-        case 'idle':
-            return "Idle";
-        default:
-            return "Active";
-    }
-}

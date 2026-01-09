@@ -7,10 +7,9 @@ import { ConfirmDialog } from "primereact/confirmdialog";
 import { Header } from "./components/Header";
 import { MainContent } from "./components/MainContent";
 import { PreviewSidebar } from "./components/PreviewSidebar";
-import { SettingsDialog } from "./components/SettingsDialog";
 import { InitializationWizard } from "./components/InitializationWizard";
-import { InitializationStatusBar } from "./components/InitializationStatusBar";
-import { connectStatusStream, startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus } from "./api/client";
+import { StatusBar } from "./components/StatusBar";
+import { connectStatusStream, startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus, type CrawlStatus } from "./api/client";
 
 // Configure Typesense InstantSearch adapter
 const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
@@ -45,49 +44,52 @@ const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
 const searchClient = typesenseInstantsearchAdapter.searchClient;
 
 function AppContent() {
-  const { stats, watchPaths } = useStatus();
+  const { status, stats, watchPaths } = useStatus();
   const [isCrawlerActive, setIsCrawlerActive] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [crawlerStatus, setCrawlerStatus] = useState<any>(null);
-  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [crawlerStatus, setCrawlerStatus] = useState<CrawlStatus["status"] | null>(null);
+  // Derived state for header
+  const hasIndexedFiles = (stats?.totals?.discovered || 0) > 0;
+  const hasFoldersConfigured = (watchPaths?.length || 0) > 0;
+
+  // Connect to status stream
+  useEffect(() => {
+    const cleanup = connectStatusStream();
+    return cleanup;
+  }, []);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
 
-  // Connect to crawler status stream (only after wizard completes)
-  React.useEffect(() => {
-    const disconnect = connectStatusStream((payload) => {
-      setCrawlerStatus(payload.status);
-      setIsCrawlerActive(payload.status.running);
-      setIsMonitoring(payload.status.monitoring_active ?? false);
-    });
-    return () => disconnect();
-  }, []);
+  // Sync local state with global status
+  useEffect(() => {
+    if (status) {
+      setIsCrawlerActive(status.running);
+      setIsMonitoring(status.monitoring_active);
+      setCrawlerStatus(status);
+    }
+  }, [status]);
 
-  const handleToggleCrawler = async (value: boolean) => {
+  const handleToggleCrawler = async () => {
     try {
-      if (value) {
-        await startCrawler();
-      } else {
+      if (isCrawlerActive) {
         await stopCrawler();
+      } else {
+        await startCrawler();
       }
-      // Optimistic update
-      setIsCrawlerActive(value);
     } catch (error) {
       console.error("Failed to toggle crawler:", error);
-      // Revert on failure (optional, or let stream update fix it)
     }
   };
 
-  const handleToggleMonitoring = async (value: boolean) => {
+  const handleToggleMonitoring = async () => {
     try {
-        if (value) {
-            await startFileMonitoring();
-        } else {
-            await stopFileMonitoring();
-        }
-        setIsMonitoring(value);
+      if (isMonitoring) {
+        await stopFileMonitoring();
+      } else {
+        await startFileMonitoring();
+      }
     } catch (error) {
-        console.error("Failed to toggle monitoring:", error);
+      console.error("Failed to toggle monitoring:", error);
     }
   };
 
@@ -95,11 +97,6 @@ function AppContent() {
     setSelectedFile(file);
     setPreviewVisible(true);
   };
-
-  // Derive state from StatusContext
-  const indexedCount = stats?.totals.indexed ?? 0;
-  const hasFoldersConfigured = watchPaths.length > 0;
-  const hasIndexedFiles = indexedCount > 0;
 
   return (
     <InstantSearch
@@ -117,7 +114,6 @@ function AppContent() {
         backgroundColor: 'var(--surface-ground)'
       }}>
         <Header
-          onSettingsClick={() => setSettingsVisible(true)}
           isCrawlerActive={isCrawlerActive}
           onToggleCrawler={handleToggleCrawler}
           isMonitoring={isMonitoring}
@@ -133,12 +129,6 @@ function AppContent() {
           visible={previewVisible}
           onHide={() => setPreviewVisible(false)}
           file={selectedFile}
-        />
-
-        <SettingsDialog
-          visible={settingsVisible}
-          onHide={() => setSettingsVisible(false)}
-          onRefreshStats={() => { }}
         />
       </div>
     </InstantSearch>
@@ -180,7 +170,7 @@ export default function App() {
 
         {/* Global Confirm Dialog - Single instance for all delete operations */}
         <ConfirmDialog />
-        <InitializationStatusBar />
+        <StatusBar />
       </NotificationProvider>
     </StatusProvider>
   );

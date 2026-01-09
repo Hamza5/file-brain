@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Card } from 'primereact/card';
 import { confirmDialog } from "primereact/confirmdialog";
+import { Tooltip } from 'primereact/tooltip';
 import { useInstantSearch } from 'react-instantsearch';
 import { FileContextMenu } from './FileContextMenu';
 import { fileOperationsService } from '../services/fileOperations';
@@ -312,9 +313,13 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                   whiteSpace: "nowrap",
                   flex: 1
                 }}
-                title={getFileName(hit.file_path)}
+                  flex: 1
+                }}
               >
-                {getFileName(hit.file_path)}
+                 <Tooltip target=".hit-filename-tooltip" position="top" />
+                 <span className="hit-filename-tooltip" data-pr-tooltip={getFileName(hit.file_path)}>
+                    {getFileName(hit.file_path)}
+                 </span>
               </div>
 
               {hit.file_extension && (
@@ -344,9 +349,13 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap"
               }}
-              title={filePath || ''}
+                whiteSpace: "nowrap"
+              }}
             >
-              {filePath || 'Unknown path'}
+              <Tooltip target=".hit-path-tooltip" position="top" />
+              <span className="hit-path-tooltip" data-pr-tooltip={filePath || ''}>
+                {filePath || 'Unknown path'}
+              </span>
             </div>
 
             {/* Content snippet */}

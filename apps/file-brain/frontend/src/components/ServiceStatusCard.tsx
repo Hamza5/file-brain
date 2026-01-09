@@ -10,23 +10,32 @@ interface ServiceStatusCardProps {
   service: ServiceInitStatus;
 }
 
+// User-friendly labels for states
+const stateLabels: Record<string, string> = {
+  ready: 'Ready',
+  failed: 'Error',
+  disabled: 'Disabled',
+  not_started: 'Waiting',
+  initializing: 'Loading',
+};
+
 export function ServiceStatusCard({ service }: ServiceStatusCardProps) {
   const [showLogs, setShowLogs] = useState(false);
 
-  // Determine severity and icon based on state
+  // Determine severity and icon
   let severity: 'success' | 'info' | 'warning' | 'danger' | null = 'info';
   let icon = 'fas fa-spinner fa-spin';
   const currentState = service.state || 'unknown';
-  let statusLabel = currentState.toUpperCase();
+  const statusLabel = stateLabels[currentState] || currentState.toUpperCase();
   
   switch(currentState) {
     case 'ready':
       severity = 'success';
-      icon = 'fas fa-check';
+      icon = 'fas fa-check-circle';
       break;
     case 'failed':
       severity = 'danger';
-      icon = 'fas fa-times';
+      icon = 'fas fa-exclamation-circle';
       break;
     case 'disabled':
       severity = 'warning';
@@ -35,47 +44,59 @@ export function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     case 'not_started':
       severity = 'info';
       icon = 'fas fa-clock';
-      statusLabel = 'WAITING';
       break;
     case 'initializing':
       severity = 'info';
       icon = 'fas fa-spinner fa-spin';
-      statusLabel = service.current_phase?.name || 'INITIALIZING';
       break;
   }
 
   // Calculate progress
-  // If ready, 100%. If initializing, use phase progress. Else 0.
   const progress = service.state === 'ready' ? 100 : 
                   service.state === 'initializing' ? (service.current_phase?.progress || 0) : 0;
 
+  // User-friendly phase message
+  const getMessage = () => {
+    if (service.error) return service.error;
+    if (service.current_phase?.message) return service.current_phase.message;
+    if (currentState === 'not_started') return 'Waiting to start...';
+    if (currentState === 'ready') return 'Running successfully';
+    return 'Please wait...';
+  };
+
   return (
     <>
-      <Card className="surface-0 shadow-1 p-0 mb-3 border-round-xl service-status-card">
-        <div className="flex align-items-center justify-content-between mb-2">
+      <Card className="surface-card shadow-1 mb-3 border-round-lg">
+        {/* Header */}
+        <div className="flex align-items-center justify-content-between mb-3">
           <div className="flex align-items-center gap-2">
-            <span className="text-xl font-bold text-900">{service.user_friendly_name}</span>
+            <span className="text-lg font-semibold text-color">{service.user_friendly_name}</span>
             <Tag severity={severity} value={statusLabel} icon={icon} />
           </div>
           <Button 
-            icon="fas fa-list"
+            icon="fas fa-terminal"
             className="p-button-text p-button-secondary p-button-sm" 
             tooltip="View Logs"
+            tooltipOptions={{ position: 'left' }}
             onClick={() => setShowLogs(true)}
           />
         </div>
         
-        <div className="mb-2">
-          <div className="flex justify-content-between text-sm mb-1 text-700">
-            <span>{service.current_phase?.message || service.error || "Waiting..."}</span>
-            <span>{progress.toFixed(2)}%</span>
+        {/* Message and Progress */}
+        <div>
+          <div className="flex justify-content-between text-sm mb-2">
+            <span className="text-color-secondary">{getMessage()}</span>
+            <span className="font-medium text-color">{progress.toFixed(0)}%</span>
           </div>
           <ProgressBar 
             value={progress} 
             showValue={false} 
-            style={{ height: '6px' }} 
-            className={service.state === 'failed' ? 'bg-red-100' : ''}
-            color={service.state === 'failed' ? 'var(--red-500)' : service.state === 'ready' ? 'var(--green-500)' : 'var(--blue-500)'}
+            style={{ height: '8px' }} 
+            color={
+              currentState === 'failed' ? 'var(--red-500)' : 
+              currentState === 'ready' ? 'var(--green-500)' : 
+              'var(--primary-color)'
+            }
           />
         </div>
       </Card>

@@ -37,6 +37,10 @@ interface StatusContextValue {
   isSystemHealthy: boolean;
   canUseSearch: boolean;
   canUseCrawler: boolean;
+  // Status bar helpers
+  isIndexing: boolean;
+  indexingProgress: number; // 0-100 percentage
+  typesenseNotReady: boolean;
 }
 
 const StatusContext = createContext<StatusContextValue | undefined>(undefined);
@@ -316,21 +320,37 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
   }, [applySnapshot, enabled]); // Add enabled to dependencies
 
   const value = useMemo<StatusContextValue>(
-    () => ({
-      status,
-      stats,
-      systemInitialization,
-      watchPaths,
-      lastUpdate,
-      isLive,
-      isLoading,
-      error,
-      // Computed properties
-      isInitializationComplete: systemInitialization?.initialization_progress === 100,
-      isSystemHealthy: systemInitialization?.overall_status === "healthy",
-      canUseSearch: systemInitialization?.capabilities?.search_api ?? false,
-      canUseCrawler: systemInitialization?.capabilities?.crawl_api ?? false,
-    }),
+    () => {
+      const isIndexing = status?.running ?? false;
+      const discovered = stats?.totals?.discovered ?? 0;
+      const indexed = stats?.totals?.indexed ?? 0;
+      const indexingProgress = discovered > 0 ? Math.min(100, (indexed / discovered) * 100) : 0;
+      
+      // Check if Typesense is not ready (initializing or failed)
+      const typesenseService = systemInitialization?.services?.['typesense'];
+      const typesenseNotReady = typesenseService ? 
+        (typesenseService.state !== 'ready' && typesenseService.state !== 'disabled') : false;
+      
+      return {
+        status,
+        stats,
+        systemInitialization,
+        watchPaths,
+        lastUpdate,
+        isLive,
+        isLoading,
+        error,
+        // Computed properties
+        isInitializationComplete: systemInitialization?.initialization_progress === 100,
+        isSystemHealthy: systemInitialization?.overall_status === "healthy",
+        canUseSearch: systemInitialization?.capabilities?.search_api ?? false,
+        canUseCrawler: systemInitialization?.capabilities?.crawl_api ?? false,
+        // Status bar helpers
+        isIndexing,
+        indexingProgress,
+        typesenseNotReady,
+      };
+    },
     [status, stats, systemInitialization, watchPaths, lastUpdate, isLive, isLoading, error]
   );
 

@@ -6,62 +6,76 @@ import { type ServiceInitStatus } from '../api/client';
 export function InitializationStatusBar() {
   const { systemInitialization, isInitializationComplete } = useStatus();
   
-  // Only show if fully complete is false, OR if there are degraded services
   if (!systemInitialization) return null;
   
-  // Find interesting services (not healthy)
-  const degradedServices = Object.values(systemInitialization.services ?? {})
+  // Find services that are not ready
+  const pendingServices = Object.values(systemInitialization.services ?? {})
     .filter((service) => {
-        const s = service as unknown as ServiceInitStatus;
-        return s.state && s.state !== 'ready' && s.state !== 'disabled';
+      const s = service as unknown as ServiceInitStatus;
+      return s.state && s.state !== 'ready' && s.state !== 'disabled';
     });
   
-  // If complete and no degraded services (all valid or disabled), don't show
-  if (isInitializationComplete && degradedServices.length === 0) return null;
+  // Hide if complete and all services are ready
+  if (isInitializationComplete && pendingServices.length === 0) return null;
   
-  // Styling for bottom bar
-  const bottomBarStyle = {
-    position: 'fixed' as const,
-    bottom: 0,
-    left: 0,
-    width: '100%',
-    zIndex: 1000,
-    boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
+  // User-friendly service name mapping
+  const getFriendlyName = (name: string | undefined) => {
+    if (!name) return 'Service';
+    const mapping: Record<string, string> = {
+      'typesense': 'Search Engine',
+      'tika': 'File Extractor',
+      'docker': 'Services',
+    };
+    return mapping[name.toLowerCase()] || name;
   };
-  
+
   return (
-    <div className="surface-overlay border-top-1 border-200 p-2 flex align-items-center justify-content-between px-4" style={bottomBarStyle}>
-      <div className="flex align-items-center gap-3">
-        {!isInitializationComplete && <i className="fas fa-spinner fa-spin text-primary" />}
-        <span className="font-medium text-700 text-sm">
-          {isInitializationComplete 
-           ? "System operating in degraded mode" 
-           : `Initializing background services... ${systemInitialization.initialization_progress.toFixed(2)}%`
-          }
-        </span>
-      </div>
-      
-      <div className="flex align-items-center gap-2">
-        {degradedServices.map((service) => {
-          const s = service as unknown as ServiceInitStatus;
-          const state = s.state || 'unknown';
-          return (
-            <Tag 
-                key={s.name}
-                severity={state === 'failed' ? 'danger' : 'warning'} 
-                value={`${s.user_friendly_name}: ${state.toUpperCase()}`}
-                icon={state === 'failed' ? 'fas fa-times' : 'fas fa-spinner fa-spin'}
-                className="text-xs"
-            />
-          );
-        })}
-      </div>
-      
-      {!isInitializationComplete && (
-        <div className="w-2">
-           <ProgressBar value={systemInitialization.initialization_progress} showValue={false} style={{ height: '6px' }} />
+    <div 
+      className="fixed bottom-0 left-0 w-full z-5 surface-overlay border-top-1 surface-border px-4 py-2 shadow-2"
+    >
+      <div className="flex align-items-center justify-content-between gap-3">
+        {/* Status message */}
+        <div className="flex align-items-center gap-2">
+          {!isInitializationComplete && (
+            <i className="fas fa-spinner fa-spin text-primary" />
+          )}
+          <span className="font-medium text-color-secondary text-sm">
+            {isInitializationComplete 
+              ? "Some features are unavailable" 
+              : `Starting up... ${systemInitialization.initialization_progress.toFixed(0)}%`
+            }
+          </span>
         </div>
-      )}
+        
+        {/* Service tags */}
+        <div className="flex align-items-center gap-2">
+          {pendingServices.map((service) => {
+            const s = service as unknown as ServiceInitStatus;
+            const state = s.state || 'unknown';
+            const isFailed = state === 'failed';
+            return (
+              <Tag 
+                key={s.name}
+                severity={isFailed ? 'danger' : 'warning'} 
+                value={`${getFriendlyName(s.name)}: ${isFailed ? 'Error' : 'Loading'}`}
+                icon={isFailed ? 'fas fa-exclamation-circle' : 'fas fa-spinner fa-spin'}
+                className="text-xs"
+              />
+            );
+          })}
+        </div>
+        
+        {/* Progress bar */}
+        {!isInitializationComplete && (
+          <div className="w-8rem hidden md:block">
+            <ProgressBar 
+              value={systemInitialization.initialization_progress} 
+              showValue={false} 
+              style={{ height: '6px' }} 
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

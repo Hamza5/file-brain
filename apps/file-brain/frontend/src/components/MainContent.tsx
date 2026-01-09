@@ -17,7 +17,6 @@ export const MainContent: React.FC<MainContentProps> = ({ onResultClick, isCrawl
             flex: 1,
             overflowY: 'auto',
             backgroundColor: 'var(--surface-ground)',
-            padding: '1rem'
         }}>
             {!hasQuery ? (
                 <HeroStats />
@@ -27,3 +26,4 @@ export const MainContent: React.FC<MainContentProps> = ({ onResultClick, isCrawl
         </main>
     );
 };
+

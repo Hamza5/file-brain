@@ -3,6 +3,7 @@ import { useHits, useInstantSearch } from 'react-instantsearch';
 import { FileContextMenu } from './FileContextMenu';
 import { fileOperationsService, type FileOperationRequest } from '../services/fileOperations';
 import { confirmDialog } from 'primereact/confirmdialog';
+import { Tooltip } from 'primereact/tooltip';
 import { pickIconClass, formatDate, getFileName } from '../utils/fileUtils';
 
 interface ResultsGridProps {
@@ -144,6 +145,8 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                 </div>
             )}
 
+            <Tooltip target=".grid-tooltip" />
+
             {/* Result Count Header */}
             {
                 !isSearching && (
@@ -225,7 +228,10 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                     whiteSpace: 'nowrap',
                                                     overflow: 'hidden',
                                                     textOverflow: 'ellipsis'
-                                                }} title={getFileName(hit.file_path)}>
+                                                }}
+                                                className="grid-tooltip"
+                                                data-pr-tooltip={getFileName(hit.file_path)}
+                                                >
                                                     {getFileName(hit.file_path)}
                                                 </div>
                                                 <div style={{
@@ -234,7 +240,10 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                     whiteSpace: 'nowrap',
                                                     overflow: 'hidden',
                                                     textOverflow: 'ellipsis'
-                                                }} title={hit.file_path}>
+                                                }}
+                                                className="grid-tooltip"
+                                                data-pr-tooltip={hit.file_path}
+                                                >
                                                     {hit.file_path}
                                                 </div>
                                                 <div style={{
