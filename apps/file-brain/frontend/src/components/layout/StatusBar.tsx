@@ -20,8 +20,10 @@ export function StatusBar() {
       'typesense': 'Search Engine',
       'tika': 'File Extractor',
       'docker': 'Services',
+      'database': 'Database',
+      'crawl_manager': 'File Monitor',
     };
-    return mapping[name.toLowerCase()] || name;
+    return mapping[name.toLowerCase()] || name.charAt(0).toUpperCase() + name.slice(1);
   };
 
   // Determine the main status message and icon

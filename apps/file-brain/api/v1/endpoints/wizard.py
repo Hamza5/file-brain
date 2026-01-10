@@ -698,3 +698,119 @@ async def reset_wizard():
     except Exception as e:
         logger.error(f"Error resetting wizard: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# App Container Startup Endpoints (Post-Wizard)
+# ============================================================================
+
+
+@router.post("/app-containers-start")
+async def start_app_containers():
+    """
+    Start Docker containers for the main app (after wizard is completed).
+    This is called when the app loads to start containers in the background.
+    Returns immediately while containers start asynchronously.
+    """
+    import asyncio
+
+    async def _start_containers_task():
+        """Background task to start containers"""
+        try:
+            docker_manager = get_docker_manager()
+
+            if not docker_manager.is_docker_available():
+                logger.error("Docker/Podman not available for app container startup")
+                return
+
+            logger.info("Starting app containers in background...")
+            result = await docker_manager.start_services()
+
+            if result.get("success"):
+                logger.info("✅ App containers started successfully")
+            else:
+                logger.error(f"❌ Failed to start app containers: {result.get('error')}")
+
+        except Exception as e:
+            logger.error(f"Error in app container startup task: {e}", exc_info=True)
+
+    # Start the background task
+    asyncio.create_task(_start_containers_task())
+
+    # Return immediately
+    return {
+        "success": True,
+        "message": "Container startup initiated in background",
+        "timestamp": int(time.time() * 1000),
+    }
+
+
+@router.get("/app-containers-status")
+async def stream_app_containers_status():
+    """
+    Stream container startup status via SSE.
+    Provides real-time updates on container health until all are ready.
+    """
+    import asyncio
+    import json
+
+    async def event_generator():
+        """Generate SSE events for container status"""
+        docker_manager = get_docker_manager()
+
+        try:
+            # Check if docker is available
+            if not docker_manager.is_docker_available():
+                yield f"data: {json.dumps({'error': 'Docker/Podman not found'})}\n\n"
+                return
+
+            # Poll container status until all healthy or timeout
+            max_checks = 60  # 60 checks * 2 seconds = 2 minutes max
+            check_count = 0
+
+            while check_count < max_checks:
+                try:
+                    status_result = await docker_manager.get_services_status()
+
+                    # Send status update
+                    status_data = {
+                        "success": status_result.get("success", False),
+                        "running": status_result.get("running", False),
+                        "healthy": status_result.get("healthy", False),
+                        "services": status_result.get("services", []),
+                        "timestamp": time.time(),
+                    }
+                    yield f"data: {json.dumps(status_data)}\n\n"
+
+                    # If all healthy, we're done
+                    if status_result.get("healthy"):
+                        logger.info("All containers healthy - stopping status stream")
+                        break
+
+                    # Wait before next check
+                    await asyncio.sleep(2)
+                    check_count += 1
+
+                except Exception as e:
+                    logger.error(f"Error checking container status: {e}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    break
+
+            # Send final completion event
+            if check_count >= max_checks:
+                timeout_data = {"timeout": True, "message": "Container startup timed out after 2 minutes"}
+                yield f"data: {json.dumps(timeout_data)}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error in container status stream: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

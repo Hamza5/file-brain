@@ -108,24 +108,16 @@ async def critical_init():
         service_manager.set_ready("database", details={"type": "sqlite", "tables": "created"})
         logger.info("✅ Database initialized")
 
-        # Auto-start Docker containers if wizard is completed
+        # Note: Docker containers are now started via API after UI loads (deferred startup)
+        # This improves app startup time by showing the UI immediately
         from database.repositories import WizardStateRepository
-        from services.docker_manager import get_docker_manager
 
         with db_session() as db:
             wizard_repo = WizardStateRepository(db)
             wizard_state = wizard_repo.get()
 
         if wizard_state and wizard_state.wizard_completed:
-            logger.info("🐳 Wizard completed - auto-starting Docker containers...")
-            docker_manager = get_docker_manager()
-
-            # Start Docker services (will fail gracefully if Docker not available)
-            start_result = await docker_manager.start_services()
-            if start_result.get("success"):
-                logger.info("✅ Docker containers started successfully")
-            else:
-                logger.warning(f"⚠️ Failed to start Docker containers: {start_result.get('error')}")
+            logger.info("🐳 Wizard completed - containers will start after UI loads")
         else:
             logger.info("🧪 Wizard not completed - Docker containers will start via wizard")
 

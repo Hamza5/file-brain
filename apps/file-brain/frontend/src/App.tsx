@@ -10,6 +10,7 @@ import { MainContent } from "./components/layout/MainContent";
 import { PreviewSidebar } from "./components/sidebars/PreviewSidebar";
 import { InitializationWizard } from "./components/wizard/InitializationWizard";
 import { StatusBar } from "./components/layout/StatusBar";
+import { ContainerInitOverlay } from "./components/container/ContainerInitOverlay";
 import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus, type CrawlStatus } from "./api/client";
 
 // Configure Typesense InstantSearch adapter
@@ -133,6 +134,7 @@ function AppContent() {
 
 export default function App() {
   const [wizardCompleted, setWizardCompleted] = useState<boolean | null>(null);
+  const [containersReady, setContainersReady] = useState<boolean>(false);
 
   // Check wizard status on mount
   useEffect(() => {
@@ -163,6 +165,12 @@ export default function App() {
     <StatusProvider enabled={wizardCompleted === true}>
       <NotificationProvider>
         <AppContent />
+
+        {/* Container initialization overlay - blocks interaction until containers ready */}
+        <ContainerInitOverlay 
+          isVisible={!containersReady} 
+          onReady={() => setContainersReady(true)}
+        />
 
         {/* Global Confirm Dialog - Single instance for all delete operations */}
         <ConfirmDialog />

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { ProgressSpinner } from 'primereact/progressspinner';
@@ -17,37 +17,58 @@ export function ServiceLogsViewer({ visible, onHide, serviceName, userFriendlyNa
   const [loading, setLoading] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch logs when dialog opens
+  // Extract actual service name from Docker container name
+  // e.g., "file-brain-typesense-1" -> "typesense"
+  // Memoize to prevent infinite loop
+  const actualServiceName = useMemo(() => {
+    const lower = serviceName.toLowerCase();
+    if (lower.includes('typesense')) return 'typesense';
+    if (lower.includes('tika')) return 'tika';
+    return serviceName; // fallback to original name
+  }, [serviceName]);
+
+  // Fetch logs when dialog opens (initial fetch only)
   useEffect(() => {
-    if (visible && serviceName) {
-      setLoading(true);
-      fetch(`/api/system/services/${serviceName}/logs`)
+    if (!visible || !actualServiceName) {
+      return;
+    }
+
+    setLoading(true);
+    
+    // Initial fetch
+    fetch(`/api/system/services/${actualServiceName}/logs`)
+      .then(res => res.json())
+      .then(data => {
+        setLogs(data.logs || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch logs", err);
+        setLogs(["Failed to load logs"]);
+        setLoading(false);
+      });
+  }, [visible, actualServiceName]);
+
+  // Separate effect for polling (only when visible and not ready)
+  useEffect(() => {
+    if (!visible || !actualServiceName || status === 'ready') {
+      return;
+    }
+
+    // Poll for new logs while service is not ready
+    const interval = setInterval(() => {
+      fetch(`/api/system/services/${actualServiceName}/logs`)
         .then(res => res.json())
         .then(data => {
           setLogs(data.logs || []);
-          setLoading(false);
         })
-        .catch(err => {
-          console.error("Failed to fetch logs", err);
-          setLogs(["Failed to load logs"]);
-          setLoading(false);
-        });
-        
-      // Also poll for new logs while open if service is not ready
-      const interval = setInterval(() => {
-        if (status !== 'ready') {
-          fetch(`/api/system/services/${serviceName}/logs`)
-            .then(res => res.json())
-            .then(data => {
-              setLogs(data.logs || []);
-            })
-            .catch(console.error);
-        }
-      }, 2000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [visible, serviceName, status]);
+        .catch(console.error);
+    }, 2000);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [visible, actualServiceName, status]);
 
   // Auto-scroll to bottom
   useEffect(() => {

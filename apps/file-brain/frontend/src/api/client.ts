@@ -713,6 +713,64 @@ export async function resetWizard(): Promise<{
   return requestJSON("/api/v1/wizard/reset", { method: "POST" });
 }
 
+// App Container Startup API (Post-Wizard)
+export async function startAppContainers(): Promise<{
+  success: boolean;
+  message?: string;
+  timestamp: number;
+}> {
+  return requestJSON("/api/v1/wizard/app-containers-start", { method: "POST" });
+}
+
+export interface AppContainerStatus {
+  success: boolean;
+  running: boolean;
+  healthy: boolean;
+  services: DockerService[];
+  error?: string;
+  timeout?: boolean;
+  message?: string;
+  timestamp: number;
+}
+
+export function connectAppContainerStatusStream(
+  onStatus: (status: AppContainerStatus) => void,
+  onError?: (error: string) => void,
+  onComplete?: () => void
+): () => void {
+  const eventSource = new EventSource("/api/v1/wizard/app-containers-status");
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data: AppContainerStatus = JSON.parse(event.data);
+
+      if (data.error) {
+        if (onError) onError(data.error);
+        eventSource.close();
+      } else if (data.timeout) {
+        onStatus(data);
+        if (onError) onError(data.message || "Container startup timed out");
+        eventSource.close();
+      } else if (data.healthy) {
+        onStatus(data);
+        if (onComplete) onComplete();
+        eventSource.close();
+      } else {
+        onStatus(data);
+      }
+    } catch {
+      // Failed to parse container status event - silent failure
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError("Connection lost");
+  };
+
+  return () => eventSource.close();
+}
+
 // Extended Stats API types
 export interface RecentFile {
   file_path: string;
