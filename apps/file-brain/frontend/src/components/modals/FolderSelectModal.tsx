@@ -3,7 +3,7 @@ import { Dialog } from "primereact/dialog";
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { Message } from "primereact/message";
-import { getFsRoots, listFs, type FsRoot, type FsEntry } from "../api/client";
+import { getFsRoots, listFs, type FsRoot, type FsEntry } from "../../api/client";
 
 type FolderSelectModalProps = {
   isOpen: boolean;
@@ -48,8 +48,6 @@ export function FolderSelectModal({
       setCurrentPath("");
       setEntries([]);
       setFilter("");
-      setFilter("");
-      setFilter("");
       setSelectedPath("");
       setLoading(false);
       setInitializing(false);
@@ -93,9 +91,8 @@ export function FolderSelectModal({
         setSelectedPath(defaultRoot.path);
 
         await loadEntries(defaultRoot.path, cancelled);
-      } catch (e) {
+      } catch {
         if (!cancelled) {
-          console.error("Failed to load filesystem roots", e);
           setError(
             "Unable to browse filesystem. Please type the path manually in the Settings page."
           );
@@ -112,7 +109,6 @@ export function FolderSelectModal({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   async function loadEntries(path: string, cancelledFlag?: boolean) {
@@ -122,8 +118,7 @@ export function FolderSelectModal({
       const children = await listFs(path);
       if (cancelledFlag) return;
       setEntries(children);
-    } catch (e) {
-      console.error("Failed to list directory", e);
+    } catch {
       if (!cancelledFlag) {
         setEntries([]);
         setError(

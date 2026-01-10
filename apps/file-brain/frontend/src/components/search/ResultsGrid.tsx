@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useHits, useInstantSearch } from 'react-instantsearch';
-import { FileContextMenu } from './FileContextMenu';
-import { fileOperationsService, type FileOperationRequest } from '../services/fileOperations';
+import { FileContextMenu } from '../modals/FileContextMenu';
+import { fileOperationsService, type FileOperationRequest } from '../../services/fileOperations';
+import { type SearchHit } from '../../types/search';
 import { confirmDialog } from 'primereact/confirmdialog';
 import { Tooltip } from 'primereact/tooltip';
-import { pickIconClass, formatDate, getFileName } from '../utils/fileUtils';
+import { pickIconClass, formatDate, getFileName } from '../../utils/fileUtils';
 
 interface ResultsGridProps {
-    onResultClick: (result: any) => void;
+    onResultClick: (result: SearchHit) => void;
     isCrawlerActive?: boolean;
 }
 
@@ -19,7 +20,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         isOpen: boolean;
         position: { x: number; y: number };
         filePath: string;
-        file: any;
+        file: SearchHit | null;
     }>({
         isOpen: false,
         position: { x: 0, y: 0 },
@@ -27,7 +28,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         file: null
     });
 
-    const handleContextMenu = (e: React.MouseEvent, hit: any) => {
+    const handleContextMenu = (e: React.MouseEvent, hit: SearchHit) => {
         e.preventDefault();
         setContextMenu({
             isOpen: true,
@@ -52,8 +53,8 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                         await fileOperationsService.deleteFile(request.file_path);
                         // Refresh search results after successful deletion
                         refresh();
-                    } catch (error) {
-                        console.error('Failed to delete file:', error);
+                    } catch {
+                        // Failed to delete file - silent failure
                     }
                 }
             });
@@ -71,8 +72,8 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                         await fileOperationsService.forgetFile(request.file_path);
                         // Refresh search results after successful forget
                         refresh();
-                    } catch (error) {
-                        console.error('Failed to forget file:', error);
+                    } catch {
+                        // Failed to forget file - silent failure
                     }
                 }
             });
@@ -178,12 +179,13 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                         gap: '0.75rem'
                     }}>
                         {
-                            results?.hits.map((hit: any) => {
-                                const iconClass = pickIconClass(hit.file_type, hit.mime_type, hit.file_extension);
-                                const extension = hit.file_extension ? hit.file_extension.replace('.', '').toUpperCase() : (hit.file_type || 'FILE');
+                            results?.hits.map((hit) => {
+                                const searchHit = hit as SearchHit;
+                                const iconClass = pickIconClass(undefined, searchHit.mime_type, searchHit.file_extension);
+                                const extension = searchHit.file_extension ? searchHit.file_extension.replace('.', '').toUpperCase() : 'FILE';
 
                                 return (
-                                    <div key={hit.objectID} style={{ padding: '0.5rem' }}>
+                                    <div key={searchHit.objectID} style={{ padding: '0.5rem' }}>
                                         <div
                                             style={{
                                                 backgroundColor: 'var(--surface-card)',
@@ -198,8 +200,8 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                 height: '100%',
                                                 boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
                                             }}
-                                            onClick={() => onResultClick(hit)}
-                                            onContextMenu={(e) => handleContextMenu(e, hit)}
+                                            onClick={() => onResultClick(searchHit)}
+                                            onContextMenu={(e) => handleContextMenu(e, searchHit)}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
                                                 e.currentTarget.style.transform = 'translateY(-4px)';
@@ -230,9 +232,9 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                     textOverflow: 'ellipsis'
                                                 }}
                                                 className="grid-tooltip"
-                                                data-pr-tooltip={getFileName(hit.file_path)}
+                                                data-pr-tooltip={getFileName(searchHit.file_path)}
                                                 >
-                                                    {getFileName(hit.file_path)}
+                                                    {getFileName(searchHit.file_path)}
                                                 </div>
                                                 <div style={{
                                                     fontSize: '0.75rem',
@@ -242,9 +244,9 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                     textOverflow: 'ellipsis'
                                                 }}
                                                 className="grid-tooltip"
-                                                data-pr-tooltip={hit.file_path}
+                                                data-pr-tooltip={searchHit.file_path}
                                                 >
-                                                    {hit.file_path}
+                                                    {searchHit.file_path}
                                                 </div>
                                                 <div style={{
                                                     display: 'flex',
@@ -264,7 +266,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                         {extension}
                                                     </span>
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-color-secondary)' }}>
-                                                        {formatDate(hit.modified_time)}
+                                                        {formatDate(searchHit.modified_time)}
                                                     </span>
                                                 </div>
                                             </div>

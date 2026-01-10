@@ -3,11 +3,10 @@ import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
 import { DataView } from 'primereact/dataview';
 import { Toast } from 'primereact/toast';
-import { Message } from 'primereact/message';
 import { InputSwitch } from 'primereact/inputswitch';
 import { Tooltip } from 'primereact/tooltip';
-import { listWatchPaths, addWatchPath, deleteWatchPath, updateWatchPath, type WatchPath } from '../api/client';
-import { FolderSelectModal } from './FolderSelectModal';
+import { listWatchPaths, addWatchPath, deleteWatchPath, updateWatchPath, type WatchPath } from '../../api/client';
+import { FolderSelectModal } from '../modals/FolderSelectModal';
 
 interface WatchedFoldersSidebarProps {
     visible: boolean;
@@ -25,8 +24,7 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({ vi
         try {
             const paths = await listWatchPaths();
             setWatchPaths(paths);
-        } catch (error) {
-            console.error("Failed to load watch paths:", error);
+        } catch {
             toast.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to load watch paths' });
         }
     };
@@ -45,8 +43,7 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({ vi
             toast.current?.show({ severity: 'success', summary: 'Success', detail: 'Watch path added' });
             // Trigger stats refresh to update empty state
             onRefreshStats?.();
-        } catch (error) {
-            console.error("Failed to add watch path:", error);
+        } catch {
             toast.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to add watch path' });
         }
     };
@@ -57,8 +54,7 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({ vi
             await loadWatchPaths();
             toast.current?.show({ severity: 'success', summary: 'Success', detail: 'Watch path removed' });
             onRefreshStats?.();
-        } catch (error) {
-            console.error("Failed to delete watch path:", error);
+        } catch {
             toast.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to delete watch path' });
         }
     };
@@ -143,8 +139,7 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({ vi
                                         await updateWatchPath(item.id, { enabled: e.value });
                                         // Specific to Primereact InputSwitch onChange event value
                                         await loadWatchPaths();
-                                    } catch (error) {
-                                        console.error("Failed to update watch path:", error);
+                                    } catch {
                                         toast.current?.show({ severity: 'error', summary: 'Error', detail: 'Failed to update watch path status' });
                                     }
                                 }}

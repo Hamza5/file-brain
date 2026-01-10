@@ -6,12 +6,10 @@ import { Card } from 'primereact/card';
 import { confirmDialog } from "primereact/confirmdialog";
 import { Tooltip } from 'primereact/tooltip';
 import { useInstantSearch } from 'react-instantsearch';
-import { FileContextMenu } from './FileContextMenu';
-import { fileOperationsService } from '../services/fileOperations';
-import { useFileSelection } from '../context/FileSelectionContext';
-import { useNotification } from '../context/NotificationContext';
+import { FileContextMenu } from '../modals/FileContextMenu';
+import { fileOperationsService } from '../../services/fileOperations';
 
-import { getFileName } from '../utils/fileUtils';
+import { getFileName } from '../../utils/fileUtils';
 interface HitType {
   file_name: string;
   file_path: string;  // Backend field name
@@ -38,8 +36,6 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
-  const { showSuccess, showError, showInfo } = useNotification();
-  const { isFileSelected, selectFile, toggleFileSelection } = useFileSelection();
   const { refresh } = useInstantSearch();
 
   // Helper to get actual file path (handles both field names)
@@ -48,7 +44,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   };
 
   const filePath = getFilePath();
-  const isSelected = filePath ? isFileSelected(filePath) : false;
+  const isSelected = false; // Simplified - selection removed
   const snippet = hit.content || "";
   const shortSnippet = snippet.length > 260 ? `${snippet.slice(0, 260)}…` : snippet;
 
@@ -57,24 +53,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-
-    if (!filePath) {
-      console.warn('No file path available for:', getFileName(hit.file_path));
-      return;
-    }
-
-    console.log(`Click on file: ${getFileName(hit.file_path)} (path: ${filePath})`);
-
-    // Single click handling:
-    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-
-    if (isCtrlOrCmd) {
-      console.log('Toggling selection (Ctrl/Cmd held)');
-      toggleFileSelection(filePath);
-    } else {
-      console.log('Selecting single file');
-      selectFile(filePath);
-    }
+    // Click handling simplified - selection feature removed
   };
 
   const handleDoubleClick = async (e: React.MouseEvent) => {
@@ -82,19 +61,13 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
     e.stopPropagation();
 
     if (!filePath) {
-      showError('Error', `Cannot open ${getFileName(hit.file_path)} - missing file path`);
       return;
     }
 
     try {
-      const result = await fileOperationsService.openFile(filePath);
-      if (result.success) {
-        showSuccess('File Opened', `Successfully opened ${getFileName(hit.file_path)}`);
-      } else {
-        showError('Error', result.error || 'Failed to open file');
-      }
+      await fileOperationsService.openFile(filePath);
     } catch {
-      showError('Error', 'Failed to open file');
+      // Silent failure
     }
   };
 
@@ -111,17 +84,14 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
 
   const handleFileOperation = async (request: { file_path: string; operation: 'file' | 'folder' | 'delete' | 'forget' }) => {
     try {
-      let result;
-
       switch (request.operation) {
         case 'file':
-          result = await fileOperationsService.openFile(request.file_path);
+          await fileOperationsService.openFile(request.file_path);
           break;
         case 'folder':
-          result = await fileOperationsService.openFolder(request.file_path);
+          await fileOperationsService.openFolder(request.file_path);
           break;
         case 'delete':
-          // Confirm before deletion using PrimeReact ConfirmDialog
           confirmDialog({
             message: `Are you sure you want to permanently delete "${getFileName(hit.file_path)}"? This action cannot be undone.`,
             header: 'Confirm Deletion',
@@ -129,29 +99,15 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
             acceptClassName: 'p-button-danger',
             accept: async () => {
               try {
-                // Show immediate feedback
-                showInfo('Processing...', 'Deleting file from filesystem and search index');
-
-                const result = await fileOperationsService.deleteFile(request.file_path);
-
-                if (result.success) {
-                  showSuccess('Success', 'File permanently deleted from filesystem');
-                  // Optimistic update: refresh search results immediately
-                  refresh();
-                } else {
-                  showError('Error', result.error || 'Failed to delete file');
-                }
+                await fileOperationsService.deleteFile(request.file_path);
+                refresh();
               } catch {
-                showError('Error', 'Operation failed');
+                // Silent failure
               }
-            },
-            reject: () => {
-              // User cancelled - do nothing
             }
           });
-          return; // Exit early since we handle the result in the accept callback
+          return;
         case 'forget':
-          // Confirm before removing from index using PrimeReact ConfirmDialog
           confirmDialog({
             message: `Are you sure you want to remove "${getFileName(hit.file_path)}" from the search index? The file will remain on disk but won't appear in search results.`,
             header: 'Remove from Search Index',
@@ -159,55 +115,17 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
             acceptClassName: 'p-button-warning',
             accept: async () => {
               try {
-                // Show immediate feedback
-                showInfo('Processing...', 'Removing file from search index');
-
-                const result = await fileOperationsService.forgetFile(request.file_path);
-
-                if (result.success) {
-                  showSuccess('Success', 'File removed from search index');
-                  // Optimistic update: refresh search results immediately
-                  refresh();
-                } else {
-                  showError('Error', result.error || 'Failed to remove file from search index');
-                }
+                await fileOperationsService.forgetFile(request.file_path);
+                refresh();
               } catch {
-                showError('Error', 'Operation failed');
+                // Silent failure
               }
-            },
-            reject: () => {
-              // User cancelled - do nothing
             }
           });
-          return; // Exit early since we handle the result in the accept callback
-        default:
-          showError('Error', `Unknown operation: ${request.operation}`);
           return;
       }
-
-      if (result && result.success) {
-        let successMessage = '';
-        switch (request.operation as string) {
-          case 'file':
-            successMessage = 'Successfully opened file';
-            break;
-          case 'folder':
-            successMessage = 'Successfully opened folder';
-            break;
-          case 'delete':
-            successMessage = 'File permanently deleted from filesystem';
-            break;
-          case 'forget':
-            successMessage = 'File removed from search index';
-            break;
-        }
-        showSuccess('Success', successMessage);
-      } else if (result) {
-        showError('Error', result.error || `Failed to ${request.operation} file`);
-      }
-
     } catch {
-      showError('Error', 'Operation failed');
+      // Silent failure
     }
   };
 
@@ -313,8 +231,6 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                   whiteSpace: "nowrap",
                   flex: 1
                 }}
-                  flex: 1
-                }}
               >
                  <Tooltip target=".hit-filename-tooltip" position="top" />
                  <span className="hit-filename-tooltip" data-pr-tooltip={getFileName(hit.file_path)}>
@@ -347,8 +263,6 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                 marginBottom: "0.5rem",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                whiteSpace: "nowrap"
-              }}
                 whiteSpace: "nowrap"
               }}
             >

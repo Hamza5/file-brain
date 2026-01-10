@@ -1,10 +1,11 @@
 import React from 'react';
-import { HeroStats } from './HeroStats';
-import { ResultsGrid } from './ResultsGrid';
+import { HeroStats } from '../dashboard/HeroStats';
+import { type SearchHit } from '../../types/search';
+import { ResultsGrid } from '../search/ResultsGrid';
 import { useSearchBox } from 'react-instantsearch';
 
 interface MainContentProps {
-    onResultClick: (result: any) => void;
+    onResultClick: (result: SearchHit) => void;
     isCrawlerActive?: boolean;
 }
 

@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import TypesenseInstantSearchAdapter from "typesense-instantsearch-adapter";
 import { InstantSearch, Configure } from "react-instantsearch";
 import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
 import { ConfirmDialog } from "primereact/confirmdialog";
-import { Header } from "./components/Header";
-import { MainContent } from "./components/MainContent";
-import { PreviewSidebar } from "./components/PreviewSidebar";
-import { InitializationWizard } from "./components/InitializationWizard";
-import { StatusBar } from "./components/StatusBar";
-import { connectStatusStream, startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus, type CrawlStatus } from "./api/client";
+import { type SearchHit } from "./types/search";
+import { Header } from "./components/layout/Header";
+import { MainContent } from "./components/layout/MainContent";
+import { PreviewSidebar } from "./components/sidebars/PreviewSidebar";
+import { InitializationWizard } from "./components/wizard/InitializationWizard";
+import { StatusBar } from "./components/layout/StatusBar";
+import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus, type CrawlStatus } from "./api/client";
 
 // Configure Typesense InstantSearch adapter
 const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
@@ -52,13 +53,8 @@ function AppContent() {
   const hasIndexedFiles = (stats?.totals?.discovered || 0) > 0;
   const hasFoldersConfigured = (watchPaths?.length || 0) > 0;
 
-  // Connect to status stream
-  useEffect(() => {
-    const cleanup = connectStatusStream();
-    return cleanup;
-  }, []);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [selectedFile, setSelectedFile] = useState<SearchHit | null>(null);
 
   // Sync local state with global status
   useEffect(() => {
@@ -93,7 +89,7 @@ function AppContent() {
     }
   };
 
-  const handleResultClick = (file: any) => {
+  const handleResultClick = (file: SearchHit) => {
     setSelectedFile(file);
     setPreviewVisible(true);
   };
@@ -118,7 +114,7 @@ function AppContent() {
           onToggleCrawler={handleToggleCrawler}
           isMonitoring={isMonitoring}
           onToggleMonitoring={handleToggleMonitoring}
-          crawlerStatus={crawlerStatus}
+          crawlerStatus={crawlerStatus || undefined}
           hasIndexedFiles={hasIndexedFiles}
           hasFoldersConfigured={hasFoldersConfigured}
         />

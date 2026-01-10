@@ -1,7 +1,7 @@
-import { useStatus } from '../context/StatusContext';
+import { useStatus } from '../../context/StatusContext';
 import { Tag } from 'primereact/tag';
 import { ProgressBar } from 'primereact/progressbar';
-import { type ServiceInitStatus } from '../api/client';
+import { type ServiceInitStatus } from '../../api/client';
 
 export function InitializationStatusBar() {
   const { systemInitialization, isInitializationComplete } = useStatus();

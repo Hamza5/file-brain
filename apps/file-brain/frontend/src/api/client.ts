@@ -46,7 +46,10 @@ const API_BASE_URL = "";
 // In production behind the same origin, keep this empty and proxy /api to FastAPI.
 // During Vite dev, configure server.proxy in vite.config.ts so that ^/api goes to FastAPI.
 
-async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
+/**
+ * Generic JSON request helper
+ */
+export async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
   const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
   const res = await fetch(url, {
     headers: {
@@ -296,13 +299,13 @@ export function connectStatusStream(
     try {
       const data = JSON.parse(event.data) as StreamPayload;
       onUpdate(data);
-    } catch (e) {
-      console.error("Failed to parse stream event", e);
+    } catch {
+      // Failed to parse stream event - silent failure
     }
   };
 
   es.onerror = (event: Event) => {
-    console.warn("Crawler stream error", event);
+    // Stream error - let caller handle via onError callback
     if (onError) {
       onError(event);
     }
@@ -404,8 +407,8 @@ export function connectInitializationStream(
       if (data && typeof data === "object") {
         onUpdate(data);
       }
-    } catch (e) {
-      console.error("Failed to parse init stream event", e);
+    } catch {
+      // Failed to parse init stream event - silent failure
     }
   };
 
@@ -521,8 +524,8 @@ export function connectDockerPullStream(
       } else if (!data.heartbeat) {
         onProgress(data);
       }
-    } catch (e) {
-      console.error("Failed to parse docker pull event", e);
+    } catch {
+      // Failed to parse docker pull event - silent failure
     }
   };
 
@@ -548,8 +551,8 @@ export function connectDockerLogsStream(
       } else if (data.log) {
         onLog(data.log, data.timestamp);
       }
-    } catch (e) {
-      console.error("Failed to parse docker log event", e);
+    } catch {
+      // Failed to parse docker log event - silent failure
     }
   };
 
@@ -591,8 +594,8 @@ export function connectCollectionLogsStream(
         onLog(data.log, data.timestamp);
       }
       // Ignore heartbeat messages
-    } catch (e) {
-      console.error("Failed to parse collection log event", e);
+    } catch {
+      // Failed to parse collection log event - silent failure
     }
   };
 
@@ -657,8 +660,8 @@ export function connectModelDownloadStream(
       } else if (!data.heartbeat) {
         onProgress(data);
       }
-    } catch (e) {
-      console.error("Failed to parse model download event", e);
+    } catch {
+      // Failed to parse model download event - silent failure
     }
   };
 

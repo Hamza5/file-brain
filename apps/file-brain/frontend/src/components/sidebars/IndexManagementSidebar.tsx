@@ -3,7 +3,7 @@ import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
 import { confirmDialog } from 'primereact/confirmdialog';
-import { clearIndexes, resetWizard } from '../api/client';
+import { clearIndexes, resetWizard } from '../../api/client';
 
 interface IndexManagementSidebarProps {
     visible: boolean;
@@ -37,8 +37,7 @@ export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ 
                         life: 5000
                     });
                      // Close sidebar after successful action? Optional.
-                } catch (error) {
-                    console.error("Failed to clear indexes:", error);
+                } catch {
                     toast.current?.show({
                         severity: 'error',
                         summary: 'Error',
@@ -77,8 +76,7 @@ export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ 
                     setTimeout(() => {
                         window.location.reload();
                     }, 1000);
-                } catch (error) {
-                    console.error("Failed to reset wizard:", error);
+                } catch {
                     toast.current?.show({
                         severity: 'error',
                         summary: 'Error',

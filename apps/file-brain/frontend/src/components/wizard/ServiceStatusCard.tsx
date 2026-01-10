@@ -3,7 +3,7 @@ import { Card } from 'primereact/card';
 import { ProgressBar } from 'primereact/progressbar';
 import { Tag } from 'primereact/tag';
 import { Button } from 'primereact/button';
-import { type ServiceInitStatus } from '../api/client';
+import { type ServiceInitStatus } from '../../api/client';
 import { ServiceLogsViewer } from './ServiceLogsViewer';
 
 interface ServiceStatusCardProps {

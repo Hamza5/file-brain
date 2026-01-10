@@ -2,7 +2,7 @@
  * File context menu component with FontAwesome icons
  */
 import { useEffect, useRef } from 'react';
-import type { FileOperationRequest } from '../services/fileOperations';
+import type { FileOperationRequest } from '../../services/fileOperations';
 
 interface FileContextMenuProps {
   filePath: string;

@@ -143,8 +143,7 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
         if (!isUnmounted) {
             applySnapshot(initialStatus, initialStats, initialWatchPaths, initialSystemInit);
         }
-      } catch (e) {
-        console.error("Failed to load initial crawler state", e);
+      } catch {
         if (!isUnmounted) {
             setError(
             "Failed to load crawler status. Some features may be temporarily unavailable."
@@ -158,7 +157,6 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
     function startPolling() {
       if (pollTimer !== null) return;
       
-      console.debug("Starting polling fallback...");
       // Only poll if SSE is not active
       const intervalMs = 5000;
       pollTimer = window.setInterval(async () => {
@@ -184,8 +182,7 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
            if (!isUnmounted) {
                applySnapshot(nextStatus, nextStats, nextWatchPaths, nextSystemInit);
            }
-        } catch (e) {
-          console.error("Polling error", e);
+        } catch {
           if (!isUnmounted) {
               setError(
                 "Lost connection to crawler status. Some information may be out of date."
@@ -199,7 +196,6 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
       if (pollTimer !== null) {
         window.clearInterval(pollTimer);
         pollTimer = null;
-        console.debug("Stopped polling (SSE connected)");
       }
     }
 
@@ -230,13 +226,10 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
             updateLiveStatus(false);
             // Fallback to polling immediately
             startPolling();
-            console.debug("SSE status stream disconnected/error, scheduling retry...");
-            
             // Schedule reconnection attempt
             if (!retryTimer) {
                 retryTimer = setTimeout(() => {
                     retryTimer = null;
-                    console.debug("Retrying SSE connection...");
                     startStream();
                 }, 10000); // Retry after 10s
             }
@@ -287,13 +280,11 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
             applySnapshot(null, null, undefined, systemInit);
           },
           () => {
-             console.debug("SSE init stream disconnected");
              // Note: We don't trigger polling/retry just for init stream as main status stream is primary
           }
         );
         
-      } catch (e) {
-        console.warn("Failed to start SSE streams", e);
+      } catch {
         setIsLive(false);
         startPolling();
         // Schedule retry

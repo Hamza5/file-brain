@@ -1,17 +1,18 @@
 import React from 'react';
-import { getFileName } from "../utils/fileUtils";
+import { getFileName } from "../../utils/fileUtils";
 import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
-import { fileOperationsService } from '../services/fileOperations';
+import { fileOperationsService } from '../../services/fileOperations';
+import { type SearchHit } from '../../types/search';
 import { confirmDialog } from 'primereact/confirmdialog';
 import { Tooltip } from 'primereact/tooltip';
-import { formatSize, formatDate } from '../utils/fileUtils';
+import { formatSize, formatDate } from '../../utils/fileUtils';
 import { Snippet, useInstantSearch } from 'react-instantsearch';
 
 interface PreviewSidebarProps {
     visible: boolean;
     onHide: () => void;
-    file: any;
+    file: SearchHit | null;
 }
 
 export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide, file }) => {
@@ -39,23 +40,34 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
         });
     };
 
-    // Check specifically for content match
-    const hasContentMatch = file._snippetResult?.content?.matchLevel !== 'none' && file._snippetResult?.content?.value;
+    // Safely check for content match with type guard
+    const hasContentMatch = file._snippetResult?.content &&
+        'matchLevel' in file._snippetResult.content &&
+        file._snippetResult.content.matchLevel !== 'none' &&
+        'value' in file._snippetResult.content &&
+        file._snippetResult.content.value;
 
-    // Get all other matches (excluding content)
-    const getMetadataMatches = () => {
-        if (!file._snippetResult) return [];
+    // Get other matched fields with proper type checking
+    const metadataMatches = file._snippetResult
+        ? Object.keys(file._snippetResult)
+            .filter(key => {
+                const result = file._snippetResult?.[key];
+                return key !== 'content' &&
+                    result &&
+                    typeof result === 'object' &&
+                    'matchLevel' in result &&
+                    result.matchLevel !== 'none';
+            })
+            .map(key => {
+                const result = file._snippetResult?.[key];
+                return {
+                    key,
+                    label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+                    value: result && typeof result === 'object' && 'value' in result ? result.value : ''
+                };
+            })
+        : [];
 
-        return Object.keys(file._snippetResult)
-            .filter(key => key !== 'content' && file._snippetResult[key].matchLevel !== 'none')
-            .map(key => ({
-                key,
-                label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
-                value: file._snippetResult[key].value
-            }));
-    };
-
-    const metadataMatches = getMetadataMatches();
     const hasAnyMatch = hasContentMatch || metadataMatches.length > 0;
 
     return (
@@ -109,7 +121,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                                     }}>
                                         Content Match
                                     </div>
-                                    <Snippet hit={file} attribute="content" />
+                                    <Snippet hit={file as any} attribute="content" />
                                 </div>
                             )}
 
@@ -130,7 +142,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                                     }}>
                                         {match.label} Match
                                     </div>
-                                    <Snippet hit={file} attribute={match.key} />
+                                    <Snippet hit={file as any} attribute={match.key} />
                                 </div>
                             ))}
                         </>
@@ -190,7 +202,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                         <div style={{ color: 'var(--text-color)' }}>{formatSize(file.file_size)}</div>
 
                         <div style={{ color: 'var(--text-color-secondary)' }}>Type</div>
-                        <div style={{ color: 'var(--text-color)' }}>{file.mime_type || file.file_type || 'Unknown'}</div>
+                        <div style={{ color: 'var(--text-color)' }}>{file.mime_type || 'Unknown'}</div>
 
                         <div style={{ color: 'var(--text-color-secondary)' }}>Modified</div>
                         <div style={{ color: 'var(--text-color)' }}>{formatDate(file.modified_time)}</div>
