@@ -5,6 +5,7 @@ import { Button } from 'primereact/button';
 import { Message } from 'primereact/message';
 import { ConfirmDialog } from 'primereact/confirmdialog';
 import { completeWizard } from '../../api/client';
+import { ThemeSwitcher } from '../layout/ThemeSwitcher';
 import { DockerCheckStep } from './steps/DockerCheckStep';
 import { ImagePullStep } from './steps/ImagePullStep';
 import { ServiceStartStep } from './steps/ServiceStartStep';
@@ -92,6 +93,11 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
     <div className="flex flex-column h-full p-4 overflow-y-auto">
       <ConfirmDialog />
       
+      {/* Theme Switcher - Positioned in top right */}
+      <div className="fixed top-0 right-0 m-3" style={{ zIndex: 1000 }}>
+        <ThemeSwitcher />
+      </div>
+
       <div className="flex flex-column align-items-center mb-4">
         <h1 className="text-4xl font-bold text-primary mb-2">
           <i className="fas fa-brain mr-2" />

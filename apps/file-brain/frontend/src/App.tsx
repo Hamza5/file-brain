@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import TypesenseInstantSearchAdapter from "typesense-instantsearch-adapter";
 import { InstantSearch, Configure } from "react-instantsearch";
+import { PrimeReactProvider } from 'primereact/api';
 import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
+import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { type SearchHit } from "./types/search";
 import { Header } from "./components/layout/Header";
@@ -157,25 +159,35 @@ export default function App() {
 
   // Show wizard if not completed
   if (!wizardCompleted) {
-    return <InitializationWizard onComplete={() => setWizardCompleted(true)} />;
+    return (
+      <PrimeReactProvider>
+        <ThemeProvider>
+          <InitializationWizard onComplete={() => setWizardCompleted(true)} />
+        </ThemeProvider>
+      </PrimeReactProvider>
+    );
   }
 
   // Show main app only after wizard completion
   return (
-    <StatusProvider enabled={wizardCompleted === true}>
-      <NotificationProvider>
-        <AppContent />
+    <PrimeReactProvider>
+      <ThemeProvider>
+        <StatusProvider enabled={wizardCompleted === true}>
+          <NotificationProvider>
+            <AppContent />
 
-        {/* Container initialization overlay - blocks interaction until containers ready */}
-        <ContainerInitOverlay 
-          isVisible={!containersReady} 
-          onReady={() => setContainersReady(true)}
-        />
+            {/* Container initialization overlay - blocks interaction until containers ready */}
+            <ContainerInitOverlay 
+              isVisible={!containersReady} 
+              onReady={() => setContainersReady(true)}
+            />
 
-        {/* Global Confirm Dialog - Single instance for all delete operations */}
-        <ConfirmDialog />
-        <StatusBar />
-      </NotificationProvider>
-    </StatusProvider>
+            {/* Global Confirm Dialog - Single instance for all delete operations */}
+            <ConfirmDialog />
+            <StatusBar />
+          </NotificationProvider>
+        </StatusProvider>
+      </ThemeProvider>
+    </PrimeReactProvider>
   );
 }

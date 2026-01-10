@@ -70,7 +70,7 @@ export function FileContextMenu({
         left: adjustedPosition.x,
         top: adjustedPosition.y,
         zIndex: 1000,
-        backgroundColor: 'white',
+        backgroundColor: 'var(--surface-card)',
         border: '1px solid var(--surface-border)',
         borderRadius: '4px',
         boxShadow: '0 4px 12px rgba(0,0,0,0.15)',

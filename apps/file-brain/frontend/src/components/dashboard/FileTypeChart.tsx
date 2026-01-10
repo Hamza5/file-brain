@@ -57,7 +57,7 @@ export const FileTypeChart: React.FC<FileTypeChartProps> = ({ fileTypes, onSegme
         data: fileTypeData.map(([, count]) => count),
         backgroundColor: ["#42A5F5", "#66BB6A", "#FFA726", "#AB47BC", "#26C6DA", "#9E9E9E"],
         borderWidth: 2,
-        borderColor: "#ffffff",
+        borderColor: "var(--surface-card)",
       }],
     };
 
@@ -94,7 +94,7 @@ export const FileTypeChart: React.FC<FileTypeChartProps> = ({ fileTypes, onSegme
   }, [fileTypes, storageByType, chartMode, onSegmentClick]);
 
   return (
-    <Card className="h-full border-round-2xl shadow-2 bg-white" pt={{ content: { className: 'p-3' } }}>
+    <Card className="h-full border-round-2xl shadow-2 surface-card" pt={{ content: { className: 'p-3' } }}>
       <div className="flex justify-content-between align-items-center mb-3">
         <div className="flex align-items-center gap-1">
           <span className="font-semibold text-color">File Types</span>

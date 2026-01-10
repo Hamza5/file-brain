@@ -1,7 +1,6 @@
-@import 'instantsearch.css/themes/satellite.css';
+@import "instantsearch.css/themes/satellite.css";
 @import "@fortawesome/fontawesome-free/css/all.min.css";
 @import "primereact/resources/primereact.min.css";
-@import "primereact/resources/themes/lara-light-cyan/theme.css";
 @import "primeflex/primeflex.css";
 
 /* Global layout baseline for light theme */
@@ -139,4 +138,38 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--surface-400);
+}
+
+/* Dark Mode Glow Effects - Replace shadows with glows for better visibility */
+/* Detect dark theme by checking if the theme link contains 'dark' */
+html:has(link[id="theme-link"][href*="dark"]) .shadow-1,
+html:has(link[id="theme-link"][href*="dark"]) .p-card {
+  box-shadow: 0 0 8px rgba(66, 165, 245, 0.15) !important;
+}
+
+html:has(link[id="theme-link"][href*="dark"]) .shadow-2 {
+  box-shadow: 0 0 12px rgba(66, 165, 245, 0.2) !important;
+}
+
+html:has(link[id="theme-link"][href*="dark"]) .shadow-3 {
+  box-shadow: 0 0 16px rgba(66, 165, 245, 0.25) !important;
+}
+
+html:has(link[id="theme-link"][href*="dark"]) .shadow-4 {
+  box-shadow: 0 0 20px rgba(66, 165, 245, 0.3) !important;
+}
+
+html:has(link[id="theme-link"][href*="dark"]) .hover\:shadow-2:hover,
+html:has(link[id="theme-link"][href*="dark"]) .hover\:shadow-4:hover {
+  box-shadow: 0 0 16px rgba(66, 165, 245, 0.35) !important;
+}
+
+/* Header glow in dark mode */
+html:has(link[id="theme-link"][href*="dark"]) header {
+  box-shadow: 0 2px 12px rgba(66, 165, 245, 0.15) !important;
+}
+
+/* Logo color inversion for dark mode */
+html:has(link[id="theme-link"][href*="dark"]) header img[src="/icon.svg"] {
+  filter: invert(1) brightness(1.2);
 }

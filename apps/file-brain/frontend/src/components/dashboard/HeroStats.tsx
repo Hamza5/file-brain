@@ -34,9 +34,10 @@ export const HeroStats: React.FC = () => {
     onClick?: () => void;
   }) => (
     <div 
-        className={`bg-white border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1 relative ${onClick ? 'cursor-pointer hover:shadow-4 surface-hover transition-all transition-duration-200' : ''}`}
+        className={`surface-card border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1 relative ${onClick ? 'cursor-pointer hover:shadow-4 surface-hover transition-all transition-duration-200' : ''}`}
         onClick={onClick}
     >
+
       <div className="flex align-items-center justify-content-center bg-primary-reverse border-round-xl">
         <i className={`${icon} text-3xl text-primary`} />
       </div>
@@ -127,7 +128,7 @@ export const HeroStats: React.FC = () => {
 
       {/* Empty State */}
       {(!stats || stats.totals.indexed === 0) && (
-        <Card className="text-center" style={{ backgroundColor: "var(--blue-50)", border: "2px dashed var(--primary-color)" }}>
+        <Card className="text-center surface-100" style={{ border: "2px dashed var(--primary-color)" }}>
           <i className={`fa-solid ${hasFoldersConfigured ? "fa-play-circle" : "fa-folder-plus"} text-4xl text-primary mb-3`} />
           <h3 className="text-lg font-semibold text-color mb-2">
             {hasFoldersConfigured ? "Ready to Index" : "Get Started"}

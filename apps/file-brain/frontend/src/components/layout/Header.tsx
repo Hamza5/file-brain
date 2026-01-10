@@ -5,6 +5,7 @@ import { Tag } from 'primereact/tag';
 import { InputSwitch } from 'primereact/inputswitch';
 import { Tooltip } from 'primereact/tooltip';
 import { useSearchBox } from 'react-instantsearch';
+import { ThemeSwitcher } from './ThemeSwitcher';
 
 interface HeaderProps {
     isCrawlerActive: boolean;
@@ -232,6 +233,11 @@ export const Header: React.FC<HeaderProps> = ({
                             severity={isTogglingCrawler ? "info" : (isCrawlerActive ? "success" : "secondary")}
                             className="text-xs"
                         />
+                    </div>
+
+                    {/* Theme Switcher - Far Right */}
+                    <div className='flex-shrink-0'>
+                        <ThemeSwitcher />
                     </div>
 
                 </div>

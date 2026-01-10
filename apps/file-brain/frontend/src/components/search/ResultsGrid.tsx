@@ -251,21 +251,27 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                 <div style={{
                                                     display: 'flex',
                                                     alignItems: 'center',
-                                                    justifyContent: 'space-between',
+                                                    gap: '0.5rem',
+                                                    flexWrap: 'wrap',
                                                     marginTop: 'auto',
                                                     paddingTop: '0.5rem'
                                                 }}>
                                                     <span style={{
                                                         fontSize: '0.75rem',
-                                                        backgroundColor: 'var(--primary-50)',
-                                                        color: 'var(--primary-700)',
+                                                        backgroundColor: 'var(--primary-reverse)',
+                                                        color: 'var(--primary-color)',
                                                         padding: '0.25rem 0.5rem',
                                                         borderRadius: '4px',
-                                                        fontWeight: 500
+                                                        fontWeight: 500,
+                                                        flexShrink: 0
                                                     }}>
                                                         {extension}
                                                     </span>
-                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-color-secondary)' }}>
+                                                    <span style={{ 
+                                                        fontSize: '0.75rem', 
+                                                        color: 'var(--text-color-secondary)',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
                                                         {formatDate(searchHit.modified_time)}
                                                     </span>
                                                 </div>
