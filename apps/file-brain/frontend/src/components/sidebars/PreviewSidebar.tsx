@@ -117,8 +117,12 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                                         color: 'var(--primary-color)',
                                         fontSize: '0.8rem',
                                         textTransform: 'uppercase',
-                                        letterSpacing: '0.5px'
+                                        letterSpacing: '0.5px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
                                     }}>
+                                        <i className="fa-solid fa-font" style={{ fontSize: '0.9rem' }} />
                                         Content Match
                                     </div>
                                     <Snippet hit={file as any} attribute="content" />
@@ -138,14 +142,58 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                                         color: 'var(--primary-color)',
                                         fontSize: '0.8rem',
                                         textTransform: 'uppercase',
-                                        letterSpacing: '0.5px'
+                                        letterSpacing: '0.5px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
                                     }}>
+                                        <i className="fa-solid fa-font" style={{ fontSize: '0.9rem' }} />
                                         {match.label} Match
                                     </div>
                                     <Snippet hit={file as any} attribute={match.key} />
                                 </div>
                             ))}
                         </>
+                    ) : file.content ? (
+                        <div className="search-snippet" style={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem',
+                            lineHeight: '1.5',
+                            color: 'var(--text-color)',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word'
+                        }}>
+                            <div style={{
+                                fontWeight: 600,
+                                marginBottom: '0.5rem',
+                                color: 'var(--primary-color)',
+                                fontSize: '0.8rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}>
+                                <i className="fa-solid fa-brain" style={{ fontSize: '0.9rem' }} />
+                                Semantic Match
+                            </div>
+                            <div style={{
+                                backgroundColor: 'var(--surface-50)',
+                                padding: '0.75rem',
+                                borderRadius: '4px',
+                                borderLeft: '3px solid var(--primary-color)'
+                            }}>
+                                {file.content}
+                            </div>
+                            <div style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--text-color-secondary)',
+                                marginTop: '0.5rem',
+                                fontStyle: 'italic'
+                            }}>
+                                Found by AI semantic similarity (no exact keyword match)
+                            </div>
+                        </div>
                     ) : (
                         <div style={{
                             display: 'flex',
@@ -156,26 +204,17 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                             textAlign: 'center',
                             padding: '2rem'
                         }}>
-                            <i className="fa-solid fa-brain" style={{
+                            <i className="fa-solid fa-file" style={{
                                 fontSize: '3rem',
-                                color: 'var(--primary-color)',
+                                color: 'var(--text-color-secondary)',
                                 marginBottom: '1rem',
-                                opacity: 0.8
+                                opacity: 0.5
                             }} />
-                            <h3 style={{
-                                fontSize: '1.1rem',
-                                fontWeight: 600,
-                                marginBottom: '0.5rem',
-                                color: 'var(--text-color)'
-                            }}>
-                                Semantic Match
-                            </h3>
                             <p style={{
                                 color: 'var(--text-color-secondary)',
-                                fontSize: '0.9rem',
-                                lineHeight: '1.5'
+                                fontSize: '0.9rem'
                             }}>
-                                This file was found because its meaning is related to your search, even though it doesn't contain the exact keywords.
+                                No preview available
                             </p>
                         </div>
                     )}
