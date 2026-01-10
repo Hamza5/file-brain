@@ -60,7 +60,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown via lifespan (used in dev mode)
+    await perform_shutdown(vite_process)
+
+
+async def perform_shutdown(vite_process=None):
+    """Perform application shutdown tasks."""
     try:
         # Trigger Typesense snapshot before shutdown
         try:
@@ -103,6 +108,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
     logger.info("👋 Application shutdown complete")
+
+
+def on_shutdown_sync():
+    """Sync wrapper for FlaskWebGUI's on_shutdown callback."""
+    logger.info("🛑 Browser closed, initiating shutdown...")
+    asyncio.run(perform_shutdown())
 
 
 # Create FastAPI application
@@ -187,4 +198,5 @@ if __name__ == "__main__":
             port=port,
             width=1200,
             height=800,
+            on_shutdown=on_shutdown_sync,
         ).run()
