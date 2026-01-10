@@ -34,7 +34,7 @@ export const HeroStats: React.FC = () => {
     onClick?: () => void;
   }) => (
     <div 
-        className={`bg-white border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1 relative ${onClick ? 'cursor-pointer hover:shadow-4 surface-hover transition-all transition-duration-200' : ''}`}
+        className={`surface-card border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1 relative ${onClick ? 'cursor-pointer hover:shadow-4 surface-hover transition-all transition-duration-200' : ''}`}
         onClick={onClick}
     >
       <div className="flex align-items-center justify-content-center bg-primary-reverse border-round-xl">

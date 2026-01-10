@@ -3,6 +3,7 @@ import TypesenseInstantSearchAdapter from "typesense-instantsearch-adapter";
 import { InstantSearch, Configure } from "react-instantsearch";
 import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
+import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { type SearchHit } from "./types/search";
 import { Header } from "./components/layout/Header";
@@ -160,14 +161,16 @@ export default function App() {
 
   // Show main app only after wizard completion
   return (
-    <StatusProvider enabled={wizardCompleted === true}>
-      <NotificationProvider>
-        <AppContent />
+    <ThemeProvider>
+      <StatusProvider enabled={wizardCompleted === true}>
+        <NotificationProvider>
+          <AppContent />
 
-        {/* Global Confirm Dialog - Single instance for all delete operations */}
-        <ConfirmDialog />
-        <StatusBar />
-      </NotificationProvider>
-    </StatusProvider>
+          {/* Global Confirm Dialog - Single instance for all delete operations */}
+          <ConfirmDialog />
+          <StatusBar />
+        </NotificationProvider>
+      </StatusProvider>
+    </ThemeProvider>
   );
 }

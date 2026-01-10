@@ -1,7 +1,6 @@
 @import 'instantsearch.css/themes/satellite.css';
 @import "@fortawesome/fontawesome-free/css/all.min.css";
 @import "primereact/resources/primereact.min.css";
-@import "primereact/resources/themes/lara-light-cyan/theme.css";
 @import "primeflex/primeflex.css";
 
 /* Global layout baseline for light theme */
@@ -16,6 +15,7 @@ body {
   font-family: var(--font-family);
   background-color: var(--surface-ground);
   color: var(--text-color);
+  transition: background-color 0.2s, color 0.2s;
 }
 
 :root {
@@ -32,7 +32,7 @@ body {
   font-family: var(--font-family);
   color: var(--text-color);
   background-color: var(--surface-card);
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .ais-SearchBox-input:focus {

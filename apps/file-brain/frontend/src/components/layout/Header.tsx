@@ -5,6 +5,7 @@ import { Tag } from 'primereact/tag';
 import { InputSwitch } from 'primereact/inputswitch';
 import { Tooltip } from 'primereact/tooltip';
 import { useSearchBox } from 'react-instantsearch';
+import { ThemeSwitcher } from '../ThemeSwitcher';
 
 interface HeaderProps {
     isCrawlerActive: boolean;
@@ -176,6 +177,8 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Controls */}
                 <div className="flex align-items-center gap-3 flex-shrink-0">
+                    <ThemeSwitcher />
+
                     {/* Auto-Index Toggle */}
                     {onToggleMonitoring && (
                         <div className="p-inputgroup">
