@@ -56,8 +56,7 @@ export const FileTypeChart: React.FC<FileTypeChartProps> = ({ fileTypes, onSegme
       datasets: [{
         data: fileTypeData.map(([, count]) => count),
         backgroundColor: ["#42A5F5", "#66BB6A", "#FFA726", "#AB47BC", "#26C6DA", "#9E9E9E"],
-        borderWidth: 2,
-        borderColor: "var(--surface-card)",
+        borderWidth: 0,
       }],
     };
 

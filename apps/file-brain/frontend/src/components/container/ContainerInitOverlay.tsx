@@ -20,7 +20,17 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
   const [containerStatus, setContainerStatus] = useState<AppContainerStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [inGracePeriod, setInGracePeriod] = useState(true); // Grace period to avoid premature failure detection
   const { isSystemHealthy, systemInitialization } = useStatus();
+
+  // Start a grace period timer when overlay becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      setInGracePeriod(true);
+      const timer = setTimeout(() => setInGracePeriod(false), 5000); // 5 seconds grace period
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible]);
 
   const startContainersAndMonitor = useCallback(async () => {
     setIsStarting(true);
@@ -96,9 +106,10 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
   };
 
   const services = getServicesByName();
-  const hasFailures = containerStatus?.services?.some(s => 
+  // Don't show failures during the initial grace period to avoid premature "container failed" message
+  const hasFailures = !inGracePeriod && (containerStatus?.services?.some(s => 
     s.health === 'unhealthy' || s.state !== 'running'
-  ) || !!error;
+  ) || !!error);
 
   // Determine overlay message based on state
   const getOverlayMessage = () => {

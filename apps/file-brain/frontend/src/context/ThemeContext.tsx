@@ -20,9 +20,9 @@ export const useTheme = () => {
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
-    // Initialize from localStorage or default to 'light'
+    // Initialize from localStorage or default to 'auto' (follow system preference)
     const stored = localStorage.getItem('theme-mode');
-    return (stored as ThemeMode) || 'light';
+    return (stored as ThemeMode) || 'auto';
   });
 
   // Determine the effective theme based on mode and system preference
