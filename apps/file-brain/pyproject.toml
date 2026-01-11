@@ -1,13 +1,23 @@
 [project]
 name = "file-brain"
-package-mode = false
 version = "0.1.0"
 description = "Advanced file search engine powered by AI"
-authors = [
-    {name = "Hamza Abbad",email = "hamza.abbad@gmail.com"}
-]
+authors = [{ name = "Hamza Abbad", email = "hamza.abbad@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
+license = { text = "GPL-3.0-or-later" }
+keywords = ["search", "ai", "file-indexing", "semantic-search", "local-search"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Desktop Environment :: File Managers",
+    "Topic :: Text Processing :: Indexing",
+]
 dependencies = [
     "pydantic (>=2.12.4,<3.0.0)",
     "pydantic-settings (>=2.11.0,<3.0.0)",
@@ -20,7 +30,7 @@ dependencies = [
     "aiohttp (>=3.13.2,<4.0.0)",
     "py7zr (>=1.0.0,<2.0.0)",
     "rarfile (>=4.2,<5.0)",
-    "flaskwebgui (>=1.1.8,<2.0.0)",
+    "flaskwebgui @ git+https://github.com/ClimenteA/flaskwebgui.git@1040603205dd42a8f658aec50c74c35714814d40",
     "watchdog (>=6.0.0,<7.0.0)",
     "docker (>=7.1.0,<8.0.0)",
     "podman (>=5.6.0,<6.0.0)",
@@ -28,10 +38,46 @@ dependencies = [
     "platformdirs (>=4.5.1,<5.0.0)",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Hamza5/file-brain"
+Repository = "https://github.com/Hamza5/file-brain"
+Issues = "https://github.com/Hamza5/file-brain/issues"
+
+[project.scripts]
+file-brain = "file_brain.main:cli_main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "file-brain"
+version = "0.0.1"
+description = "Advanced file search engine powered by AI"
+authors = ["Hamza Abbad <hamza.abbad@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "file_brain" }]
+include = [
+    { path = "file_brain/docker-compose.yml", format = [
+        "sdist",
+        "wheel",
+    ] },
+    { path = "file_brain/frontend/dist/**/*", format = [
+        "sdist",
+        "wheel",
+    ] },
+]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.15"
+flaskwebgui = { git = "https://github.com/ClimenteA/flaskwebgui.git", rev = "1040603205dd42a8f658aec50c74c35714814d40" }
+
+[tool.poetry.scripts]
+file-brain = "file_brain.main:cli_main"
+
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = false
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"
