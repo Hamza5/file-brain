@@ -2,6 +2,8 @@ import { Hero } from "@/components/Hero";
 import { Features } from "@/components/Features";
 import { AppMockup } from "@/components/AppMockup";
 import { Footer } from "@/components/Footer";
+import { CTA } from "@/components/CTA";
+import { UseCases } from "@/components/UseCases";
 
 export default function Home() {
   return (
@@ -9,6 +11,8 @@ export default function Home() {
       <Hero />
       <AppMockup />
       <Features />
+      <UseCases />
+      <CTA />
       <Footer />
     </main>
   );

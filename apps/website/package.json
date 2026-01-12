@@ -9,14 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "next": "16.1.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "primereact": "^10.9.7",
-    "primeflex": "^4.0.0",
+    "@file-brain/shared": "*",
     "@fortawesome/fontawesome-free": "^7.1.0",
     "chart.js": "^4.5.1",
-    "@file-brain/shared": "*"
+    "next": "16.1.1",
+    "primeflex": "^4.0.0",
+    "primereact": "^10.9.7",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
