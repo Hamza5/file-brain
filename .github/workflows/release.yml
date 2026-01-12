@@ -17,6 +17,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,6 +54,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+          cache: "npm"
+
+      - name: Install Node Dependencies
+        if: steps.version_check.outputs.changed == 'true'
+        run: npm ci
+        working-directory: ./
 
       - name: Install Poetry
         if: steps.version_check.outputs.changed == 'true'
@@ -80,9 +87,8 @@ jobs:
             apps/file-brain/dist/*.tar.gz
           generate_release_notes: true
 
-      - name: Publish to GitHub Packages
+      - name: Publish to PyPI
         if: steps.version_check.outputs.changed == 'true'
-        run: |
-          poetry config repositories.github https://maven.pkg.github.com/${{ github.repository_owner }}
-          poetry config pypi-token.github ${{ secrets.GITHUB_TOKEN }}
-          poetry publish -r github
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: apps/file-brain/dist/

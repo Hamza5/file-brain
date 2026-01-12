@@ -23,8 +23,15 @@ def build():
     print(f"   Frontend directory: {frontend_dir}")
 
     try:
-        # Check if node_modules exists
-        if not (frontend_dir / "node_modules").exists():
+        # Check if we are in the monorepo and dependencies are installed at root
+        # Repo root is ../../ relative to this script
+        repo_root = project_root.parent.parent
+        root_node_modules = repo_root / "node_modules"
+
+        if root_node_modules.exists():
+            print("✅ Detected monorepo environment with installed dependencies.")
+        # Check if local node_modules exists (fallback)
+        elif not (frontend_dir / "node_modules").exists():
             print("📦 Installing frontend dependencies...")
             subprocess.run(
                 ["npm", "install"],
