@@ -51,11 +51,6 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "file-brain"
-version = "0.0.1"
-description = "Advanced file search engine powered by AI"
-authors = ["Hamza Abbad <hamza.abbad@gmail.com>"]
-readme = "README.md"
 packages = [{ include = "file_brain" }]
 include = [
     { path = "file_brain/docker-compose.yml", format = [
@@ -67,13 +62,6 @@ include = [
         "wheel",
     ] },
 ]
-
-[tool.poetry.dependencies]
-python = ">=3.11,<3.15"
-flaskwebgui = { git = "https://github.com/ClimenteA/flaskwebgui.git", rev = "1040603205dd42a8f658aec50c74c35714814d40" }
-
-[tool.poetry.scripts]
-file-brain = "file_brain.main:cli_main"
 
 [tool.poetry.build]
 script = "build.py"
@@ -97,4 +85,3 @@ line-length = 120
 # Enable Pyflakes (`F`), pycodestyle (`E`, `W`), isort (`I`)
 select = ["E", "F", "I"]
 fixable = ["ALL"]
-

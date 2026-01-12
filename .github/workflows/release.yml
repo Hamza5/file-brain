@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/file-brain/pyproject.toml"
+
+defaults:
+  run:
+    working-directory: apps/file-brain
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if version changed
+        id: version_check
+        run: |
+          # Get the current version
+          current_version=$(grep -m 1 '^version =' pyproject.toml | awk -F '"' '{print $2}')
+
+          # Get the previous version using git show
+          # We need to look at the previous commit's version of the file
+          # The path is relative to the repo root for git show
+          previous_version=$(git show HEAD^:apps/file-brain/pyproject.toml 2>/dev/null | grep -m 1 '^version =' | awk -F '"' '{print $2}' || echo "none")
+
+          if [ "$current_version" != "$previous_version" ]; then
+            echo "Version changed from $previous_version to $current_version"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$current_version" >> $GITHUB_OUTPUT
+          else
+            echo "Version did not change ($current_version)"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Python
+        if: steps.version_check.outputs.changed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        if: steps.version_check.outputs.changed == 'true'
+        run: pipx install poetry
+
+      - name: Build Package
+        if: steps.version_check.outputs.changed == 'true'
+        run: poetry build
+
+      - name: Create Git Tag
+        if: steps.version_check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version_check.outputs.version }}" -m "Release v${{ steps.version_check.outputs.version }}"
+          git push origin "v${{ steps.version_check.outputs.version }}"
+
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.version_check.outputs.version }}"
+          files: |
+            apps/file-brain/dist/*.whl
+            apps/file-brain/dist/*.tar.gz
+          generate_release_notes: true
+
+      - name: Publish to GitHub Packages
+        if: steps.version_check.outputs.changed == 'true'
+        run: |
+          poetry config repositories.github https://maven.pkg.github.com/${{ github.repository_owner }}
+          poetry config pypi-token.github ${{ secrets.GITHUB_TOKEN }}
+          poetry publish -r github
