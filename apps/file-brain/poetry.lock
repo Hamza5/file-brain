@@ -804,13 +804,17 @@ description = "Create desktop applications with Flask/Django/FastAPI!"
 optional = false
 python-versions = "*"
 groups = ["main"]
-files = [
-    {file = "flaskwebgui-1.1.8-py3-none-any.whl", hash = "sha256:4364985444d16c98b9ff9891fbe90f5d65213fc338508d10ec8d8bd2da9e397f"},
-    {file = "flaskwebgui-1.1.8.tar.gz", hash = "sha256:24b0a1bad3e263ba17a9fd947566cf193a5bd9e37d5427e73412af80d5dad55b"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 psutil = ">=7.0,<8.0"
+
+[package.source]
+type = "git"
+url = "https://github.com/ClimenteA/flaskwebgui.git"
+reference = "1040603205dd42a8f658aec50c74c35714814d40"
+resolved_reference = "1040603205dd42a8f658aec50c74c35714814d40"
 
 [[package]]
 name = "frozenlist"
@@ -2389,6 +2393,25 @@ pygments = ">=2.7.2"
 dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "requests", "setuptools", "xmlschema"]
 
 [[package]]
+name = "pytest-asyncio"
+version = "0.26.0"
+description = "Pytest support for asyncio"
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "pytest_asyncio-0.26.0-py3-none-any.whl", hash = "sha256:7b51ed894f4fbea1340262bdae5135797ebbe21d8638978e35d31c6d19f72fb0"},
+    {file = "pytest_asyncio-0.26.0.tar.gz", hash = "sha256:c4df2a697648241ff39e7f0e4a73050b03f123f760673956cf0d72a4990e312f"},
+]
+
+[package.dependencies]
+pytest = ">=8.2,<9"
+
+[package.extras]
+docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1)"]
+testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
+
+[[package]]
 name = "python-dotenv"
 version = "1.2.1"
 description = "Read key-value pairs from a .env file and set them as environment variables"
@@ -3562,4 +3585,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "64300fe8a765169b27fb17d07ead1cbffab97b2be53fce9cf72400931644649c"
+content-hash = "d51f8d5cae7ad8dfcc46b53370b65ed6dc2b6a4a79e0e516450964c69ec23dcf"

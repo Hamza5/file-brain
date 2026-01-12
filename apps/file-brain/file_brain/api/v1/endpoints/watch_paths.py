@@ -3,6 +3,7 @@ Watch paths management API endpoints
 """
 
 import os
+import time
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -121,6 +122,7 @@ async def clear_watch_paths(
     return MessageResponse(
         message=f"Removed all watch paths. Deleted {count} path(s).",
         success=True,
+        timestamp=int(time.time() * 1000),
     )
 
 

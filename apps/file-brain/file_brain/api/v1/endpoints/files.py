@@ -230,7 +230,11 @@ async def open_file_operation(request: FileOperationRequest):
                 "file_path": request.file_path,
             }
         else:
-            raise HTTPException(status_code=500, detail=message)
+            # Return 404 for file not found, 500 for other errors
+            if "not found" in message.lower():
+                raise HTTPException(status_code=404, detail=message)
+            else:
+                raise HTTPException(status_code=500, detail=message)
 
     except HTTPException:
         raise
