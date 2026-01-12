@@ -2,11 +2,17 @@
 Application configuration using pydantic-settings
 """
 
+import secrets
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Import app metadata from pyproject.toml (single source of truth)
 from file_brain.core.app_info import get_app_description, get_app_name, get_app_version
+
+
+def import_secrets():
+    return secrets
 
 
 class Settings(BaseSettings):
@@ -32,7 +38,10 @@ class Settings(BaseSettings):
     typesense_host: str = Field(default="localhost")
     typesense_port: int = Field(default=8108)
     typesense_protocol: str = Field(default="http")
-    typesense_api_key: str = Field(default="xyz-typesense-key")
+    typesense_api_key: str = Field(
+        default_factory=lambda: f"FILEBRAIN_{import_secrets().token_urlsafe(16)}",
+        validate_default=False,
+    )
     typesense_collection_name: str = Field(default="files")
     typesense_connection_timeout: int = Field(default=10, description="Connection timeout in seconds")
     typesense_model_download_timeout: int = Field(default=120, description="Timeout for model downloads in seconds")

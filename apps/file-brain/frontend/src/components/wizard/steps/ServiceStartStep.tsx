@@ -83,33 +83,33 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
 
   return (
     <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Starting Docker Services</h3>
+      <h3 className="mt-0">Initializing Search Engine</h3>
       <p className="text-600 mt-0">
-        Starting the Typesense search engine and Apache Tika content extractor containers.
+        Starting the search and file extraction engine.
       </p>
 
       {dockerStatus?.running ? (
         <>
           <Message 
             severity={dockerStatus.healthy ? "success" : "warn"} 
-            text={dockerStatus.healthy ? "All services are healthy!" : "Services are running but not all are healthy yet..."}
+            text={dockerStatus.healthy ? "All components are ready!" : "Engine is starting, but some components are still warming up..."}
           />
           <div className="flex flex-column gap-2">
             {dockerStatus.services.map((service) => (
               <div key={service.name} className="flex justify-content-between align-items-center p-2 surface-100 border-round">
                 <div className="flex flex-column">
-                  <span className="font-semibold">{service.service}</span>
+                  <span className="font-semibold">{service.service.includes('typesense') ? 'Search Core' : 'File Processor'}</span>
                   <span className="text-sm text-600">{service.name}</span>
                 </div>
                 <div className="flex gap-2">
                   <Tag
-                    value={service.state}
+                    value={service.state === 'running' ? 'Active' : service.state}
                     severity={service.state === 'running' ? 'success' : 'warning'}
                     icon={service.state === 'running' ? 'fas fa-check' : 'fas fa-spinner fa-spin'}
                   />
                   {service.health && service.health !== '' && (
                     <Tag
-                      value={service.health}
+                      value={service.health === 'healthy' ? 'Healthy' : service.health}
                       severity={service.health === 'healthy' ? 'success' : service.health === 'starting' ? 'info' : 'danger'}
                       icon={service.health === 'healthy' ? 'fas fa-heartbeat' : 'fas fa-exclamation-triangle'}
                     />
@@ -119,7 +119,7 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
             ))}
           </div>
           <Button
-            label="Continue to Model Download"
+            label="Continue to AI Model"
             icon="fas fa-arrow-right"
             onClick={onComplete}
             size="large"
@@ -129,7 +129,7 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
           {!dockerStatus.healthy && (
             <div className="text-sm text-600 text-center">
               <i className="fas fa-info-circle mr-2" />
-              Waiting for all containers to become healthy before proceeding...
+              Waiting for all components to become ready before proceeding...
             </div>
           )}
         </>
@@ -140,13 +140,13 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
               <ProgressBar mode="indeterminate" />
               <div className="flex align-items-center gap-2 text-sm text-600">
                 <i className="fas fa-spinner fa-spin" />
-                <span>Starting containers...</span>
+                <span>Starting engine...</span>
               </div>
             </>
           )}
           {!loading && !error && (
             <Button
-              label="Start Docker Services"
+              label="Start Search Engine"
               icon="fas fa-play"
               onClick={handleStartDockerServices}
               size="large"
@@ -154,7 +154,7 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
           )}
           {!loading && error && (
             <Button
-              label="Restart Docker Services"
+              label="Restart Search Engine"
               icon="fas fa-redo"
               onClick={handleStartDockerServices}
               size="large"

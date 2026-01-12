@@ -554,6 +554,8 @@ class DockerManager:
 
             env = os.environ.copy()
             env.update(app_paths.get_env_vars())
+            # Inject dynamic API key
+            env["TYPESENSE_API_KEY"] = settings.typesense_api_key
 
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -613,6 +615,8 @@ class DockerManager:
 
             env = os.environ.copy()
             env.update(app_paths.get_env_vars())
+            # Inject dynamic API key for consistency (though less critical for stop)
+            env["TYPESENSE_API_KEY"] = settings.typesense_api_key
 
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -666,6 +670,7 @@ class DockerManager:
 
             env = os.environ.copy()
             env.update(app_paths.get_env_vars())
+            env["TYPESENSE_API_KEY"] = settings.typesense_api_key
 
             process = await asyncio.create_subprocess_exec(
                 *cmd,

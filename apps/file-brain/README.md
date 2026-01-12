@@ -42,11 +42,11 @@ pip install file-brain
 2.  **Initialization Wizard**:
     On the first run, a simple wizard will guide you:
 
-    1.  **Docker Check**: Verifies Docker is running.
-    2.  **Pull Images**: Downloads the necessary search services.
-    3.  **Start Services**: Starts the background services.
-    4.  **Download Model**: Fetches the AI model for semantic search.
-    5.  **Create Collection**: Initializes the search database.
+    1.  **System Check**: Verifies Docker is running.
+    2.  **Download Components**: Downloads the necessary search services.
+    3.  **Initialize Engine**: Starts the background search components.
+    4.  **Download AI Model**: Fetches the AI model for intelligent search.
+    5.  **Finalize Setup**: Initializes the search engine database.
 
     ![Initialization Wizard](docs/images/wizard.png)
     _The easy-to-use setup wizard that guides you through downloading models and initializing the search database._

@@ -104,14 +104,14 @@ export const HeroStats: React.FC = () => {
       <div className="grid align-content-stretch">
         {/* Left Column: Charts */}
         <div className="col-12 xl:col-8">
-          <div className="grid">
+          <div className="grid h-full">
             {/* Indexing Activity Chart */}
-            <div className="col-12 lg:col-6">
+            <div className="col-12 lg:col-6 pb-3 lg:pb-0 h-full">
               <IndexingActivityChart />
             </div>
 
             {/* File Type Chart */}
-            <div className="col-12 lg:col-6">
+            <div className="col-12 lg:col-6 h-full">
               <FileTypeChart 
                 fileTypes={stats?.file_types}
                 onSegmentClick={handleChartClick}

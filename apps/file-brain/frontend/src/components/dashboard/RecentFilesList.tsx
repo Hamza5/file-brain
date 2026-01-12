@@ -36,25 +36,28 @@ export const RecentFilesList: React.FC<RecentFilesListProps> = ({ onRefresh }) =
     return () => clearInterval(interval);
   }, [onRefresh]);
 
-  if (recentFiles.length === 0) {
-    return null;
-  }
-
   return (
-    <div className="flex flex-column gap-3 h-full">
-      <div className="flex align-items-center justify-content-between px-2">
+    <div className="surface-card border-round-2xl p-3 shadow-2 h-full flex flex-column gap-3">
+      <div className="flex align-items-center justify-content-between">
         <span className="font-bold text-lg text-color">Recent Activity</span>
         <span className="text-xs text-color-secondary">{recentFiles.length} items</span>
       </div>
       <div className="flex flex-column gap-2 overflow-y-auto pr-1" style={{ flex: '1 1 0', minHeight: '300px' }}>
-        {recentFiles.map((file, index) => (
-          <FileItem
-            key={file.file_path || index}
-            file={file}
-            onContextMenu={handleContextMenu}
-            onFileOperation={handleFileOperation}
-          />
-        ))}
+        {recentFiles.length === 0 ? (
+          <div className="flex flex-column align-items-center justify-content-center h-full text-color-secondary opacity-70">
+            <i className="fa-regular fa-clock text-4xl mb-2"></i>
+            <span>No recent activity</span>
+          </div>
+        ) : (
+          recentFiles.map((file, index) => (
+            <FileItem
+              key={file.file_path || index}
+              file={file}
+              onContextMenu={handleContextMenu}
+              onFileOperation={handleFileOperation}
+            />
+          ))
+        )}
       </div>
 
       <Tooltip target=".hero-action-tooltip" />

@@ -49,7 +49,10 @@ const API_BASE_URL = "";
 /**
  * Generic JSON request helper
  */
-export async function requestJSON<T>(input: string, init?: RequestInit): Promise<T> {
+export async function requestJSON<T>(
+  input: string,
+  init?: RequestInit
+): Promise<T> {
   const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
   const res = await fetch(url, {
     headers: {
@@ -72,6 +75,20 @@ export async function requestJSON<T>(input: string, init?: RequestInit): Promise
   }
 
   return (await res.json()) as T;
+}
+
+export interface AppConfig {
+  typesense: {
+    api_key: string;
+    host: string;
+    port: number;
+    protocol: string;
+    collection_name: string;
+  };
+}
+
+export async function getAppConfig(): Promise<AppConfig> {
+  return requestJSON("/api/v1/config");
 }
 
 // Types for stats API (Typesense-backed)
@@ -583,7 +600,7 @@ export function connectCollectionLogsStream(
   eventSource.onmessage = (event) => {
     try {
       const data: CollectionLogEvent = JSON.parse(event.data);
-      
+
       if (data.error) {
         if (onError) onError(data.error);
         eventSource.close();
@@ -847,7 +864,9 @@ export async function getFilesByType(
   perPage: number = 20
 ): Promise<FilesByTypeResponse> {
   return requestJSON(
-    `/api/v1/stats/files-by-type?ext=${encodeURIComponent(ext)}&page=${page}&per_page=${perPage}`
+    `/api/v1/stats/files-by-type?ext=${encodeURIComponent(
+      ext
+    )}&page=${page}&per_page=${perPage}`
   );
 }
 

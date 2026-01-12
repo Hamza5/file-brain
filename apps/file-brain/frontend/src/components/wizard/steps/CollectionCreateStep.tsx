@@ -128,29 +128,29 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
 
   return (
     <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Creating Search Collection</h3>
+      <h3 className="mt-0">Finalizing Search Engine</h3>
       <p className="text-600 mt-0">
-        Setting up the Typesense search collection for indexing your files.
+        Setting up the search database to store and index your file information.
       </p>
 
       {collectionStatus?.ready || collectionStatus?.exists ? (
         <>
-          <Message severity="success" text="A search collection already exists." />
+          <Message severity="success" text="Search database is ready." />
           {collectionStatus.document_count !== undefined && (
             <div className="text-sm text-600 mb-2">
-              <strong>Current Document Count:</strong> {collectionStatus.document_count}
+              <strong>Indexed Files:</strong> {collectionStatus.document_count}
             </div>
           )}
           <div className="flex gap-3 justify-content-end">
             <Button
-              label="Reset & Re-create"
+              label="Reset Database"
               icon="fas fa-redo"
               onClick={handleResetCollection}
               severity="warning"
               outlined
             />
             <Button
-              label="Skip & Continue"
+              label="Finish Setup"
               icon="fas fa-arrow-right"
               onClick={onComplete}
             />
@@ -163,11 +163,11 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
               <ProgressBar mode="indeterminate" />
               <div className="flex align-items-center gap-2 text-sm text-600">
                 <i className="fas fa-spinner fa-spin" />
-                <span>Creating collection...</span>
+                <span>Finalizing...</span>
               </div>
               {collectionLogs.length > 0 && (
                 <div className="p-3 surface-100 border-round" style={{ maxHeight: '300px', overflow: 'auto' }}>
-                  <div className="text-sm font-semibold mb-2 text-600">Collection Logs:</div>
+                  <div className="text-sm font-semibold mb-2 text-600">Setup Logs:</div>
                   <code className="text-xs">
                     {collectionLogs.map((log, idx) => (
                       <div key={idx} className="text-600">
@@ -181,7 +181,7 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
           )}
           {!loading && (
             <Button
-              label="Create Collection"
+              label="Complete Setup"
               icon="fas fa-database"
               onClick={handleCreateCollection}
               size="large"

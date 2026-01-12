@@ -22,11 +22,11 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
   const [error, setError] = useState<string | null>(null);
 
   const steps = [
-    { label: 'Docker Check' },
-    { label: 'Pull Images' },
-    { label: 'Start Services' },
-    { label: 'Download Model' },
-    { label: 'Create Collection' },
+    { label: 'System Check' },
+    { label: 'Download Components' },
+    { label: 'Initialize Engine' },
+    { label: 'Download AI Model' },
+    { label: 'Finalize Setup' },
     { label: 'Complete' },
   ];
 
@@ -100,7 +100,7 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
 
       <div className="flex flex-column align-items-center mb-4">
         <h1 className="text-4xl font-bold text-primary mb-2">
-          <i className="fas fa-brain mr-2" />
+          <i className="fas fa-screwdriver-wrench mr-2" />
           File Brain Setup
         </h1>
         <p className="text-600 text-center max-w-30rem">

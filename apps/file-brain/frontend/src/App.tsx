@@ -6,6 +6,8 @@ import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
+import { ProgressSpinner } from 'primereact/progressspinner';
+import { Button } from 'primereact/button';
 import { type SearchHit } from "./types/search";
 import { Header } from "./components/layout/Header";
 import { MainContent } from "./components/layout/MainContent";
@@ -13,41 +15,9 @@ import { PreviewSidebar } from "./components/sidebars/PreviewSidebar";
 import { InitializationWizard } from "./components/wizard/InitializationWizard";
 import { StatusBar } from "./components/layout/StatusBar";
 import { ContainerInitOverlay } from "./components/container/ContainerInitOverlay";
-import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus, type CrawlStatus } from "./api/client";
+import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus, getAppConfig, type CrawlStatus } from "./api/client";
 
-// Configure Typesense InstantSearch adapter
-const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
-  server: {
-    // IMPORTANT: use a search-only API key in real deployments
-    apiKey: "xyz-typesense-key",
-    nodes: [
-      {
-        host: "localhost",
-        port: 8108,
-        path: "",
-        protocol: "http",
-      },
-    ],
-    cacheSearchResultsForSeconds: 0,
-    connectionTimeoutSeconds: 30, // Extended timeout for slower queries
-  },
-  additionalSearchParameters: {
-    // Search strategy:
-    // - Search all chunks (full content coverage)
-    // - Group by file_path to deduplicate (one result per file)
-    // - Relevance determines which chunk is shown (best match)
-    // - All chunks have essential metadata (file_extension, file_size, mime_type, modified_time)
-    query_by: "file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
-    exclude_fields: "embedding",
-    group_by: "file_path", // Deduplicate: show each file once
-    group_limit: 1, // Show the most relevant chunk per file
-    per_page: 24,
-  },
-});
-
-const searchClient = typesenseInstantsearchAdapter.searchClient;
-
-function AppContent() {
+function AppContent({ searchClient }: { searchClient: any }) {
   const { status, stats, watchPaths } = useStatus();
   const [isCrawlerActive, setIsCrawlerActive] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -137,6 +107,8 @@ function AppContent() {
 export default function App() {
   const [wizardCompleted, setWizardCompleted] = useState<boolean | null>(null);
   const [containersReady, setContainersReady] = useState<boolean>(false);
+  const [searchClient, setSearchClient] = useState<any>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   // Check wizard status on mount
   useEffect(() => {
@@ -152,9 +124,55 @@ export default function App() {
     checkWizard();
   }, []);
 
+  // Fetch config and initialize search client after wizard is completed
+  useEffect(() => {
+    if (wizardCompleted) {
+      const initClient = async () => {
+        setConfigError(null);
+        try {
+          const config = await getAppConfig();
+          const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
+            server: {
+              apiKey: config.typesense.api_key,
+              nodes: [
+                {
+                  host: config.typesense.host,
+                  port: config.typesense.port,
+                  path: "",
+                  protocol: config.typesense.protocol,
+                },
+              ],
+              cacheSearchResultsForSeconds: 0,
+              connectionTimeoutSeconds: 30,
+            },
+            additionalSearchParameters: {
+              query_by: "file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
+              exclude_fields: "embedding",
+              group_by: "file_path",
+              group_limit: 1,
+              per_page: 24,
+            },
+          });
+          setSearchClient(typesenseInstantsearchAdapter.searchClient);
+        } catch (error) {
+          console.error("Failed to load app config:", error);
+          setConfigError(error instanceof Error ? error.message : String(error));
+          
+          // Retry after a delay if it's a network error (backend might be starting)
+          setTimeout(initClient, 3000);
+        }
+      };
+      initClient();
+    }
+  }, [wizardCompleted]);
+
   // Show loading while checking wizard status
   if (wizardCompleted === null) {
-    return <div className="flex align-items-center justify-content-center h-screen">Loading...</div>;
+    return (
+      <div className="flex align-items-center justify-content-center h-screen" style={{ backgroundColor: 'var(--surface-ground)' }}>
+         <ProgressSpinner style={{width: '50px', height: '50px'}} strokeWidth="4" animationDuration=".5s" />
+      </div>
+    );
   }
 
   // Show wizard if not completed
@@ -174,7 +192,24 @@ export default function App() {
       <ThemeProvider>
         <StatusProvider enabled={wizardCompleted === true}>
           <NotificationProvider>
-            <AppContent />
+            {searchClient ? (
+              <AppContent searchClient={searchClient} />
+            ) : (
+              <div className="flex flex-column align-items-center justify-content-center h-screen" style={{ backgroundColor: 'var(--surface-ground)' }}>
+                <ProgressSpinner style={{width: '50px', height: '50px'}} strokeWidth="4" animationDuration=".5s" />
+                <p className="mt-3 text-600">
+                  {configError ? `Connection failed: ${configError}. Retrying...` : 'Loading Configuration...'}
+                </p>
+                {configError && (
+                  <Button 
+                    label="Retry Now" 
+                    icon="fas fa-sync" 
+                    className="p-button-text mt-2" 
+                    onClick={() => setWizardCompleted(prev => prev)} // Trigger effect
+                  />
+                )}
+              </div>
+            )}
 
             {/* Container initialization overlay - blocks interaction until containers ready */}
             <ContainerInitOverlay 

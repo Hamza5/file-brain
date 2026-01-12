@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Message } from 'primereact/message';
 import { Button } from 'primereact/button';
 import { checkDockerInstallation, type DockerCheckResult } from '../../../api/client';
@@ -12,11 +12,7 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({ onComplete }) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    checkDocker();
-  }, []);
-
-  const checkDocker = async () => {
+  const checkDocker = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -31,11 +27,15 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({ onComplete }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [onComplete]);
+
+  useEffect(() => {
+    checkDocker();
+  }, [checkDocker]);
 
   return (
     <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Checking Docker Installation</h3>
+      <h3 className="mt-0">Checking System Requirements</h3>
       {loading && (
         <div className="flex align-items-center gap-2">
           <i className="fas fa-spinner fa-spin" />

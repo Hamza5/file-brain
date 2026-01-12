@@ -78,14 +78,20 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
 
   return (
     <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Downloading Embedding Model</h3>
+      <h3 className="mt-0">Downloading AI Search Model</h3>
       <p className="text-600 mt-0">
-        Downloading the AI embedding model from HuggingFace. This enables semantic search capabilities.
-        The model is approximately 1.1 GB.
+        Downloading the AI model that enables intelligent natural-language search. This model processes your files locally to understand their meaning.
+        (Approx. 1.1 GB)
       </p>
 
+      <Message 
+        severity="info" 
+        text="The download may appear to pause at times or make quick jumps while the model components are being finalized. Please be patient." 
+        className="w-full justify-content-start"
+      />
+
       {modelDownloadComplete ? (
-        <Message severity="success" text="Embedding model downloaded successfully!" />
+        <Message severity="success" text="AI Search model downloaded successfully!" />
       ) : (
         <>
           {loading && modelDownloadProgress && (
@@ -104,13 +110,13 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
                 )}
               </div>
 
-              {/* Current file info with file-level progress */}
+              {/* Current component info with component-level progress */}
               {modelDownloadProgress.file && (
                 <div className="p-3 surface-100 border-round">
                   <div className="flex justify-content-between align-items-center">
                     <div className="flex align-items-center gap-2">
                       <i className="fas fa-file text-primary" />
-                      <span className="font-semibold text-sm">{modelDownloadProgress.file}</span>
+                      <span className="font-semibold text-sm">Component: {modelDownloadProgress.file}</span>
                     </div>
                     <span className="text-sm text-primary font-bold">{(modelDownloadProgress.file_percent || 0).toFixed(2)}%</span>
                   </div>
@@ -137,12 +143,12 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
           {loading && !modelDownloadProgress && (
             <div className="flex align-items-center gap-2">
               <i className="fas fa-spinner fa-spin" />
-              <span>Checking model status...</span>
+              <span>Initializing download...</span>
             </div>
           )}
           {!loading && !modelDownloadComplete && modelStatus?.exists && (
             <>
-              <Message severity="success" text="Model already downloaded!" />
+              <Message severity="success" text="AI model already downloaded!" />
               <Button
                 label="Continue"
                 icon="fas fa-arrow-right"
@@ -153,7 +159,7 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
           )}
           {!loading && !modelDownloadComplete && !modelStatus?.exists && (
             <Button
-              label="Download Model"
+              label="Download AI Model"
               icon="fas fa-download"
               onClick={handleDownloadModel}
               size="large"

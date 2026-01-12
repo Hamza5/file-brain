@@ -132,7 +132,7 @@ export function StatusBar() {
           <div className="w-12rem hidden md:block flex-shrink-0">
             <ProgressBar 
               value={mainStatus.progressValue} 
-              showValue={true}
+              showValue={false}
               style={{ height: '8px' }} 
             />
           </div>

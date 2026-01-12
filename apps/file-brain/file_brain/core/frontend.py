@@ -73,7 +73,7 @@ def setup_frontend_routes(app: "FastAPI", frontend_dist_path: str):
         """
         # Let the API router handle its own paths
         if full_path.startswith("api/"):
-            pass
+            return JSONResponse(status_code=404, content={"error": "API route not found"})
 
         # Proxy to Vite Dev Server if in debug mode
         if settings.debug:
