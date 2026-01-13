@@ -25,6 +25,10 @@ This document provides guidelines for AI agents working on this project.
 - **Remove Unused Code**: Aggressively remove dead code, unused imports, and commented-out blocks.
 - Keep the codebase clean and lean.
 
+### Dependency Management
+
+- **Update Lock File**: Whenever you modify `pyproject.toml` (e.g., adding/removing dependencies), you MUST run `poetry lock` to update the `poetry.lock` file. Failure to do so will break CI/CD workflows.
+
 ## Maintenance
 
 - **Keep this file updated**: When making significant updates to the code or project structure, always check if this file needs to be updated to reflect the new state or conventions.
