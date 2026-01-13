@@ -57,7 +57,7 @@ async def register_all_health_checkers():
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
                         f"{settings.tika_url}/version",
-                        timeout=aiohttp.ClientTimeout(total=5),
+                        timeout=aiohttp.ClientTimeout(total=30),
                     ) as response:
                         if response.status == 200:
                             return {
@@ -69,6 +69,14 @@ async def register_all_health_checkers():
                             "healthy": False,
                             "error": f"Tika server returned status {response.status}",
                         }
+            except asyncio.TimeoutError:
+                # On timeout, mark as busy rather than failed
+                # Tika may be processing large files and unable to respond to health checks
+                return {
+                    "healthy": True,
+                    "busy": True,
+                    "message": "Processing (may be handling large files)",
+                }
             except Exception as e:
                 return {"healthy": False, "error": str(e)}
 

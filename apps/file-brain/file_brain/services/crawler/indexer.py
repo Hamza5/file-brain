@@ -4,7 +4,6 @@ File Indexer component
 
 import asyncio
 import hashlib
-import mimetypes
 import os
 from pathlib import Path
 from typing import Callable, Optional, Tuple
@@ -98,7 +97,7 @@ class FileIndexer:
                 "chunk_hash": chunk_hash,
                 "file_extension": Path(file_path).suffix.lower(),
                 "file_size": operation.file_size,
-                "mime_type": mimetypes.guess_type(file_path)[0] or "application/octet-stream",
+                "mime_type": document_content.metadata.get("mime_type") or "application/octet-stream",
                 "modified_time": int(operation.modified_time) if operation.modified_time is not None else None,
             }
 

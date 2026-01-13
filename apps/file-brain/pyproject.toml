@@ -28,8 +28,6 @@ dependencies = [
     "tika (>=3.1.0,<4.0.0)",
     "chardet (>=5.2.0,<6.0.0)",
     "aiohttp (>=3.13.2,<4.0.0)",
-    "py7zr (>=1.0.0,<2.0.0)",
-    "rarfile (>=4.2,<5.0)",
     "flaskwebgui @ git+https://github.com/ClimenteA/flaskwebgui.git@1040603205dd42a8f658aec50c74c35714814d40",
     "watchdog (>=6.0.0,<7.0.0)",
     "docker (>=7.1.0,<8.0.0)",

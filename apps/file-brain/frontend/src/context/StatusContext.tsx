@@ -249,6 +249,7 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
                 if (s.state === 'ready') status = 'healthy';
                 else if (s.state === 'failed') status = 'error';
                 else if (s.state === 'disabled') status = 'disabled';
+                else if (s.state === 'busy') status = 'initializing'; // Treat busy as initializing for UI
                 else if (s.state === 'initializing') status = 'initializing';
                 
                 acc[name] = {
@@ -308,7 +309,7 @@ export function StatusProvider({ children, enabled = true }: { children: ReactNo
       stopPolling();
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [applySnapshot, enabled]); // Add enabled to dependencies
+  }, [applySnapshot, enabled, updateLiveStatus]);
 
   const value = useMemo<StatusContextValue>(
     () => {

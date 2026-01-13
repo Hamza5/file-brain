@@ -5,6 +5,7 @@ including archive handling.
 Uses Strategy pattern for pluggable extraction methods.
 """
 
+import mimetypes
 import os
 from typing import List, Optional
 
@@ -19,42 +20,13 @@ class ContentExtractor:
     Document content extractor using pluggable extraction strategies.
 
     Uses Strategy pattern to select appropriate extraction method:
-    1. Archive extraction for archive files (.zip, .tar.gz, etc.)
-    2. Tika extraction for documents, images, etc.
-    3. Basic extraction as fallback
+    1. Tika extraction for documents, images, and archives
+    2. Basic extraction as fallback
     """
 
-    def __init__(self, strategies: Optional[List[ExtractionStrategy]] = None):
+    def __init__(self, strategies: List[ExtractionStrategy]):
         """Initialize the content extractor with extraction strategies."""
-        # Configure tika-python for client-only mode when Docker Tika is enabled
-        if settings.tika_enabled and settings.tika_client_only:
-            os.environ["TIKA_CLIENT_ONLY"] = "True"
-            logger.info(f"Configured Tika client-only mode for endpoint: {settings.tika_url}")
-
-        # Initialize strategies (can be injected for testing)
-        if strategies is not None:
-            self.strategies = strategies
-        else:
-            self.strategies = self._create_default_strategies()
-
-    def _create_default_strategies(self) -> List[ExtractionStrategy]:
-        """Create the default chain of extraction strategies."""
-        from file_brain.services.extraction.archive_strategy import ArchiveExtractionStrategy
-        from file_brain.services.extraction.basic_strategy import BasicExtractionStrategy
-        from file_brain.services.extraction.tika_strategy import TikaExtractionStrategy
-
-        tika_endpoint = settings.tika_url if settings.tika_client_only else None
-
-        # Create inner strategies for archive extraction
-        tika_strategy = TikaExtractionStrategy(tika_endpoint=tika_endpoint)
-        basic_strategy = BasicExtractionStrategy()
-
-        # Archive strategy uses Tika and Basic for files within archives
-        archive_strategy = ArchiveExtractionStrategy(
-            inner_strategies=[tika_strategy, basic_strategy],
-        )
-
-        return [archive_strategy, tika_strategy, basic_strategy]
+        self.strategies = strategies
 
     def extract(self, file_path: str) -> DocumentContent:
         """
@@ -75,19 +47,32 @@ class ContentExtractor:
 
         # Try each strategy in order
         last_error = None
+        result = None
+
         for strategy in self.strategies:
             if strategy.can_extract(file_path):
                 try:
-                    return strategy.extract(file_path)
+                    result = strategy.extract(file_path)
+                    break
                 except Exception as e:
                     logger.warning(f"{strategy.__class__.__name__} failed for {file_path}: {e}")
                     last_error = e
 
-        if last_error:
-            logger.error(f"All extraction strategies failed for {file_path}")
-            raise last_error
+        if not result:
+            if last_error:
+                logger.error(f"All extraction strategies failed for {file_path}")
+                raise last_error
+            return DocumentContent(
+                content="",
+                metadata={"error": "No extraction strategy available"},
+            )
 
-        return DocumentContent(content="", metadata={"error": "No extraction strategy available"})
+        # Centralized MIME type detection
+        if not result.metadata.get("mime_type") or result.metadata["mime_type"] == "application/octet-stream":
+            guessed_type, _ = mimetypes.guess_type(file_path)
+            result.metadata["mime_type"] = guessed_type or "application/octet-stream"
+
+        return result
 
 
 # Global extractor instance
@@ -98,5 +83,16 @@ def get_extractor() -> ContentExtractor:
     """Get or create global extractor instance"""
     global _extractor
     if _extractor is None:
-        _extractor = ContentExtractor()
+        from file_brain.services.extraction.basic_strategy import BasicExtractionStrategy
+        from file_brain.services.extraction.tika_strategy import TikaExtractionStrategy
+
+        tika_endpoint = settings.tika_url if settings.tika_client_only else None
+
+        # Create strategies
+        strategies = [
+            TikaExtractionStrategy(tika_endpoint=tika_endpoint),
+            BasicExtractionStrategy(),
+        ]
+        _extractor = ContentExtractor(strategies=strategies)
+
     return _extractor

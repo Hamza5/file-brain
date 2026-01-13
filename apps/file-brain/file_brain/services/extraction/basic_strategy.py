@@ -23,11 +23,7 @@ class BasicExtractionStrategy:
 
     def extract(self, file_path: str) -> DocumentContent:
         """Extract content using basic text detection."""
-        import mimetypes
-
         logger.info(f"Attempting basic extraction for: {file_path}")
-
-        mime_type, _ = mimetypes.guess_type(file_path)
 
         text = self._extract_smart_text(file_path)
 
@@ -37,7 +33,6 @@ class BasicExtractionStrategy:
                 content=text,
                 metadata={
                     "extraction_method": "smart_text",
-                    "mime_type": mime_type or "application/octet-stream",
                 },
             )
 
@@ -46,7 +41,6 @@ class BasicExtractionStrategy:
             content="",
             metadata={
                 "extraction_method": "basic_fallback",
-                "mime_type": mime_type or "application/octet-stream",
                 "extraction_note": "No extractable text content found",
             },
         )

@@ -29,7 +29,7 @@ export interface ServicePhase {
 export interface ServiceInitStatus {
   name: string;
   user_friendly_name: string;
-  state: "not_started" | "initializing" | "ready" | "failed" | "disabled";
+  state: "not_started" | "initializing" | "ready" | "failed" | "disabled" | "busy";
   current_phase?: ServicePhase;
   error?: string;
   logs: string[];

@@ -21,6 +21,7 @@ class ServiceState(Enum):
     NOT_STARTED = "not_started"
     INITIALIZING = "initializing"
     READY = "ready"
+    BUSY = "busy"  # Service is operational but temporarily unresponsive (e.g., processing)
     FAILED = "failed"
     DISABLED = "disabled"
 
@@ -231,6 +232,20 @@ class ServiceManager:
         details = {"disabled_reason": reason} if reason else {}
         self.update_service_state(service_name, ServiceState.DISABLED, details=details)
 
+    def set_busy(self, service_name: str, reason: str = "Processing"):
+        """Mark service as busy (operational but temporarily unresponsive)"""
+        with self._lock:
+            if service_name in self._services:
+                status = self._services[service_name]
+                status.state = ServiceState.BUSY
+                status.last_check = time.time()
+                status.current_phase = ServicePhase(
+                    phase_name="Busy",
+                    progress_percent=50.0,
+                    message=reason,
+                )
+                self.append_service_log(service_name, f"Service busy: {reason}")
+
     def reset_service_for_retry(self, service_name: str):
         """Reset service state and clear logs for a fresh retry attempt"""
         with self._lock:
@@ -304,8 +319,13 @@ class ServiceManager:
                     result = await checker()
 
                     if result.get("healthy", False):
-                        self.set_ready(service_name, details=result)
-                        return {"status": "healthy", "timestamp": time.time(), **result}
+                        # Check if service is busy (healthy but unresponsive)
+                        if result.get("busy", False):
+                            self.set_busy(service_name, result.get("message", "Processing"))
+                            return {"status": "busy", "timestamp": time.time(), **result}
+                        else:
+                            self.set_ready(service_name, details=result)
+                            return {"status": "healthy", "timestamp": time.time(), **result}
                     else:
                         self.set_failed(service_name, result.get("error", "Health check failed"))
                         return {
