@@ -15,7 +15,7 @@ import { PreviewSidebar } from "./components/sidebars/PreviewSidebar";
 import { InitializationWizard } from "./components/wizard/InitializationWizard";
 import { StatusBar } from "./components/layout/StatusBar";
 import { ContainerInitOverlay } from "./components/container/ContainerInitOverlay";
-import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, getWizardStatus, getAppConfig, type CrawlStatus } from "./api/client";
+import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, checkStartupRequirements, getAppConfig, type CrawlStatus } from "./api/client";
 
 function AppContent({ searchClient }: { searchClient: any }) {
   const { status, stats, watchPaths } = useStatus();
@@ -105,28 +105,35 @@ function AppContent({ searchClient }: { searchClient: any }) {
 }
 
 export default function App() {
-  const [wizardCompleted, setWizardCompleted] = useState<boolean | null>(null);
+  const [wizardNeeded, setWizardNeeded] = useState<boolean | null>(null);
+  const [wizardStartStep, setWizardStartStep] = useState<number>(0);
+  const [isUpgrade, setIsUpgrade] = useState<boolean>(false);
   const [containersReady, setContainersReady] = useState<boolean>(false);
   const [searchClient, setSearchClient] = useState<any>(null);
   const [configError, setConfigError] = useState<string | null>(null);
 
-  // Check wizard status on mount
+  // Check startup requirements on mount
   useEffect(() => {
-    const checkWizard = async () => {
+    const checkStartup = async () => {
       try {
-        const status = await getWizardStatus();
-        setWizardCompleted(status.wizard_completed);
+        const result = await checkStartupRequirements();
+        setWizardNeeded(result.needs_wizard);
+        setWizardStartStep(result.start_step || 0);
+        setIsUpgrade(result.is_upgrade);
       } catch (error) {
-        console.error("Failed to check wizard status:", error);
-        setWizardCompleted(false);
+        console.error("Failed to check startup requirements:", error);
+        // On error, assume wizard is needed from the beginning
+        setWizardNeeded(true);
+        setWizardStartStep(0);
+        setIsUpgrade(false);
       }
     };
-    checkWizard();
+    checkStartup();
   }, []);
 
-  // Fetch config and initialize search client after wizard is completed
+  // Fetch config and initialize search client after wizard is not needed
   useEffect(() => {
-    if (wizardCompleted) {
+    if (wizardNeeded === false) {
       const initClient = async () => {
         setConfigError(null);
         try {
@@ -164,10 +171,10 @@ export default function App() {
       };
       initClient();
     }
-  }, [wizardCompleted]);
+  }, [wizardNeeded]);
 
-  // Show loading while checking wizard status
-  if (wizardCompleted === null) {
+  // Show loading while checking startup requirements
+  if (wizardNeeded === null) {
     return (
       <div className="flex align-items-center justify-content-center h-screen" style={{ backgroundColor: 'var(--surface-ground)' }}>
          <ProgressSpinner style={{width: '50px', height: '50px'}} strokeWidth="4" animationDuration=".5s" />
@@ -175,22 +182,26 @@ export default function App() {
     );
   }
 
-  // Show wizard if not completed
-  if (!wizardCompleted) {
+  // Show wizard if needed
+  if (wizardNeeded) {
     return (
       <PrimeReactProvider>
         <ThemeProvider>
-          <InitializationWizard onComplete={() => setWizardCompleted(true)} />
+          <InitializationWizard 
+            onComplete={() => setWizardNeeded(false)} 
+            startStep={wizardStartStep}
+            isUpgrade={isUpgrade}
+          />
         </ThemeProvider>
       </PrimeReactProvider>
     );
   }
 
-  // Show main app only after wizard completion
+  // Show main app only after wizard is not needed
   return (
     <PrimeReactProvider>
       <ThemeProvider>
-        <StatusProvider enabled={wizardCompleted === true}>
+        <StatusProvider enabled={wizardNeeded === false}>
           <NotificationProvider>
             {searchClient ? (
               <AppContent searchClient={searchClient} />
@@ -205,7 +216,7 @@ export default function App() {
                     label="Retry Now" 
                     icon="fas fa-sync" 
                     className="p-button-text mt-2" 
-                    onClick={() => setWizardCompleted(prev => prev)} // Trigger effect
+                    onClick={() => setWizardNeeded(prev => prev)} // Trigger effect
                   />
                 )}
               </div>

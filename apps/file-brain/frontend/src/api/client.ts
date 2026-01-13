@@ -473,6 +473,30 @@ export interface DockerStatusResult {
 export async function getWizardStatus(): Promise<WizardStatus> {
   return requestJSON("/api/v1/wizard/status");
 }
+
+export interface CheckDetail {
+  passed: boolean;
+  message: string;
+}
+
+export interface StartupCheckResult {
+  all_checks_passed: boolean;
+  needs_wizard: boolean;
+  start_step: number | null;
+  is_upgrade: boolean;
+  checks: {
+    docker_available: CheckDetail;
+    docker_images: CheckDetail;
+    services_healthy: CheckDetail;
+    model_downloaded: CheckDetail;
+    collection_ready: CheckDetail;
+    schema_current: CheckDetail;
+  };
+}
+
+export async function checkStartupRequirements(): Promise<StartupCheckResult> {
+  return requestJSON("/api/v1/wizard/startup-check");
+}
 export async function checkDockerInstallation(): Promise<DockerCheckResult> {
   return requestJSON("/api/v1/wizard/docker-check");
 }

@@ -1,0 +1,490 @@
+"""
+Unit tests for StartupChecker service.
+"""
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from file_brain.services.startup_checker import CheckDetail, StartupChecker
+
+
+@pytest.fixture
+def mock_docker_manager():
+    """Mock docker manager for testing."""
+    manager = MagicMock()
+    manager.get_docker_info = MagicMock()
+    manager.check_required_images = AsyncMock()
+    manager.get_services_status = AsyncMock()
+    return manager
+
+
+@pytest.fixture
+def mock_model_downloader():
+    """Mock model downloader for testing."""
+    downloader = MagicMock()
+    downloader.check_model_exists = MagicMock()
+    return downloader
+
+
+@pytest.fixture
+def mock_typesense_client():
+    """Mock typesense client for testing."""
+    client = MagicMock()
+    client.check_collection_exists = AsyncMock()
+    return client
+
+
+@pytest.fixture
+def startup_checker(mock_docker_manager, mock_model_downloader, mock_typesense_client):
+    """Create a StartupChecker with mocked dependencies."""
+    with (
+        patch("file_brain.services.startup_checker.get_docker_manager", return_value=mock_docker_manager),
+        patch("file_brain.services.startup_checker.get_model_downloader", return_value=mock_model_downloader),
+        patch("file_brain.services.startup_checker.get_typesense_client", return_value=mock_typesense_client),
+    ):
+        checker = StartupChecker()
+        # Replace the dependencies with our mocks
+        checker.docker_manager = mock_docker_manager
+        checker.model_downloader = mock_model_downloader
+        checker.typesense_client = mock_typesense_client
+        return checker
+
+
+# ============================================================================
+# Individual Check Tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_check_docker_available_success(startup_checker, mock_docker_manager):
+    """Docker check passes when Docker is available."""
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
+
+    result = await startup_checker.check_docker_available()
+
+    assert result.passed is True
+    assert "docker 27.0.1" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_docker_available_failure(startup_checker, mock_docker_manager):
+    """Docker check fails when Docker is not available."""
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": False,
+        "error": "Command not found",
+    }
+
+    result = await startup_checker.check_docker_available()
+
+    assert result.passed is False
+    assert "not available" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_docker_images_success(startup_checker, mock_docker_manager):
+    """Images check passes when all images are present."""
+    mock_docker_manager.check_required_images.return_value = {
+        "success": True,
+        "all_present": True,
+        "missing": [],
+    }
+
+    result = await startup_checker.check_docker_images()
+
+    assert result.passed is True
+    assert "All required images present" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_docker_images_failure(startup_checker, mock_docker_manager):
+    """Images check fails when images are missing."""
+    mock_docker_manager.check_required_images.return_value = {
+        "success": True,
+        "all_present": False,
+        "missing": ["hamza5/tika:latest-full", "hamza5/typesense-gpu:29.0"],
+    }
+
+    result = await startup_checker.check_docker_images()
+
+    assert result.passed is False
+    assert "2 image(s) missing" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_services_healthy_success(startup_checker, mock_docker_manager):
+    """Services check passes when all services are healthy."""
+    mock_docker_manager.get_services_status.return_value = {
+        "healthy": True,
+        "running": True,
+    }
+
+    result = await startup_checker.check_services_healthy()
+
+    assert result.passed is True
+    assert "All services healthy" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_services_healthy_running_not_healthy(startup_checker, mock_docker_manager):
+    """Services check fails when services are running but not healthy."""
+    mock_docker_manager.get_services_status.return_value = {
+        "healthy": False,
+        "running": True,
+    }
+
+    result = await startup_checker.check_services_healthy()
+
+    assert result.passed is False
+    assert "running but not healthy" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_services_healthy_not_running(startup_checker, mock_docker_manager):
+    """Services check fails when services are not running."""
+    mock_docker_manager.get_services_status.return_value = {
+        "healthy": False,
+        "running": False,
+    }
+
+    result = await startup_checker.check_services_healthy()
+
+    assert result.passed is False
+    assert "not running" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_model_downloaded_success(startup_checker, mock_model_downloader):
+    """Model check passes when model exists."""
+    mock_model_downloader.check_model_exists.return_value = {
+        "exists": True,
+        "missing_files": [],
+    }
+
+    result = await startup_checker.check_model_downloaded()
+
+    assert result.passed is True
+    assert "ready" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_model_downloaded_failure(startup_checker, mock_model_downloader):
+    """Model check fails when model files are missing."""
+    mock_model_downloader.check_model_exists.return_value = {
+        "exists": False,
+        "missing_files": ["model.safetensors", "config.json", "tokenizer.json"],
+    }
+
+    result = await startup_checker.check_model_downloaded()
+
+    assert result.passed is False
+    assert "3 model file(s) missing" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_collection_ready_success(startup_checker, mock_typesense_client):
+    """Collection check passes when collection exists."""
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.check_collection_ready()
+
+    assert result.passed is True
+    assert "exists" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_collection_ready_failure(startup_checker, mock_typesense_client):
+    """Collection check fails when collection doesn't exist."""
+    mock_typesense_client.check_collection_exists.return_value = False
+
+    result = await startup_checker.check_collection_ready()
+
+    assert result.passed is False
+    assert "not found" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_schema_current_success(startup_checker, mock_typesense_client):
+    """Schema check passes when collection exists (basic implementation)."""
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.check_schema_current()
+
+    assert result.passed is True
+    assert "Schema version" in result.message
+
+
+@pytest.mark.asyncio
+async def test_check_schema_current_no_collection(startup_checker, mock_typesense_client):
+    """Schema check fails when collection doesn't exist."""
+    mock_typesense_client.check_collection_exists.return_value = False
+
+    result = await startup_checker.check_schema_current()
+
+    assert result.passed is False
+    assert "does not exist" in result.message
+
+
+# ============================================================================
+# Combined Check Tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_all_pass(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """All checks pass in ideal scenario."""
+    # Setup all mocks to return success
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True, "missing": []}
+    mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is True
+    assert result.needs_wizard is False
+    assert result.get_first_failed_step() is None
+    assert result.is_upgrade is False
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_docker_missing(startup_checker, mock_docker_manager):
+    """First check fails when Docker is missing."""
+    mock_docker_manager.get_docker_info.return_value = {"available": False, "error": "Not found"}
+    # Other checks don't matter if Docker is missing
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
+    mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
+
+    result = await startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is False
+    assert result.needs_wizard is True
+    assert result.get_first_failed_step() == 0  # Docker check step
+    assert result.is_upgrade is False  # No upgrade if Docker isn't available
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_images_missing(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Images check fails in upgrade scenario."""
+    # Docker available but images missing
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {
+        "success": True,
+        "all_present": False,
+        "missing": ["image1"],
+    }
+    mock_docker_manager.get_services_status.return_value = {"healthy": False, "running": False}
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is False
+    assert result.needs_wizard is True
+    assert result.get_first_failed_step() == 1  # Image pull step
+    assert result.is_upgrade is True  # Docker available + some checks passed
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_services_not_healthy(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Services check fails when containers aren't healthy."""
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
+    mock_docker_manager.get_services_status.return_value = {"healthy": False, "running": True}
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is False
+    assert result.needs_wizard is True
+    assert result.get_first_failed_step() == 2  # Service start step
+    assert result.is_upgrade is True
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_model_missing(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Model check fails when model isn't downloaded."""
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
+    mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
+    mock_model_downloader.check_model_exists.return_value = {"exists": False, "missing_files": ["model.safetensors"]}
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is False
+    assert result.needs_wizard is True
+    assert result.get_first_failed_step() == 3  # Model download step
+    assert result.is_upgrade is True
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_collection_missing(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Collection check fails when collection doesn't exist."""
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
+    mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+    mock_typesense_client.check_collection_exists.return_value = False
+
+    result = await startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is False
+    assert result.needs_wizard is True
+    assert result.get_first_failed_step() == 4  # Collection create step
+    assert result.is_upgrade is True
+
+
+# ============================================================================
+# CheckDetail and StartupCheckResult Tests
+# ============================================================================
+
+
+def test_check_detail_creation():
+    """CheckDetail can be created with passed and message."""
+    detail = CheckDetail(passed=True, message="Test message")
+    assert detail.passed is True
+    assert detail.message == "Test message"
+
+
+def test_startup_check_result_all_checks_passed():
+    """all_checks_passed property works correctly."""
+    from file_brain.services.startup_checker import StartupCheckResult
+
+    # All passed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.all_checks_passed is True
+    assert result.needs_wizard is False
+
+    # One failed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(False, "missing"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.all_checks_passed is False
+    assert result.needs_wizard is True
+
+
+def test_startup_check_result_is_upgrade():
+    """is_upgrade property correctly identifies upgrade scenarios."""
+    from file_brain.services.startup_checker import StartupCheckResult
+
+    # Fresh install (Docker not available)
+    result = StartupCheckResult(
+        docker_available=CheckDetail(False, "not found"),
+        docker_images=CheckDetail(False, "missing"),
+        services_healthy=CheckDetail(False, "not running"),
+        model_downloaded=CheckDetail(False, "missing"),
+        collection_ready=CheckDetail(False, "missing"),
+        schema_current=CheckDetail(False, "missing"),
+    )
+    assert result.is_upgrade is False
+
+    # Upgrade scenario (Docker available, some checks passed)
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(False, "not healthy"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.is_upgrade is True
+
+
+def test_startup_check_result_get_first_failed_step():
+    """get_first_failed_step returns correct wizard step number."""
+    from file_brain.services.startup_checker import StartupCheckResult
+
+    # Docker failed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(False, "not found"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.get_first_failed_step() == 0
+
+    # Images failed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(False, "missing"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.get_first_failed_step() == 1
+
+    # Services failed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(False, "not healthy"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.get_first_failed_step() == 2
+
+    # Model failed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(False, "missing"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.get_first_failed_step() == 3
+
+    # Collection or schema failed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(False, "missing"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.get_first_failed_step() == 4
+
+    # All passed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(True, "ok"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+    )
+    assert result.get_first_failed_step() is None

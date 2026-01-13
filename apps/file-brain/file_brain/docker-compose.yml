@@ -1,7 +1,7 @@
 services:
   # Apache Tika Server (Docker-based content extraction)
   tika:
-    image: apache/tika:latest-full
+    image: hamza5/tika:latest-full
     container_name: file-brain-data-extractor
     network_mode: "host"
     environment:

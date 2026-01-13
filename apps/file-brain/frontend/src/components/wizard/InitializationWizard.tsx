@@ -14,10 +14,12 @@ import { CollectionCreateStep } from './steps/CollectionCreateStep';
 
 interface InitializationWizardProps {
   onComplete: () => void;
+  startStep?: number;
+  isUpgrade?: boolean;
 }
 
-export function InitializationWizard({ onComplete }: InitializationWizardProps) {
-  const [activeStep, setActiveStep] = useState(0);
+export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = false }: InitializationWizardProps) {
+  const [activeStep, setActiveStep] = useState(startStep);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,10 +103,12 @@ export function InitializationWizard({ onComplete }: InitializationWizardProps) 
       <div className="flex flex-column align-items-center mb-4">
         <h1 className="text-4xl font-bold text-primary mb-2">
           <i className="fas fa-screwdriver-wrench mr-2" />
-          File Brain Setup
+          {isUpgrade ? 'File Brain Update' : 'File Brain Setup'}
         </h1>
         <p className="text-600 text-center max-w-30rem">
-          Welcome! Let's set up your intelligent file search system. This wizard will guide you through the installation process.
+          {isUpgrade 
+            ? 'An update is required to complete the setup. This wizard will guide you through the necessary steps.'
+            : 'Welcome! Let\'s set up your intelligent file search system. This wizard will guide you through the installation process.'}
         </p>
       </div>
 

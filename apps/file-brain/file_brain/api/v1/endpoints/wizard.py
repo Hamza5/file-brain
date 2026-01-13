@@ -13,6 +13,7 @@ from file_brain.core.logging import logger
 from file_brain.database.models import db_session
 from file_brain.database.repositories.wizard_state_repository import WizardStateRepository
 from file_brain.services.docker_manager import get_docker_manager
+from file_brain.services.startup_checker import get_startup_checker
 from file_brain.services.typesense_client import get_typesense_client
 
 router = APIRouter(prefix="/wizard", tags=["wizard"])
@@ -73,6 +74,23 @@ class CollectionStatusResponse(BaseModel):
     error: Optional[str] = None
 
 
+class CheckDetailResponse(BaseModel):
+    """Response model for individual check detail"""
+
+    passed: bool
+    message: str
+
+
+class StartupCheckResponse(BaseModel):
+    """Response model for comprehensive startup checks"""
+
+    all_checks_passed: bool
+    needs_wizard: bool
+    start_step: Optional[int] = None
+    is_upgrade: bool
+    checks: dict  # Maps check name to CheckDetailResponse
+
+
 @router.get("/status", response_model=WizardStatusResponse)
 async def get_wizard_status():
     """Get current wizard completion status"""
@@ -104,6 +122,59 @@ async def get_wizard_status():
             )
     except Exception as e:
         logger.error(f"Error getting wizard status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/startup-check", response_model=StartupCheckResponse)
+async def check_startup_requirements():
+    """
+    Perform comprehensive startup checks to determine if wizard is needed.
+
+    This endpoint validates all system requirements and returns detailed status
+    for each check. Unlike the /status endpoint which reads from DB, this performs
+    actual validation of external conditions (Docker, images, services, model, collection).
+
+    Returns:
+        Detailed status of each check, plus which wizard step to start from if any checks fail
+    """
+    try:
+        checker = get_startup_checker()
+        result = await checker.perform_all_checks()
+
+        return StartupCheckResponse(
+            all_checks_passed=result.all_checks_passed,
+            needs_wizard=result.needs_wizard,
+            start_step=result.get_first_failed_step(),
+            is_upgrade=result.is_upgrade,
+            checks={
+                "docker_available": {
+                    "passed": result.docker_available.passed,
+                    "message": result.docker_available.message,
+                },
+                "docker_images": {
+                    "passed": result.docker_images.passed,
+                    "message": result.docker_images.message,
+                },
+                "services_healthy": {
+                    "passed": result.services_healthy.passed,
+                    "message": result.services_healthy.message,
+                },
+                "model_downloaded": {
+                    "passed": result.model_downloaded.passed,
+                    "message": result.model_downloaded.message,
+                },
+                "collection_ready": {
+                    "passed": result.collection_ready.passed,
+                    "message": result.collection_ready.message,
+                },
+                "schema_current": {
+                    "passed": result.schema_current.passed,
+                    "message": result.schema_current.message,
+                },
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error performing startup checks: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

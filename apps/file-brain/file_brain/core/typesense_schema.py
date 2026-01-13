@@ -2,6 +2,8 @@
 Typesense collection schema definition
 """
 
+import hashlib
+import json
 from typing import Any, Dict
 
 
@@ -84,3 +86,22 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
         ],
         "default_sorting_field": "chunk_index",
     }
+
+
+def get_schema_version() -> str:
+    """
+    Get a hash of the current schema definition.
+
+    This version changes whenever schema fields or configuration change,
+    allowing detection of schema updates that require collection recreation.
+
+    Returns:
+        16-character hex string representing schema version
+    """
+    # Get schema without collection name (not relevant for versioning)
+    schema = get_collection_schema("dummy")
+    del schema["name"]
+
+    # Create deterministic JSON string and hash it
+    schema_str = json.dumps(schema, sort_keys=True)
+    return hashlib.sha256(schema_str.encode()).hexdigest()[:16]
