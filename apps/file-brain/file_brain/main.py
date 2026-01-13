@@ -78,6 +78,8 @@ async def perform_shutdown(vite_process=None):
                 # Trigger snapshot via API (uses Typesense default behavior)
                 await asyncio.to_thread(typesense.client.operations.perform, "snapshot", {})
                 logger.info("✅ Snapshot created successfully")
+            else:
+                logger.debug("ℹ️  Skipping snapshot: Collection not ready (first run or not completed)")
         except Exception as e:
             logger.warning(f"⚠️ Failed to create snapshot on shutdown: {e}")
 

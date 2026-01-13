@@ -392,11 +392,19 @@ class TypesenseClient:
             file_count = results.get("found", 0)
 
             collection = self.client.collections[self.collection_name].retrieve()
+
+            # Since we successfully retrieved data, the collection is ready
+            self.collection_ready = True
+
             return {
                 "num_documents": file_count,  # File count, not chunk count
                 "schema": collection,
             }
         except Exception as e:
+            # If we failed to get stats, we can't be sure the collection is ready
+            # But we don't necessarily want to set it to False if it was previously True
+            # (transient errors shouldn't disable readiness flag generally)
+
             # Check if this is a Typesense unavailability error (503, connection errors, etc.)
             error_str = str(e)
             if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
