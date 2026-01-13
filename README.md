@@ -75,6 +75,17 @@ Search naturally, like "Airplane ticket" to find relevant documents even if the 
 
 ![Semantic Search](docs/images/search.png)
 
+## Pro Version
+
+Want more power? The Pro version is coming soon with advanced capabilities:
+
+- **Chat with Files**: Ask questions and get answers from your documents.
+- **Search by File**: Find semantically similar files.
+- **Video Search**: Find scenes in your videos.
+- **Cloud & Network Drives**: Connect Google Drive, Dropbox, Box, and network drives.
+
+[Check out the website](https://hamza5.github.io/file-brain/) to learn more.
+
 ## License
 
 This project is licensed under the GPL-3.0-or-later license.
