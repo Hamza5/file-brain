@@ -52,8 +52,33 @@ class StartupCheckResult:
 
     @property
     def needs_wizard(self) -> bool:
-        """Check if wizard needs to be shown"""
-        return not self.all_checks_passed
+        """
+        Check if wizard needs to be shown.
+
+        The wizard is only needed for critical failures that require user intervention:
+        - Docker not available (need to install)
+        - Images missing (need to download)
+        - Model missing (need to download)
+        - Collection missing BUT ONLY if services are healthy (otherwise app will start services first)
+
+        Services not running is NOT a wizard-worthy issue - the app can start them automatically.
+        """
+        # Critical checks that always require wizard
+        always_critical = [
+            self.docker_available.passed,
+            self.docker_images.passed,
+            self.model_downloaded.passed,
+        ]
+
+        if not all(always_critical):
+            return True
+
+        # Collection check only matters if services are healthy
+        # If services aren't healthy, the app will start them first, then check collection
+        if self.services_healthy.passed and not self.collection_ready.passed:
+            return True
+
+        return False
 
     @property
     def is_upgrade(self) -> bool:
@@ -66,7 +91,6 @@ class StartupCheckResult:
 
         checks = [
             self.docker_images.passed,
-            self.services_healthy.passed,
             self.model_downloaded.passed,
             self.collection_ready.passed,
         ]
@@ -84,7 +108,7 @@ class StartupCheckResult:
         Wizard steps:
         0: Docker Check
         1: Image Pull
-        2: Service Start
+        2: Service Start (only if services are unhealthy, not just stopped)
         3: Model Download
         4: Collection Create
         5: Complete
@@ -93,8 +117,8 @@ class StartupCheckResult:
             return 0
         if not self.docker_images.passed:
             return 1
-        if not self.services_healthy.passed:
-            return 2
+        # Skip service start step - services not running doesn't require wizard
+        # The app will start them automatically via ContainerInitOverlay
         if not self.model_downloaded.passed:
             return 3
         if not self.collection_ready.passed or not self.schema_current.passed:

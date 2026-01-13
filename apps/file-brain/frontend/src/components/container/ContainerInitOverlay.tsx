@@ -27,7 +27,7 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
   useEffect(() => {
     if (isVisible) {
       setInGracePeriod(true);
-      const timer = setTimeout(() => setInGracePeriod(false), 5000); // 5 seconds grace period
+      const timer = setTimeout(() => setInGracePeriod(false), 15000); // 15 seconds grace period for Typesense
       return () => clearTimeout(timer);
     }
   }, [isVisible]);

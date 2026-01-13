@@ -136,7 +136,8 @@ async def test_check_services_healthy_running_not_healthy(startup_checker, mock_
         "healthy": False,
         "running": True,
     }
-
+    # Skip service start step - app will start services automatically
+    # Only show this step if explicitly needed (which it never is now)
     result = await startup_checker.check_services_healthy()
 
     assert result.passed is False
@@ -298,7 +299,7 @@ async def test_perform_all_checks_images_missing(
 async def test_perform_all_checks_services_not_healthy(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
-    """Services check fails when containers aren't healthy."""
+    """Services check fails when containers are running but unhealthy - wizard should NOT show."""
     mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": False, "running": True}
@@ -308,9 +309,29 @@ async def test_perform_all_checks_services_not_healthy(
     result = await startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
-    assert result.needs_wizard is True
-    assert result.get_first_failed_step() == 2  # Service start step
-    assert result.is_upgrade is True
+    # Services running but not healthy should NOT trigger wizard (critical checks passed)
+    assert result.needs_wizard is False
+    assert result.get_first_failed_step() is None  # No wizard step needed
+    assert result.is_upgrade is False  # All critical checks passed
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_services_not_running(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Services not running should NOT trigger wizard - app will start them automatically."""
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
+    mock_docker_manager.get_services_status.return_value = {"healthy": False, "running": False}
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is False  # Services check failed
+    assert result.needs_wizard is False  # But wizard not needed - app will start services
+    assert result.get_first_failed_step() is None  # No wizard step needed
+    assert result.is_upgrade is False  # All critical checks passed
 
 
 @pytest.mark.asyncio
@@ -407,11 +428,11 @@ def test_startup_check_result_is_upgrade():
     )
     assert result.is_upgrade is False
 
-    # Upgrade scenario (Docker available, some checks passed)
+    # Upgrade scenario (Docker available, some critical checks failed)
     result = StartupCheckResult(
         docker_available=CheckDetail(True, "ok"),
-        docker_images=CheckDetail(True, "ok"),
-        services_healthy=CheckDetail(False, "not healthy"),
+        docker_images=CheckDetail(False, "missing"),  # Critical check failed
+        services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
@@ -445,7 +466,7 @@ def test_startup_check_result_get_first_failed_step():
     )
     assert result.get_first_failed_step() == 1
 
-    # Services failed
+    # Services failed - should NOT trigger wizard (app will start them)
     result = StartupCheckResult(
         docker_available=CheckDetail(True, "ok"),
         docker_images=CheckDetail(True, "ok"),
@@ -454,7 +475,7 @@ def test_startup_check_result_get_first_failed_step():
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
     )
-    assert result.get_first_failed_step() == 2
+    assert result.get_first_failed_step() is None  # No wizard step needed
 
     # Model failed
     result = StartupCheckResult(
