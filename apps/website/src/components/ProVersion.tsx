@@ -16,7 +16,7 @@ export const ProVersion = () => {
                         Want more of <span style={{ color: 'var(--primary-color)' }}>File Brain</span>?
                     </h2>
                     <p className="text-xl mt-4 max-w-2xl mx-auto" style={{ color: 'var(--text-color-secondary)' }}>
-                        Check out the <Tag value="Pro" rounded severity="info" className="px-2 py-0 text-base align-middle mx-1" style={{ backgroundColor: 'var(--primary-color)', color: 'white' }}></Tag> version for advanced capabilities like chatting with files and video search.
+                        Check out the <Tag value="Pro" rounded severity="info" className="px-2 py-0 text-base align-middle mx-1 uppercase" style={{ backgroundColor: 'var(--primary-color)', color: 'white' }}></Tag> version for advanced capabilities like chatting with files and video search.
                     </p>
                 </div>
 

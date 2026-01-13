@@ -2,9 +2,9 @@ import React from 'react';
 
 const features = [
     {
-        icon: 'fa-solid fa-bolt',
-        title: 'Instant Search',
-        description: 'Blazing fast search across all your local files. Find what you need in milliseconds.'
+        icon: 'fa-solid fa-wand-magic-sparkles',
+        title: 'Typo Resistance',
+        description: 'Robust against typos. Search for "iphone" even if you typed "ipnone" and still get perfect results.'
     },
     {
         icon: 'fa-solid fa-brain',

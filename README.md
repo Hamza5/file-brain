@@ -11,12 +11,13 @@ File Brain is a desktop application that helps you find files instantly using na
 ## Key Features
 
 - **🧠 Find what you mean**: Uses advanced Semantic Search -in addition to full text search- to understand the intent behind your query (e.g., search for "worker", find documents mentioning "employee").
-- **🔒 Privacy First**: All indexing and AI processing happens 100% locally on your machine. Your data never leaves your computer.
+- **📝 Typo Resistance**: Robust against typos. Search for "iphone" even if you typed "ipnone".
 - **📄 Supports Everything**: Extracts the content of over 1400+ file formats (PDF, Word, Excel, PowerPoint, images, archives, and more).
 - **🌍 Cross-Language Search**: Search in one language to find documents written in another (e.g., search for "Chair", find documents mentioning "Silla" -in Spanish-).
 - **🚀 Fast Matching**: Search results are shown within milliseconds, not minutes.
 - **👁️ OCR Support**: Automatically extracts text from screenshots, and scanned documents.
 - **⚡ Auto-Indexing**: Detects changes in real-time and updates the index instantly.
+- **🔒 Privacy First**: All indexing and AI processing happens 100% locally on your machine. Your data never leaves your computer.
 
 ## Prerequisites
 
