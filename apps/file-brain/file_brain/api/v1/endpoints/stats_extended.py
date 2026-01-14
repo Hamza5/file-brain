@@ -54,7 +54,7 @@ async def get_recent_files(limit: int = Query(default=10, ge=1, le=50)):
     except Exception as e:
         error_str = str(e)
         if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
-            logger.warning(f"Search engine unavailable in get_recent_files: {e}")
+            logger.debug(f"Search engine unavailable in get_recent_files: {e}")
             return {"files": [], "total": 0}
         logger.error(f"Error getting recent files: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -182,7 +182,7 @@ async def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default
     except Exception as e:
         error_str = str(e)
         if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
-            logger.warning(f"Search engine unavailable in get_indexing_activity: {e}")
+            logger.debug(f"Search engine unavailable in get_indexing_activity: {e}")
             return {"range": time_range, "activity": [], "total": 0}
         logger.error(f"Error getting indexing activity: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -244,7 +244,7 @@ async def get_files_by_type(
     except Exception as e:
         error_str = str(e)
         if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
-            logger.warning(f"Search engine unavailable in get_files_by_type: {e}")
+            logger.debug(f"Search engine unavailable in get_files_by_type: {e}")
             return {"files": [], "total": 0, "page": page, "per_page": per_page, "extension": ext}
         logger.error(f"Error getting files by type: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -424,7 +424,7 @@ async def get_storage_by_type():
     except Exception as e:
         error_str = str(e)
         if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
-            logger.warning(f"Search engine unavailable in get_storage_by_type: {e}")
+            logger.debug(f"Search engine unavailable in get_storage_by_type: {e}")
             return {"storage": {}}
         logger.error(f"Error getting storage by type: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -471,7 +471,7 @@ async def get_index_storage():
     except Exception as e:
         error_str = str(e)
         if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
-            logger.warning(f"Search engine unavailable in get_index_storage: {e}")
+            logger.debug(f"Search engine unavailable in get_index_storage: {e}")
             return {
                 "num_documents": 0,
                 "collection_name": client.collection_name if "client" in locals() else "files",

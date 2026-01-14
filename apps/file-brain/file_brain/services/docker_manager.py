@@ -720,10 +720,10 @@ class DockerManager:
                                 url, headers=headers or {}, timeout=aiohttp.ClientTimeout(total=3)
                             ) as resp:
                                 healthy = resp.status < 400
-                                logger.info(f"Health check {name}: {url} -> status {resp.status}, healthy={healthy}")
+                                logger.debug(f"Health check {name}: {url} -> status {resp.status}, healthy={healthy}")
                                 return healthy
                     except Exception as e:
-                        logger.warning(f"Health check {name}: {url} -> failed: {e}")
+                        logger.debug(f"Health check {name}: {url} -> failed: {e}")
                         return False
 
                 # Check Tika

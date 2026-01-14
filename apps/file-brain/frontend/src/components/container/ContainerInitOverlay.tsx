@@ -32,8 +32,11 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
     }
   }, [isVisible]);
 
+  const [hasStarted, setHasStarted] = useState(false);
+
   const startContainersAndMonitor = useCallback(async () => {
     setIsStarting(true);
+    setHasStarted(true);
     setError(null);
 
     try {
@@ -66,10 +69,10 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
 
   // Start containers when overlay becomes visible
   useEffect(() => {
-    if (isVisible && !isStarting) {
+    if (isVisible && !isStarting && !hasStarted) {
       startContainersAndMonitor();
     }
-  }, [isVisible, isStarting, startContainersAndMonitor]);
+  }, [isVisible, isStarting, hasStarted, startContainersAndMonitor]);
 
   // Check if we should dismiss the overlay
   // Only dismiss when:

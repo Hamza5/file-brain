@@ -3,7 +3,7 @@ import { Message } from 'primereact/message';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { Tag } from 'primereact/tag';
-import { startDockerServices, getDockerStatus, type DockerStatusResult } from '../../../api/client';
+import { startDockerServices, getDockerStatus, connectAppContainerStatusStream, type DockerStatusResult } from '../../../api/client';
 
 interface ServiceStartStepProps {
   onComplete: () => void;
@@ -41,36 +41,40 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
   const handleStartDockerServices = async () => {
     setLoading(true);
     setError(null);
-    const intervals: NodeJS.Timeout[] = [];
 
     try {
       const result = await startDockerServices();
       if (result.success) {
-        // Poll for docker status
-        const pollInterval = setInterval(async () => {
-          const status = await getDockerStatus();
-          setDockerStatus(status);
-
-          // Auto-proceed after services become healthy
-          if (status.healthy) {
-            intervals.forEach(clearInterval);
-            setLoading(false);
-            setTimeout(() => {
-              onComplete();
-            }, 2000);
+        // Use SSE stream instead of polling
+        connectAppContainerStatusStream(
+          (status) => {
+            setDockerStatus(status);
+            
+            // Auto-proceed after services become healthy
+            if (status.healthy) {
+              setLoading(false);
+              setTimeout(() => {
+                onComplete();
+              }, 2000);
+            }
+          },
+          (err) => {
+            // Only set error if we haven't already succeeded
+            if (!dockerStatus?.healthy) {
+              setError(err);
+              setLoading(false);
+            }
+          },
+          () => {
+            // Completion callback
+            if (!dockerStatus?.healthy) {
+               // Stream ended but not healthy? Likely timeout from backend
+               setError('Connection closed before services were ready.');
+               setLoading(false);
+            }
           }
-        }, 2000);
-        intervals.push(pollInterval);
+        );
 
-        // Timeout after 2 minutes
-        const timeoutId = setTimeout(() => {
-          intervals.forEach(clearInterval);
-          if (!dockerStatus?.running) {
-            setError('Docker services failed to start within timeout. Try restarting.');
-            setLoading(false);
-          }
-        }, 120000);
-        intervals.push(timeoutId as unknown as NodeJS.Timeout);
       } else {
         setError(result.error || 'Failed to start Docker services');
         setLoading(false);
