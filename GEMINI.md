@@ -1,0 +1,1 @@
+ALWAYS read `AGENTS.md`

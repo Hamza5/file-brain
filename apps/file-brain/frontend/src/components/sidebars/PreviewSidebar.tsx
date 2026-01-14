@@ -17,14 +17,27 @@ interface PreviewSidebarProps {
 
 export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide, file }) => {
     const { refresh } = useInstantSearch();
+    const [isOpeningFile, setIsOpeningFile] = React.useState(false);
+    const [isOpeningFolder, setIsOpeningFolder] = React.useState(false);
+    
     if (!file) return null;
 
     const handleOpen = async () => {
-        await fileOperationsService.openFile(file.file_path);
+        setIsOpeningFile(true);
+        try {
+            await fileOperationsService.openFile(file.file_path);
+        } finally {
+            setIsOpeningFile(false);
+        }
     };
 
     const handleOpenFolder = async () => {
-        await fileOperationsService.openFolder(file.file_path);
+        setIsOpeningFolder(true);
+        try {
+            await fileOperationsService.openFolder(file.file_path);
+        } finally {
+            setIsOpeningFolder(false);
+        }
     };
 
     const handleDelete = () => {
@@ -249,9 +262,27 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
-                    <Button label="Open" icon="fa-solid fa-external-link-alt" style={{ flex: 1 }} onClick={handleOpen} />
-                    <Button label="Folder" icon="fa-solid fa-folder" severity="secondary" style={{ flex: 1 }} onClick={handleOpenFolder} />
-                    <Button icon="fa-solid fa-trash" severity="danger" aria-label="Delete" onClick={handleDelete} />
+                    <Button 
+                        label="Open" 
+                        icon="fa-solid fa-external-link-alt" 
+                        style={{ flex: 1 }} 
+                        onClick={handleOpen}
+                        loading={isOpeningFile}
+                    />
+                    <Button 
+                        label="Folder" 
+                        icon="fa-solid fa-folder" 
+                        severity="secondary" 
+                        style={{ flex: 1 }} 
+                        onClick={handleOpenFolder}
+                        loading={isOpeningFolder}
+                    />
+                    <Button 
+                        icon="fa-solid fa-trash" 
+                        severity="danger" 
+                        aria-label="Delete" 
+                        onClick={handleDelete} 
+                    />
                 </div>
             </div>
             <style>{`

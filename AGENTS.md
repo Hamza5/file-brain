@@ -33,6 +33,15 @@ This document provides guidelines for AI agents working on this project.
   - `poetry run python -m file_brain.main` (NOT `python -m file_brain.main`)
   - This ensures you're using the correct virtual environment with all dependencies installed.
 
+### Testing
+
+- **Run Full Test Suite**: Before submitting changes, run the full test suite:
+  ```bash
+  cd apps/file-brain
+  poetry run pytest tests/ -v
+  ```
+- **Verify All Tests Pass**: Ensure all tests pass before considering your work complete. The project maintains 100% test pass rate.
+
 ## Technology Stack
 
 When working on this project, strictly adhere to the following technologies and patterns. Do not introduce new libraries or frameworks without explicit permission.

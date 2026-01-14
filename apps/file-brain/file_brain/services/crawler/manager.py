@@ -35,8 +35,8 @@ class CrawlJobManager:
         self._stop_event = asyncio.Event()
         self._running = False
 
-        # Start persistent indexing worker
-        self._indexing_task = asyncio.create_task(self._process_queue())
+        # Lazy initialization - task created when needed in async context
+        self._indexing_task: Optional[asyncio.Task] = None
 
         # Progress tracking
         self.tracker = CrawlProgressTracker()
@@ -167,10 +167,19 @@ class CrawlJobManager:
             "orphan_count": self.verification_progress.orphaned_count,
         }
 
+    async def _ensure_indexing_task(self):
+        """Ensure indexing task is running in the current event loop."""
+        if self._indexing_task is None or self._indexing_task.done():
+            logger.info("Starting indexing worker task")
+            self._indexing_task = asyncio.create_task(self._process_queue())
+
     async def start_crawl(self) -> bool:
         if self._running:
             logger.warning("Crawl job already running.")
             return False
+
+        # Ensure indexing task is running
+        await self._ensure_indexing_task()
 
         self._running = True
         self._stop_event.clear()
@@ -334,6 +343,9 @@ class CrawlJobManager:
         self.discoverer.stop()
         self.indexer.stop()
 
+        # Note: We don't cancel the indexing task here as it's persistent
+        # and continues to process any remaining queue items
+
     async def clear_indexes(self) -> bool:
         """Reset the collection (drop and recreate with latest schema) and reset statistics"""
         logger.info("Resetting collection and statistics...")
@@ -357,6 +369,9 @@ class CrawlJobManager:
     async def start_monitoring(self) -> bool:
         """Start file monitoring"""
         logger.info("Starting file monitoring...")
+
+        # Ensure indexing task is running to process monitored file events
+        await self._ensure_indexing_task()
 
         # Get enabled paths
         if not self.watch_paths:

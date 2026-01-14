@@ -2,9 +2,11 @@
 File operations API for cross-platform file opening functionality
 """
 
+import asyncio
 import os
 import platform
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List
 
@@ -15,6 +17,26 @@ from file_brain.core.logging import logger
 from file_brain.services.typesense_client import TypesenseClient
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+# Create a thread pool for file operations to avoid GIL blocking
+_file_ops_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="file_ops")
+
+
+def _run_subprocess(args):
+    """Run subprocess in a separate thread to avoid GIL blocking."""
+    subprocess.Popen(
+        args,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,  # Completely detach from parent session
+        close_fds=True,  # Close all file descriptors
+    )
+
+
+def _delete_file(file_path: str):
+    """Delete file in a separate thread to avoid GIL blocking."""
+    os.remove(file_path)
 
 
 class FileOperationRequest(BaseModel):
@@ -27,7 +49,7 @@ class MultipleFileOperationRequest(BaseModel):
     operation: str  # "file", "folder", "delete", or "forget"
 
 
-def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
+async def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
     """Open a file with its associated application"""
     system = platform.system()
 
@@ -43,28 +65,19 @@ def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
         # Normalize the path
         file_path = os.path.abspath(file_path)
 
+        # Determine command based on OS
         if system == "Windows":
-            # Use cmd.exe to handle Windows file associations
-            # The empty string before the path is required for proper Windows shell handling
-            subprocess.Popen(
-                ["cmd.exe", "/c", "start", "", file_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            args = ["cmd.exe", "/c", "start", "", file_path]
         elif system == "Darwin":  # macOS
-            subprocess.Popen(
-                ["open", file_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            args = ["open", file_path]
         elif system == "Linux":
-            subprocess.Popen(
-                ["xdg-open", file_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            args = ["xdg-open", file_path]
         else:
             return False, f"Unsupported operating system: {system}"
+
+        # Run subprocess in executor to avoid GIL blocking
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(_file_ops_executor, _run_subprocess, args)
 
         return True, "File opened successfully"
 
@@ -72,7 +85,7 @@ def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
         return False, f"Error opening file: {str(e)}"
 
 
-def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
+async def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
     """Open the containing folder and select the file"""
     system = platform.system()
 
@@ -89,55 +102,32 @@ def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
         file_path = os.path.abspath(file_path)
         folder_path = str(Path(file_path).parent)
 
+        # Determine command based on OS
         if system == "Windows":
-            # Open folder and select the file
-            subprocess.Popen(
-                ["explorer.exe", "/select,", file_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            args = ["explorer.exe", "/select,", file_path]
         elif system == "Darwin":  # macOS
-            subprocess.Popen(
-                ["open", "-R", file_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            args = ["open", "-R", file_path]
         elif system == "Linux":
-            # Try different approaches for different Linux file managers
+            # Try to use xdg-open to open the folder
             import shutil
 
-            # Try to use xdg-open to open the folder
-            try:
-                subprocess.Popen(
-                    ["xdg-open", folder_path],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            except FileNotFoundError:
+            if shutil.which("xdg-open"):
+                args = ["xdg-open", folder_path]
+            else:
                 # Fallback: try common file managers
-                file_managers = [
-                    "nautilus",
-                    "dolphin",
-                    "thunar",
-                    "pcmanfm",
-                    "caja",
-                    "nemo",
-                ]
+                file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm", "caja", "nemo"]
                 for fm in file_managers:
                     if shutil.which(fm):
-                        try:
-                            subprocess.Popen(
-                                [fm, folder_path],
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL,
-                            )
-                            break
-                        except Exception:
-                            continue
+                        args = [fm, folder_path]
+                        break
                 else:
                     return False, "No file manager found to open folder"
         else:
             return False, f"Unsupported operating system: {system}"
+
+        # Run subprocess in executor to avoid GIL blocking
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(_file_ops_executor, _run_subprocess, args)
 
         return True, "Folder opened successfully"
 
@@ -145,10 +135,8 @@ def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
         return False, f"Error opening folder: {str(e)}"
 
 
-def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
+async def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
     """Delete a file from the filesystem with security validations"""
-    system = platform.system()
-
     try:
         # Validate file path exists
         if not os.path.exists(file_path):
@@ -170,16 +158,9 @@ def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
         if not os.access(parent_dir, os.W_OK):
             return False, "Permission denied: cannot write to parent directory"
 
-        # Perform the deletion based on the operating system
-        if system == "Windows":
-            # Use os.remove for Windows (handles permissions automatically)
-            os.remove(file_path)
-        elif system == "Darwin":  # macOS
-            os.remove(file_path)
-        elif system == "Linux":
-            os.remove(file_path)
-        else:
-            return False, f"Unsupported operating system: {system}"
+        # Delete file in executor to avoid GIL blocking
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(_file_ops_executor, _delete_file, file_path)
 
         return True, "File deleted successfully"
 
@@ -218,9 +199,9 @@ async def open_file_operation(request: FileOperationRequest):
         from file_brain.core.telemetry import telemetry
 
         if request.operation == "file":
-            success, message = open_file_cross_platform(request.file_path)
+            success, message = await open_file_cross_platform(request.file_path)
         elif request.operation == "folder":
-            success, message = open_folder_cross_platform(request.file_path)
+            success, message = await open_folder_cross_platform(request.file_path)
         else:
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'file' or 'folder'")
 
@@ -265,9 +246,9 @@ async def open_multiple_files_operation(request: MultipleFileOperationRequest):
                 continue
 
             if request.operation == "file":
-                success, message = open_file_cross_platform(file_path)
+                success, message = await open_file_cross_platform(file_path)
             elif request.operation == "folder":
-                success, message = open_folder_cross_platform(file_path)
+                success, message = await open_folder_cross_platform(file_path)
             else:
                 errors.append(f"Invalid operation '{request.operation}' for: {file_path}")
                 continue
@@ -360,7 +341,7 @@ async def delete_file_operation(request: FileOperationRequest):
         if request.operation != "delete":
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'delete'")
 
-        success, message = delete_file_cross_platform(request.file_path)
+        success, message = await delete_file_cross_platform(request.file_path)
 
         if success:
             # Immediately remove from search index to avoid slow watcher processing
@@ -429,7 +410,7 @@ async def delete_multiple_files_operation(request: MultipleFileOperationRequest)
 
         for file_path in request.file_paths:
             try:
-                success, message = delete_file_cross_platform(file_path)
+                success, message = await delete_file_cross_platform(file_path)
 
                 if success:
                     results.append(file_path)
