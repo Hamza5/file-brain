@@ -65,3 +65,6 @@ jobs:
 
       - name: Build Package
         run: poetry build
+
+      - name: Install Built Package
+        run: pip install dist/*.whl

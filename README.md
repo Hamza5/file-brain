@@ -1,8 +1,15 @@
-# File Brain
+<div align="center">
+  <img src="docs/images/logo.svg" alt="File Brain Logo" width="120" />
+  <h1>File Brain</h1>
+  <p><strong>Your Local AI Search Engine</strong></p>
 
-**Your Local AI Search Engine**
+  [![CI](https://github.com/hamza5/file-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/ci.yml)
+  [![Release](https://github.com/hamza5/file-brain/actions/workflows/release.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/release.yml)
+</div>
 
-Find what you mean, not just what you say. File Brain runs locally on your machine to index and understand your files.
+<p align="center">
+  Find what you mean, not just what you say. File Brain runs locally on your machine to index and understand your files.
+</p>
 
 ## What is File Brain?
 
