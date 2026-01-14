@@ -41,6 +41,7 @@ class WatchPathResponse(BaseModel):
 async def start_crawler(db: Session = Depends(get_db)):
     """Start the crawl job with parallel discovery and indexing"""
     try:
+        from file_brain.core.telemetry import telemetry
         from file_brain.services.service_manager import require_service
 
         # Check service readiness before starting crawl
@@ -92,6 +93,12 @@ async def start_crawler(db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail="Failed to start crawl job")
 
         logger.info("Enhanced crawl job started successfully")
+
+        # Track crawl start
+        telemetry.capture_event(
+            "crawl_started",
+            {"watch_path_count": len(valid_paths)},
+        )
 
         return MessageResponse(
             message=f"Enhanced crawl job started successfully for {len(valid_paths)} path(s). "
@@ -218,6 +225,8 @@ async def stop_file_monitoring(db: Session = Depends(get_db)):
 async def stop_crawler(db: Session = Depends(get_db)):
     """Stop the current crawl job immediately"""
     try:
+        from file_brain.core.telemetry import telemetry
+
         crawl_manager = get_crawl_job_manager()
 
         if not crawl_manager.is_running():
@@ -232,6 +241,12 @@ async def stop_crawler(db: Session = Depends(get_db)):
         await crawl_manager.stop_crawl()
 
         logger.info("Enhanced crawl job stopped successfully")
+
+        # Track crawl stop
+        telemetry.capture_event(
+            "crawl_stopped",
+            {"reason": "user_initiated"},
+        )
 
         return MessageResponse(
             message="Enhanced crawl job stopped successfully.",
@@ -248,6 +263,8 @@ async def stop_crawler(db: Session = Depends(get_db)):
 async def clear_all_indexes(db: Session = Depends(get_db)):
     """Clear all files from Typesense and reset indexed files tracking"""
     try:
+        from file_brain.core.telemetry import telemetry
+
         crawl_manager = get_crawl_job_manager()
 
         # Don't allow clearing while crawl is running
@@ -265,6 +282,9 @@ async def clear_all_indexes(db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail="Failed to clear indexes")
 
         logger.info("All indexes cleared successfully")
+
+        # Track index clear
+        telemetry.capture_event("index_cleared")
 
         return ClearIndexesResponse(
             success=True,

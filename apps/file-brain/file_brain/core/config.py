@@ -80,6 +80,14 @@ class Settings(BaseSettings):
     tika_enabled: bool = Field(default=True)
     tika_client_only: bool = Field(default=True)
 
+    # PostHog Analytics
+    posthog_project_api_key: str = Field(default="phc_cZAOKLFo8KyPxIs4VzoiQfg2a88Oyw7AeOfiHVR79t2")
+    posthog_host: str = Field(default="https://eu.i.posthog.com")
+    posthog_enabled: bool = Field(default=True)
+    posthog_batch_flush_interval: int = Field(
+        default=900, description="Interval in seconds to flush batched telemetry events (default: 15 minutes)"
+    )
+
     @property
     def typesense_url(self) -> str:
         """Get full Typesense URL"""

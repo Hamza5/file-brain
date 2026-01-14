@@ -215,6 +215,8 @@ async def forget_file_from_index(file_path: str, typesense_client: TypesenseClie
 async def open_file_operation(request: FileOperationRequest):
     """Open a single file or containing folder"""
     try:
+        from file_brain.core.telemetry import telemetry
+
         if request.operation == "file":
             success, message = open_file_cross_platform(request.file_path)
         elif request.operation == "folder":
@@ -223,6 +225,9 @@ async def open_file_operation(request: FileOperationRequest):
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'file' or 'folder'")
 
         if success:
+            # Track file open
+            telemetry.capture_event("file_opened", {"operation": request.operation})
+
             return {
                 "success": True,
                 "message": message,
@@ -350,6 +355,8 @@ async def get_file_operation_info():
 async def delete_file_operation(request: FileOperationRequest):
     """Delete a single file from the filesystem and remove from search index"""
     try:
+        from file_brain.core.telemetry import telemetry
+
         if request.operation != "delete":
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'delete'")
 
@@ -364,6 +371,9 @@ async def delete_file_operation(request: FileOperationRequest):
             except Exception as e:
                 logger.warning(f"Failed to remove deleted file from index {request.file_path}: {e}")
                 # Don't fail the operation if index removal fails
+
+            # Track file deletion
+            telemetry.capture_event("file_deleted")
 
             return {
                 "success": True,
@@ -434,6 +444,12 @@ async def delete_multiple_files_operation(request: MultipleFileOperationRequest)
 
             except Exception as e:
                 errors.append(f"Error processing {file_path}: {str(e)}")
+
+        # Track multiple file deletions
+        if len(results) > 0:
+            from file_brain.core.telemetry import telemetry
+
+            telemetry.capture_event("files_deleted", {"count": len(results)})
 
         return {
             "success": len(errors) == 0,

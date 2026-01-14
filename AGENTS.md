@@ -28,6 +28,10 @@ This document provides guidelines for AI agents working on this project.
 ### Dependency Management
 
 - **Update Lock File**: Whenever you modify `pyproject.toml` (e.g., adding/removing dependencies), you MUST run `poetry lock` to update the `poetry.lock` file. Failure to do so will break CI/CD workflows.
+- **Use Poetry for Commands**: ALWAYS use `poetry run` prefix when running tests, scripts, or any Python commands in the backend. For example:
+  - `poetry run pytest tests/` (NOT `pytest tests/`)
+  - `poetry run python -m file_brain.main` (NOT `python -m file_brain.main`)
+  - This ensures you're using the correct virtual environment with all dependencies installed.
 
 ## Technology Stack
 

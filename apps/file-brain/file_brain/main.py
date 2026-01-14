@@ -23,6 +23,7 @@ from file_brain.core.initialization import (
     health_monitoring_loop,
 )
 from file_brain.core.logging import logger
+from file_brain.core.telemetry import telemetry
 from file_brain.services.crawler.manager import get_crawl_job_manager
 
 
@@ -32,6 +33,9 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info("=" * 50)
+
+    # Capture startup event
+    telemetry.capture_event("application_start")
 
     vite_process = None
 
@@ -57,6 +61,7 @@ async def lifespan(app: FastAPI):
         logger.info("ℹ️  Complete the initialization wizard to set up remaining services")
     except Exception as e:
         logger.error(f"❌ Critical initialization failed: {e}")
+        telemetry.capture_exception(e)
         raise
 
     yield
@@ -82,6 +87,7 @@ async def perform_shutdown(vite_process=None):
                 logger.debug("ℹ️  Skipping snapshot: Collection not ready (first run or not completed)")
         except Exception as e:
             logger.warning(f"⚠️ Failed to create snapshot on shutdown: {e}")
+            telemetry.capture_exception(e)
 
         # Stop docker containers if configured
         from file_brain.services.docker_manager import get_docker_manager
@@ -108,8 +114,15 @@ async def perform_shutdown(vite_process=None):
         if crawl_manager.is_running():
             await crawl_manager.stop_crawl()
             logger.info("✅ Crawl manager stopped")
+
+        # Shutdown telemetry (flushes batched events and captures shutdown event)
+        logger.info("📊 Shutting down telemetry...")
+        telemetry.shutdown()
+        logger.info("✅ Telemetry shutdown complete")
+
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
+        telemetry.capture_exception(e)
     logger.info("👋 Application shutdown complete")
 
 

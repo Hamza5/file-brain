@@ -138,8 +138,26 @@ async def check_startup_requirements():
         Detailed status of each check, plus which wizard step to start from if any checks fail
     """
     try:
+        from file_brain.core.telemetry import telemetry
+
         checker = get_startup_checker()
         result = await checker.perform_all_checks()
+
+        # Track wizard start if needed
+        if result.needs_wizard:
+            telemetry.capture_event(
+                "wizard_started",
+                {
+                    "start_step": result.get_first_failed_step(),
+                    "is_upgrade": result.is_upgrade,
+                    "docker_available": result.docker_available.passed,
+                    "docker_images": result.docker_images.passed,
+                    "services_healthy": result.services_healthy.passed,
+                    "model_downloaded": result.model_downloaded.passed,
+                    "collection_ready": result.collection_ready.passed,
+                    "schema_current": result.schema_current.passed,
+                },
+            )
 
         return StartupCheckResponse(
             all_checks_passed=result.all_checks_passed,
@@ -182,6 +200,8 @@ async def check_startup_requirements():
 async def check_docker():
     """Check if Docker/Podman is installed"""
     try:
+        from file_brain.core.telemetry import telemetry
+
         docker_manager = get_docker_manager()
         info = docker_manager.get_docker_info()
 
@@ -190,6 +210,16 @@ async def check_docker():
             with db_session() as db:
                 repo = WizardStateRepository(db)
                 repo.update_docker_check(True)
+
+            # Track successful docker check
+            telemetry.capture_event(
+                "wizard_step_docker_check",
+                {
+                    "success": True,
+                    "docker_command": info.get("command"),
+                    "docker_version": info.get("version"),
+                },
+            )
 
         return DockerCheckResponse(
             available=info.get("available", False),
@@ -244,11 +274,26 @@ async def pull_docker_images():
         async def do_pull():
             nonlocal pull_complete, pull_error
             try:
+                from file_brain.core.telemetry import telemetry
+
                 logger.info("Starting docker pull...")
+                start_time = time.time()
                 result = await docker_manager.pull_images_with_progress(progress_callback)
+                duration = time.time() - start_time
                 logger.info(f"Docker pull completed: {result}")
+
                 if not result.get("success"):
                     pull_error = result.get("error")
+                else:
+                    # Track successful docker pull
+                    telemetry.capture_event(
+                        "wizard_step_docker_pull_completed",
+                        {
+                            "success": True,
+                            "duration_seconds": round(duration, 2),
+                        },
+                    )
+
                 pull_complete = True
                 await progress_queue.put(None)  # Signal completion
             except Exception as e:
@@ -290,6 +335,8 @@ async def pull_docker_images():
 async def start_docker_services():
     """Start docker-compose services"""
     try:
+        from file_brain.core.telemetry import telemetry
+
         docker_manager = get_docker_manager()
 
         # Check if docker is available
@@ -308,6 +355,12 @@ async def start_docker_services():
                 repo = WizardStateRepository(db)
                 repo.update_docker_services(True)
                 repo.update_last_step(1)
+
+            # Track successful docker start
+            telemetry.capture_event(
+                "wizard_step_docker_started",
+                {"success": True},
+            )
 
         return DockerStartResponse(
             success=result.get("success", False),
@@ -460,11 +513,26 @@ async def download_model():
         async def do_download():
             nonlocal download_complete, download_error
             try:
+                from file_brain.core.telemetry import telemetry
+
                 logger.info("Starting model download...")
+                start_time = time.time()
                 result = await downloader.download_model_with_progress(progress_callback)
+                duration = time.time() - start_time
                 logger.info(f"Model download completed: {result}")
+
                 if not result.get("success"):
                     download_error = result.get("error")
+                else:
+                    # Track successful model download
+                    telemetry.capture_event(
+                        "wizard_step_model_download_completed",
+                        {
+                            "success": True,
+                            "duration_seconds": round(duration, 2),
+                        },
+                    )
+
                 download_complete = True
                 await progress_queue.put(None)  # Signal completion
             except Exception as e:
@@ -509,6 +577,7 @@ async def create_collection():
 
     async def _create_collection_task():
         """Background task to create collection"""
+        from file_brain.core.telemetry import telemetry
         from file_brain.services.service_manager import get_service_manager
 
         # Reset service state and clear logs for fresh start
@@ -529,11 +598,18 @@ async def create_collection():
                     repo.update_collection_created(True)
                     repo.update_last_step(2)
                 logger.info("Collection creation completed successfully")
+
+                # Track successful collection creation
+                telemetry.capture_event(
+                    "wizard_step_collection_created",
+                    {"success": True},
+                )
             else:
                 logger.error("Collection creation failed")
 
         except Exception as e:
             logger.error(f"Error creating collection: {e}", exc_info=True)
+            telemetry.capture_exception(e)
 
     # Start the background task
     asyncio.create_task(_create_collection_task())
@@ -739,9 +815,23 @@ async def stream_collection_logs():
 async def complete_wizard():
     """Mark wizard as complete"""
     try:
+        from file_brain.core.telemetry import telemetry
+
         with db_session() as db:
             repo = WizardStateRepository(db)
+            state = repo.get_or_create()
             repo.mark_completed()
+
+            # Track wizard completion
+            telemetry.capture_event(
+                "wizard_completed",
+                {
+                    "total_steps": state.last_step_completed + 1,
+                    "docker_check_passed": state.docker_check_passed,
+                    "docker_services_started": state.docker_services_started,
+                    "collection_created": state.collection_created,
+                },
+            )
 
         return {
             "success": True,

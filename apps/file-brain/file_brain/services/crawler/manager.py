@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from file_brain.api.models.operations import CrawlOperation
 from file_brain.core.logging import logger
+from file_brain.core.telemetry import telemetry
 from file_brain.database.models import WatchPath, db_session
 from file_brain.database.repositories import CrawlerStateRepository
 from file_brain.services.crawler.discoverer import FileDiscoverer
@@ -228,6 +229,8 @@ class CrawlJobManager:
 
                 if success:
                     self.indexing_progress.files_indexed += 1
+                    # Track file indexed (batched)
+                    telemetry.track_batched_event("file_indexed")
                 else:
                     self.indexing_progress.files_failed += 1
 
@@ -268,6 +271,8 @@ class CrawlJobManager:
                 if self._stop_event.is_set():
                     break
                 self.discovery_progress.files_found += 1
+                # Track file discovered (batched)
+                telemetry.track_batched_event("file_discovered")
                 # Use file path as key for deduplication
                 await self.queue.put(operation.file_path, operation)
 

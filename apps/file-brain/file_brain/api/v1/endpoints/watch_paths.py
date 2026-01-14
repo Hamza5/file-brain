@@ -75,6 +75,8 @@ async def create_watch_path(
     """
     Add a single watch path.
     """
+    from file_brain.core.telemetry import telemetry
+
     watch_path_repo = WatchPathRepository(db)
 
     if not os.path.exists(request.path):
@@ -94,6 +96,16 @@ async def create_watch_path(
             watch_path = watch_path_repo.update(watch_path.id, {"enabled": request.enabled})
 
         logger.info(f"Added watch path: {request.path}")
+
+        # Track watch path addition
+        telemetry.capture_event(
+            "watch_path_added",
+            {
+                "include_subdirectories": request.include_subdirectories,
+                "is_excluded": request.is_excluded,
+            },
+        )
+
         return WatchPathResponse(
             id=watch_path.id,
             path=watch_path.path,
@@ -114,10 +126,16 @@ async def clear_watch_paths(
     """
     Remove all configured watch paths.
     """
+    from file_brain.core.telemetry import telemetry
+
     watch_path_repo = WatchPathRepository(db)
     count = watch_path_repo.delete_all()
 
     logger.info(f"Cleared all watch paths via API: {count} removed")
+
+    # Track watch paths clear
+    if count > 0:
+        telemetry.capture_event("watch_paths_cleared", {"count": count})
 
     return MessageResponse(
         message=f"Removed all watch paths. Deleted {count} path(s).",
@@ -168,6 +186,8 @@ async def delete_watch_path_by_id(
     """
     Delete a single watch path by its ID.
     """
+    from file_brain.core.telemetry import telemetry
+
     watch_path_repo = WatchPathRepository(db)
     deleted_path = watch_path_repo.delete(path_id)
 
@@ -175,6 +195,9 @@ async def delete_watch_path_by_id(
         raise HTTPException(status_code=404, detail="Watch path not found")
 
     logger.info(f"Deleted watch path with ID {path_id} via API")
+
+    # Track watch path removal
+    telemetry.capture_event("watch_path_removed")
 
     import time
 
