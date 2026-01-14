@@ -79,15 +79,18 @@ class TelemetryManager:
     def _generate_device_id(self) -> str:
         """
         Generate a privacy-friendly, deterministic device ID with multiple fallbacks.
+        Persists the ID to ensure consistency across different environments/processes.
 
         Priority order:
-        1. py-machineid (hashed) - most reliable cross-platform
-        2. Platform-specific identifiers (hostname + username hash)
-        3. Random persistent ID (stored in user config)
+        1. Existing persistent ID from file
+        2. py-machineid (hashed) - most reliable cross-platform
+        3. Platform-specific identifiers (hostname + username hash)
+        4. Random persistent ID (last resort)
 
         Returns:
             A deterministic device identifier string
         """
+        import getpass
         import hashlib
         import platform
         import socket
@@ -95,50 +98,74 @@ class TelemetryManager:
 
         import platformdirs
 
-        # Method 1: Try py-machineid (most reliable)
-        if machineid is not None:
-            try:
-                device_id = machineid.hashed_id()
-                logger.debug("Generated device ID using py-machineid")
-                return device_id
-            except Exception as e:
-                logger.warning(f"py-machineid failed: {type(e).__name__}: {e}")
-        else:
-            logger.debug("py-machineid not available, using fallback")
-
-        # Method 2: Platform-specific fallback (hostname + username)
-        try:
-            hostname = socket.gethostname()
-            username = platform.node() or "unknown"
-            system_info = f"{hostname}:{username}:{platform.system()}"
-
-            # Hash for privacy
-            device_id = hashlib.sha256(system_info.encode()).hexdigest()
-            logger.info(f"Generated device ID using hostname+username (hostname: {hostname})")
-            return device_id
-        except Exception as e:
-            logger.warning(f"Hostname-based ID generation failed: {type(e).__name__}: {e}")
-
-        # Method 3: Persistent random ID (last resort)
         try:
             config_dir = Path(platformdirs.user_config_dir(settings.app_name, ensure_exists=True))
             device_id_file = config_dir / ".device_id"
 
+            # 1. Try to load existing ID first (Highest Priority)
             if device_id_file.exists():
-                device_id = device_id_file.read_text().strip()
-                logger.info("Loaded persistent device ID from config")
-                return device_id
+                try:
+                    device_id = device_id_file.read_text().strip()
+                    if device_id:
+                        logger.info("Loaded persistent device ID from config")
+                        return device_id
+                except Exception as e:
+                    logger.warning(f"Failed to read persistent ID file: {e}")
+
+            # If no existing ID, generate one
+            device_id = None
+
+            # 2. Try py-machineid (Primary Generation Method)
+            if machineid is not None:
+                try:
+                    device_id = f"mid_{machineid.hashed_id()}"
+                    logger.debug("Generated device ID using py-machineid")
+                except Exception as e:
+                    logger.warning(f"py-machineid failed: {type(e).__name__}: {e}")
             else:
-                # Generate and persist a new random ID
+                logger.debug("py-machineid not available, skipping")
+
+            # 3. Platform-specific fallback (Secondary Generation Method)
+            if not device_id:
+                try:
+                    hostname = socket.gethostname()
+                    # Try to get username, fallback to "unknown"
+                    try:
+                        username = getpass.getuser()
+                    except Exception:
+                        username = platform.node() or "unknown"
+
+                    system_info = f"{hostname}:{username}:{platform.system()}"
+
+                    # Hash for privacy
+                    device_id = f"sys_{hashlib.sha256(system_info.encode()).hexdigest()}"
+                    logger.info(f"Generated device ID using hostname+username (hostname: {hostname})")
+                except Exception as e:
+                    logger.warning(f"Hostname-based ID generation failed: {type(e).__name__}: {e}")
+
+            # 4. Random ID (Last Resort)
+            if not device_id:
                 import secrets
 
-                device_id = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+                try:
+                    device_id = f"rnd_{hashlib.sha256(secrets.token_bytes(32)).hexdigest()}"
+                    logger.info("Generated new random device ID")
+                except Exception as e:
+                    logger.error(f"Random ID generation failed: {e}")
+                    return "err_unknown_device"
+
+            # Persist the generated ID
+            try:
                 device_id_file.write_text(device_id)
-                logger.info("Generated and persisted new random device ID")
-                return device_id
+                logger.info("Persisted device ID to config")
+            except Exception as e:
+                logger.warning(f"Failed to persist device ID: {e}")
+
+            return device_id
+
         except Exception as e:
-            logger.error(f"All device ID generation methods failed: {type(e).__name__}: {e}")
-            return "unknown-device"
+            logger.error(f"Critical error in device ID generation: {e}")
+            return "err_critical_failure"
 
     def capture_event(self, event: str, properties: Optional[Dict] = None):
         """
