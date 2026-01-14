@@ -55,6 +55,10 @@ class ServiceStatus:
     current_phase: Optional[ServicePhase] = None
     initialization_log: List[str] = field(default_factory=list)
 
+    # Log suppression
+    last_logged_error: Optional[str] = None
+    last_logged_time: Optional[float] = None
+
 
 class ServiceManager:
     """
@@ -186,22 +190,38 @@ class ServiceManager:
             elif state == ServiceState.FAILED:
                 status.error_message = error_message
                 status.retry_count += 1
-                if status.retry_count < status.max_retries:
-                    # Exponential backoff for retries
-                    backoff_seconds = min(2**status.retry_count, 300)  # Max 5 minutes
-                    status.next_retry = time.time() + backoff_seconds
-                    self.append_service_log(
-                        service_name,
-                        f"Failed (attempt {status.retry_count}): {error_message}",
-                    )
-                    logger.warning(f"Service {service_name} failed (attempt {status.retry_count}): {error_message}")
-                else:
-                    status.next_retry = None  # Max retries reached
-                    self.append_service_log(service_name, f"Permanently failed: {error_message}")
-                    logger.error(
-                        f"Service {service_name} failed permanently after "
-                        f"{status.max_retries} attempts: {error_message}"
-                    )
+
+                # Check for log suppression
+                should_log = True
+                current_time = time.time()
+
+                if (
+                    status.last_logged_error == error_message
+                    and status.last_logged_time
+                    and current_time - status.last_logged_time < 60  # Suppress for 60 seconds
+                ):
+                    should_log = False
+
+                if should_log:
+                    status.last_logged_error = error_message
+                    status.last_logged_time = current_time
+
+                    if status.retry_count < status.max_retries:
+                        # Exponential backoff for retries
+                        backoff_seconds = min(2**status.retry_count, 300)  # Max 5 minutes
+                        status.next_retry = time.time() + backoff_seconds
+                        self.append_service_log(
+                            service_name,
+                            f"Failed (attempt {status.retry_count}): {error_message}",
+                        )
+                        logger.warning(f"Service {service_name} failed (attempt {status.retry_count}): {error_message}")
+                    else:
+                        status.next_retry = None  # Max retries reached
+                        self.append_service_log(service_name, f"Permanently failed: {error_message}")
+                        logger.error(
+                            f"Service {service_name} failed permanently after "
+                            f"{status.max_retries} attempts: {error_message}"
+                        )
 
             elif state == ServiceState.INITIALIZING:
                 self.append_service_log(service_name, "Initialization started")

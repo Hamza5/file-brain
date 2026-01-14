@@ -408,7 +408,8 @@ class TypesenseClient:
             # Check if this is a Typesense unavailability error (503, connection errors, etc.)
             error_str = str(e)
             if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
-                logger.warning(f"Search engine unavailable in get_collection_stats: {e}")
+                # Log as debug to avoid flooding logs during startup/shutdown
+                logger.debug(f"Search engine unavailable in get_collection_stats: {e}")
             else:
                 logger.error(f"Error getting stats: {e}")
             raise
@@ -449,7 +450,7 @@ class TypesenseClient:
             # Check if this is a Typesense unavailability error
             error_str = str(e)
             if "503" in error_str or "Not Ready" in error_str or "Lagging" in error_str or "Connection" in error_str:
-                logger.warning(f"Search engine unavailable in get_file_type_distribution: {e}")
+                logger.debug(f"Search engine unavailable in get_file_type_distribution: {e}")
             else:
                 logger.error(f"Error getting file type distribution: {e}")
             return {}

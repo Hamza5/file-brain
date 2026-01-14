@@ -394,7 +394,16 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                     total_indexed = ts_stats.get("num_documents", 0)
                     healthy = True
                 except Exception as e:
-                    logger.warning(f"Typesense unavailable in SSE stream: {e}")
+                    error_str = str(e)
+                    if (
+                        "503" in error_str
+                        or "Not Ready" in error_str
+                        or "Lagging" in error_str
+                        or "Connection" in error_str
+                    ):
+                        logger.debug(f"Typesense unavailable in SSE stream: {e}")
+                    else:
+                        logger.warning(f"Error getting Typesense stats in SSE: {e}")
                     total_indexed = 0
                     healthy = False
 
@@ -402,7 +411,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                 try:
                     file_types = await typesense_client.get_file_type_distribution()
                 except Exception as e:
-                    logger.warning(f"Failed to get file type distribution in SSE: {e}")
+                    logger.debug(f"Failed to get file type distribution in SSE: {e}")
                     file_types = {}
 
                 # Get watch paths from database
