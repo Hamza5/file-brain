@@ -4,6 +4,7 @@ import { InstantSearch, Configure } from "react-instantsearch";
 import { PrimeReactProvider } from 'primereact/api';
 import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
+import { useNotification } from "./context/NotificationContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { ProgressSpinner } from 'primereact/progressspinner';
@@ -19,6 +20,7 @@ import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, che
 
 function AppContent({ searchClient }: { searchClient: any }) {
   const { status, stats, watchPaths } = useStatus();
+  const { showSuccess, showInfo, showError } = useNotification();
   const [isCrawlerActive, setIsCrawlerActive] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlStatus["status"] | null>(null);
@@ -42,11 +44,14 @@ function AppContent({ searchClient }: { searchClient: any }) {
     try {
       if (isCrawlerActive) {
         await stopCrawler();
+        showInfo("Indexing Stopped", "The indexer has been stopped.");
       } else {
         await startCrawler();
+        showSuccess("Indexing Started", "The indexer is now scanning your files.");
       }
     } catch (error) {
       console.error("Failed to toggle crawler:", error);
+      showError("Indexing Error", "Failed to toggle the indexer. Please try again.");
     }
   };
 

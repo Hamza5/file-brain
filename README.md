@@ -66,7 +66,7 @@ pip install file-brain
 
 ### Dashboard
 
-See all your indexed files, storage usage, and recent activity at a glance.
+See all your indexed files, storage usage, and recently indexed files at a glance.
 
 ![Dashboard Overview](docs/images/dashboard.png)
 

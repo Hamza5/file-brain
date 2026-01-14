@@ -29,6 +29,12 @@ class FileDiscoverer:
         self._stop_event.set()
         self._sync_stop_event = True
 
+    def reset(self):
+        """Reset the discoverer state for a new crawl."""
+        self._stop_event.clear()
+        self._sync_stop_event = False
+        self.files_found = 0
+
     async def discover(self):
         """
         Discover files in watch paths and yield crawl operations.

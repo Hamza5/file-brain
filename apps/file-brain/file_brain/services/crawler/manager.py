@@ -185,16 +185,19 @@ class CrawlJobManager:
         self._stop_event.clear()
         self._start_time = datetime.utcnow()
 
+        # Reset component stop events
+        self.discoverer.reset()
+        self.indexer.reset()
+        self.verifier.reset()
+
         # Reset progress
-        self.discoverer.files_found = 0
         self.tracker.reset(len(self.watch_paths))
         # Re-bind aliases after reset creates new objects
         self.discovery_progress = self.tracker.discovery
         self.indexing_progress = self.tracker.indexing
         self.verification_progress = self.tracker.verification
 
-        # Reset verifier
-        self.verifier = IndexVerifier()  # Re-instantiate to reset progress
+        # Re-bind verifier progress after reset
         self.verification_progress = self.verifier.progress
 
         # Update DB state - explicitly reset counts

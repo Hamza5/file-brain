@@ -28,6 +28,10 @@ class FileIndexer:
         """Signal the indexing process to stop."""
         self._stop_event.set()
 
+    def reset(self):
+        """Reset the indexer state for a new crawl."""
+        self._stop_event.clear()
+
     async def index_file(
         self, operation: CrawlOperation, progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> bool:

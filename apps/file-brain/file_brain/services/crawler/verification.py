@@ -41,6 +41,11 @@ class IndexVerifier:
         """Signal the verification process to stop."""
         self._stop_event.set()
 
+    def reset(self):
+        """Reset the verifier state for a new crawl."""
+        self._stop_event.clear()
+        self.progress = VerificationProgress()
+
     async def verify_index(self):
         """
         Iterate through all indexed files and verify their existence.
