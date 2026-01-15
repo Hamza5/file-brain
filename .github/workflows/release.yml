@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "apps/file-brain/pyproject.toml"
+  workflow_dispatch:
 
 defaults:
   run:
@@ -28,6 +29,13 @@ jobs:
         run: |
           # Get the current version
           current_version=$(grep -m 1 '^version =' pyproject.toml | awk -F '"' '{print $2}')
+
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Manual trigger detected. Skipping version check."
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$current_version" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
           # Get the previous version using git show
           # We need to look at the previous commit's version of the file
