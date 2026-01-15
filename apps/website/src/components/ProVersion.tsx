@@ -1,115 +1,408 @@
-'use client';
-import React from 'react';
-import { Button } from 'primereact/button';
-import { Tag } from 'primereact/tag';
-import { Badge } from 'primereact/badge';
+"use client";
+import React from "react";
+import { Button } from "primereact/button";
+import { Tag } from "primereact/tag";
+import { ButtonProps } from "primereact/button";
 
 export const ProVersion = () => {
-    return (
-        <section className="py-8" style={{ backgroundColor: 'var(--surface-ground)' }}>
-            <div className="landing-container">
-                <div className="text-center mb-8">
-                    <div className="mb-3">
-                        <Tag value="GO PRO" rounded severity="info" className="text-sm font-bold tracking-widest px-3 py-2" style={{ backgroundColor: 'rgba(6, 182, 212, 0.1)', color: 'var(--primary-color)' }}></Tag>
-                    </div>
-                    <h2 className="text-4xl md:text-5xl font-bold mt-2" style={{ color: 'var(--text-color)' }}>
-                        Want more of <span style={{ color: 'var(--primary-color)' }}>File Brain</span>?
-                    </h2>
-                    <p className="text-xl mt-4 max-w-2xl mx-auto" style={{ color: 'var(--text-color-secondary)' }}>
-                        Check out the <Tag value="Pro" rounded severity="info" className="px-2 py-0 text-base align-middle mx-1 uppercase" style={{ backgroundColor: 'var(--primary-color)', color: 'white' }}></Tag> version for advanced capabilities like chatting with files and video search.
-                    </p>
+  const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
+  const pricingTiers = [
+    {
+      name: "Knowledge Engine",
+      icon: "fa-solid fa-brain",
+      preorderPrice: "$99",
+      launchPrice: "$149",
+      color: "#06b6d4",
+      features: [
+        "Everything in Free",
+        "Chat with files",
+        "Find similar files by text",
+        "Auto-updates (1 year)",
+        "Priority support (1 year)",
+      ],
+      severity: "info" as ButtonProps["severity"],
+    },
+    {
+      name: "Media Suite",
+      icon: "fa-solid fa-film",
+      preorderPrice: "$129",
+      launchPrice: "$199",
+      color: "#8b5cf6",
+      features: [
+        "Everything in Knowledge Engine",
+        "Image search by text/image",
+        "Video scene search",
+        "Auto-updates (1 year)",
+        "Priority support (1 year)",
+      ],
+      severity: "help" as ButtonProps["severity"],
+    },
+    {
+      name: "Cloud Connect",
+      icon: "fa-solid fa-cloud",
+      preorderPrice: "$159",
+      launchPrice: "$249",
+      color: "#f59e0b",
+      features: [
+        "Everything in Media Suite",
+        "Network drives (FTP, SFTP, SMB, WebDAV)",
+        "Cloud storage (Google Drive, Dropbox, S3, OneDrive, Box)",
+        "Auto-updates (1 year)",
+        "Priority support (1 year)",
+      ],
+      severity: "warning" as ButtonProps["severity"],
+    },
+  ];
+
+  const comparisonFeatures = [
+    {
+      name: "Local File Search",
+      free: true,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Fuzzy & typo-resistant search",
+      free: true,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Text-based semantic search",
+      free: true,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Auto-indexing",
+      free: true,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Chat with files",
+      free: false,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Find similar files by text",
+      free: false,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Image search by text/image",
+      free: false,
+      knowledge: false,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Video scene search",
+      free: false,
+      knowledge: false,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Network drives (FTP, SFTP, SMB, WebDAV)",
+      free: false,
+      knowledge: false,
+      media: false,
+      cloud: true,
+    },
+    {
+      name: "Cloud storage (Google Drive, Dropbox, S3, OneDrive, Box)",
+      free: false,
+      knowledge: false,
+      media: false,
+      cloud: true,
+    },
+    {
+      name: "Updates",
+      free: "Manual",
+      knowledge: "Auto (1 year)",
+      media: "Auto (1 year)",
+      cloud: "Auto (1 year)",
+    },
+    {
+      name: "Priority support",
+      free: false,
+      knowledge: "1 year",
+      media: "1 year",
+      cloud: "1 year",
+    },
+  ];
+
+  return (
+    <section
+      className="py-8"
+      style={{ backgroundColor: "var(--surface-ground)" }}
+    >
+      <div className="landing-container">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="mb-3">
+            <Tag
+              value="GO PRO"
+              rounded
+              severity="info"
+              className="text-sm font-bold tracking-widest px-3 py-2"
+              style={{
+                backgroundColor: "rgba(6, 182, 212, 0.1)",
+                color: "var(--primary-color)",
+              }}
+            ></Tag>
+          </div>
+          <h2
+            className="text-4xl md:text-5xl font-bold mt-2"
+            style={{ color: "var(--text-color)" }}
+          >
+            Choose Your{" "}
+            <span style={{ color: "var(--primary-color)" }}>Pro Tier</span>
+          </h2>
+          <p
+            className="text-xl mt-4 max-w-2xl mx-auto"
+            style={{ color: "var(--text-color-secondary)" }}
+          >
+            One-time payment. Auto-updates and priority support for one year.
+          </p>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="grid mb-8">
+          {pricingTiers.map((tier, index) => (
+            <div key={index} className="col-12 lg:col-4 p-3">
+              <div
+                className="h-full p-6 border-round-2xl flex flex-column"
+                style={{
+                  backgroundColor: "white",
+                  boxShadow: "0 4px 15px rgba(0,0,0,0.06)",
+                }}
+              >
+                <div className="text-center mb-4">
+                  <div
+                    className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mx-auto mb-3"
+                    style={{
+                      backgroundColor: `${tier.color}15`,
+                      color: tier.color,
+                    }}
+                  >
+                    <i className={`${tier.icon} text-2xl`}></i>
+                  </div>
+                  <h3
+                    className="text-2xl font-bold mb-2"
+                    style={{ color: "var(--text-color)" }}
+                  >
+                    {tier.name}
+                  </h3>
+                  <div className="mb-2">
+                    <span
+                      className="text-4xl font-bold"
+                      style={{ color: tier.color }}
+                    >
+                      {tier.preorderPrice}
+                    </span>
+                    <span
+                      className="ml-2 line-through"
+                      style={{ color: "var(--text-color-secondary)" }}
+                    >
+                      {tier.launchPrice}
+                    </span>
+                  </div>
+                  <p
+                    className="text-sm mb-0"
+                    style={{ color: "var(--text-color-secondary)" }}
+                  >
+                    Preorder price
+                  </p>
                 </div>
 
-                <div className="grid">
-                    <div className="col-12 lg:col-6 p-4">
-                        <div className="flex flex-column gap-6">
-                            <div className="flex gap-4">
-                                <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center flex-shrink-0" style={{ backgroundColor: 'white', color: 'var(--primary-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
-                                    <i className="fa-solid fa-comments text-2xl"></i>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Chat with Files</h3>
-                                    <p className="m-0" style={{ color: 'var(--text-color-secondary)' }}>
-                                        Instead of just searching, have a conversation with your documents. <b style={{ color: 'var(--primary-color)' }}>File Brain</b><sup><Badge value="PRO" severity="info" className="text-xs px-1" style={{ backgroundColor: 'var(--primary-color)', color: 'white', transform: 'scale(0.8)' }}></Badge></sup> reads relevant files and answers your questions directly.
-                                    </p>
-                                </div>
-                            </div>
+                <ul className="list-none p-0 m-0 mb-4 flex-grow-1">
+                  {tier.features.map((feature, i) => (
+                    <li key={i} className="flex align-items-start mb-3">
+                      <i
+                        className="fa-solid fa-check mr-2 mt-1"
+                        style={{ color: tier.color }}
+                      ></i>
+                      <span style={{ color: "var(--text-color-secondary)" }}>
+                        {feature}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
 
-                            <div className="flex gap-4">
-                                <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center flex-shrink-0" style={{ backgroundColor: 'white', color: 'var(--primary-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
-                                    <i className="fa-solid fa-file-invoice text-2xl"></i>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Search by File</h3>
-                                    <p className="m-0" style={{ color: 'var(--text-color-secondary)' }}>
-                                        Select a file to find semantically similar documents instantly. Perfect for finding related research or documentation.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4">
-                                <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center flex-shrink-0" style={{ backgroundColor: 'white', color: 'var(--primary-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
-                                    <i className="fa-solid fa-video text-2xl"></i>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Video Search</h3>
-                                    <p className="m-0" style={{ color: 'var(--text-color-secondary)' }}>
-                                        Find specific scenes in your video collection using text queries or even image inputs.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4">
-                                <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center flex-shrink-0" style={{ backgroundColor: 'white', color: 'var(--primary-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
-                                    <i className="fa-solid fa-cloud text-2xl"></i>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Cloud & Network Drives</h3>
-                                    <p className="m-0" style={{ color: 'var(--text-color-secondary)' }}>
-                                        Connect popular cloud providers like Google Drive, Dropbox, and Box, or add any network drive to your search index.
-                                    </p>
-                                </div>
-                            </div>
-
-                             <div className="flex gap-4">
-                                <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center flex-shrink-0" style={{ backgroundColor: 'white', color: 'var(--primary-color)', boxShadow: '0 4px 10px rgba(0,0,0,0.03)' }}>
-                                    <i className="fa-solid fa-wand-magic-sparkles text-2xl"></i>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Preorder Bonus</h3>
-                                    <p className="m-0" style={{ color: 'var(--text-color-secondary)' }}>
-                                        Get your custom feature requests prioritized during the preorder period.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="col-12 lg:col-6 p-4">
-                        <div className="h-full p-6 border-round-2xl text-center flex flex-column justify-content-center align-items-center" 
-                             style={{ backgroundColor: 'white', boxShadow: '0 8px 30px rgba(0,0,0,0.04)' }}>
-                            <div className="mb-4">
-                                <Tag value="LIMITED TIME OFFER" rounded severity="warning" className="text-sm font-bold tracking-widest px-3 py-2"></Tag>
-                            </div>
-                            <h3 className="text-3xl font-bold mb-3" style={{ color: 'var(--text-color)' }}>Lifetime Deal</h3>
-                            <p className="text-lg mb-6 max-w-sm mx-auto" style={{ color: 'var(--text-color-secondary)' }}>
-                                Available only for preorder users. After launch, <b style={{ color: 'var(--primary-color)' }}>File Brain</b><sup><Badge value="PRO" severity="info" className="text-xs font-bold px-1" style={{ backgroundColor: 'var(--primary-color)', color: 'white', transform: 'scale(0.8)' }}></Badge></sup> will be a subscription-based product.
-                            </p>
-                            
-                            <Button
-                                label="Contact to Preorder"
-                                icon="fa-solid fa-envelope"
-                                className="p-button-rounded p-button-lg shadow-2"
-                                onClick={() => window.location.href = 'mailto:contact@filebrain.com?subject=File%20Brain%20Pro%20Preorder'}
-                            />
-                            
-                            <p className="mt-4 text-sm" style={{ color: 'var(--text-color-secondary)' }}>
-                                Secure your lifetime access today
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <Button
+                  label="Contact to Preorder"
+                  icon="fa-solid fa-envelope"
+                  className="p-button-rounded w-full shadow-2"
+                  severity={tier.severity}
+                  onClick={() =>
+                    (window.location.href = `mailto:${contactEmail}?subject=File%20Brain%20Pro%20Preorder%20-%20${encodeURIComponent(
+                      tier.name
+                    )}`)
+                  }
+                />
+              </div>
             </div>
-        </section>
-    );
+          ))}
+        </div>
+
+        {/* Comparison Table */}
+        <div className="mt-8">
+          <h3
+            className="text-3xl font-bold text-center mb-6"
+            style={{ color: "var(--text-color)" }}
+          >
+            Compare Features
+          </h3>
+          <div className="overflow-x-auto">
+            <table
+              className="w-full"
+              style={{
+                backgroundColor: "white",
+                borderRadius: "12px",
+                overflow: "hidden",
+              }}
+            >
+              <thead>
+                <tr style={{ backgroundColor: "var(--surface-100)" }}>
+                  <th
+                    className="text-left p-3"
+                    style={{ color: "var(--text-color)", fontWeight: "bold" }}
+                  >
+                    Feature
+                  </th>
+                  <th
+                    className="text-center p-3"
+                    style={{ color: "var(--text-color)", fontWeight: "bold" }}
+                  >
+                    Free
+                  </th>
+                  <th
+                    className="text-center p-3"
+                    style={{ color: "var(--text-color)", fontWeight: "bold" }}
+                  >
+                    Knowledge Engine
+                  </th>
+                  <th
+                    className="text-center p-3"
+                    style={{ color: "var(--text-color)", fontWeight: "bold" }}
+                  >
+                    Media Suite
+                  </th>
+                  <th
+                    className="text-center p-3"
+                    style={{ color: "var(--text-color)", fontWeight: "bold" }}
+                  >
+                    Cloud Connect
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonFeatures.map((feature, index) => (
+                  <tr
+                    key={index}
+                    style={{
+                      borderBottom:
+                        index < comparisonFeatures.length - 1
+                          ? "1px solid var(--surface-200)"
+                          : "none",
+                    }}
+                  >
+                    <td className="p-3" style={{ color: "var(--text-color)" }}>
+                      {feature.name}
+                    </td>
+                    <td className="text-center p-3">
+                      {typeof feature.free === "boolean" ? (
+                        feature.free ? (
+                          <i
+                            className="fa-solid fa-check text-xl"
+                            style={{ color: "var(--primary-color)" }}
+                          ></i>
+                        ) : (
+                          <i
+                            className="fa-solid fa-xmark text-xl"
+                            style={{ color: "var(--text-color-secondary)" }}
+                          ></i>
+                        )
+                      ) : (
+                        <span style={{ color: "var(--text-color-secondary)" }}>
+                          {feature.free}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-center p-3">
+                      {typeof feature.knowledge === "boolean" ? (
+                        feature.knowledge ? (
+                          <i
+                            className="fa-solid fa-check text-xl"
+                            style={{ color: "#06b6d4" }}
+                          ></i>
+                        ) : (
+                          <i
+                            className="fa-solid fa-xmark text-xl"
+                            style={{ color: "var(--text-color-secondary)" }}
+                          ></i>
+                        )
+                      ) : (
+                        <span style={{ color: "var(--text-color-secondary)" }}>
+                          {feature.knowledge}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-center p-3">
+                      {typeof feature.media === "boolean" ? (
+                        feature.media ? (
+                          <i
+                            className="fa-solid fa-check text-xl"
+                            style={{ color: "#8b5cf6" }}
+                          ></i>
+                        ) : (
+                          <i
+                            className="fa-solid fa-xmark text-xl"
+                            style={{ color: "var(--text-color-secondary)" }}
+                          ></i>
+                        )
+                      ) : (
+                        <span style={{ color: "var(--text-color-secondary)" }}>
+                          {feature.media}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-center p-3">
+                      {typeof feature.cloud === "boolean" ? (
+                        feature.cloud ? (
+                          <i
+                            className="fa-solid fa-check text-xl"
+                            style={{ color: "#f59e0b" }}
+                          ></i>
+                        ) : (
+                          <i
+                            className="fa-solid fa-xmark text-xl"
+                            style={{ color: "var(--text-color-secondary)" }}
+                          ></i>
+                        )
+                      ) : (
+                        <span style={{ color: "var(--text-color-secondary)" }}>
+                          {feature.cloud}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 };

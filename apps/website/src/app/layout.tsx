@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "File Brain - Effortless Local Search",
+  title: "File Brain - Effortless Local File Search",
   description: "File Brain indexes your local files and makes them searchable with AI-powered semantic search.",
 };
 

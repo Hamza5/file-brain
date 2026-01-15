@@ -37,6 +37,9 @@ jobs:
         run: npm ci
 
       - name: Build website
+        env:
+          NEXT_PUBLIC_CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+          GITHUB_PAGES: "true"
         run: |
           npm run build --workspace=@file-brain/website
 
