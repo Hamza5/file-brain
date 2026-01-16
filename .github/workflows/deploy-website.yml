@@ -39,7 +39,8 @@ jobs:
       - name: Build website
         env:
           NEXT_PUBLIC_CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
-          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
         run: |
           npm run build --workspace=@file-brain/website
 
