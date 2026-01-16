@@ -35,6 +35,27 @@ def mock_typesense_client():
     return client
 
 
+@pytest.fixture(autouse=True)
+def mock_wizard_state():
+    """Mock wizard state as completed for all tests by default."""
+    mock_state = MagicMock()
+    mock_state.wizard_completed = True
+
+    mock_repo = MagicMock()
+    mock_repo.get.return_value = mock_state
+
+    with (
+        patch("file_brain.services.startup_checker.db_session") as mock_db_session,
+        patch("file_brain.services.startup_checker.WizardStateRepository") as mock_repo_class,
+    ):
+        # Setup database mocks
+        mock_db = MagicMock()
+        mock_db_session.return_value.__enter__.return_value = mock_db
+        mock_db_session.return_value.__exit__.return_value = None
+        mock_repo_class.return_value = mock_repo
+        yield
+
+
 @pytest.fixture
 def startup_checker(mock_docker_manager, mock_model_downloader, mock_typesense_client):
     """Create a StartupChecker with mocked dependencies."""
@@ -48,7 +69,7 @@ def startup_checker(mock_docker_manager, mock_model_downloader, mock_typesense_c
         checker.docker_manager = mock_docker_manager
         checker.model_downloader = mock_model_downloader
         checker.typesense_client = mock_typesense_client
-        return checker
+        yield checker
 
 
 # ============================================================================
@@ -396,6 +417,7 @@ def test_startup_check_result_all_checks_passed():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.all_checks_passed is True
     assert result.needs_wizard is False
@@ -408,6 +430,7 @@ def test_startup_check_result_all_checks_passed():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.all_checks_passed is False
     assert result.needs_wizard is True
@@ -425,6 +448,7 @@ def test_startup_check_result_is_upgrade():
         model_downloaded=CheckDetail(False, "missing"),
         collection_ready=CheckDetail(False, "missing"),
         schema_current=CheckDetail(False, "missing"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.is_upgrade is False
 
@@ -436,6 +460,7 @@ def test_startup_check_result_is_upgrade():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.is_upgrade is True
 
@@ -452,6 +477,7 @@ def test_startup_check_result_get_first_failed_step():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.get_first_failed_step() == 0
 
@@ -463,6 +489,7 @@ def test_startup_check_result_get_first_failed_step():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.get_first_failed_step() == 1
 
@@ -474,6 +501,7 @@ def test_startup_check_result_get_first_failed_step():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.get_first_failed_step() is None  # No wizard step needed
 
@@ -485,6 +513,7 @@ def test_startup_check_result_get_first_failed_step():
         model_downloaded=CheckDetail(False, "missing"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.get_first_failed_step() == 3
 
@@ -496,6 +525,7 @@ def test_startup_check_result_get_first_failed_step():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(False, "missing"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.get_first_failed_step() == 4
 
@@ -507,5 +537,6 @@ def test_startup_check_result_get_first_failed_step():
         model_downloaded=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.get_first_failed_step() is None

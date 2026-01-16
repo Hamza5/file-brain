@@ -189,6 +189,10 @@ async def check_startup_requirements():
                     "passed": result.schema_current.passed,
                     "message": result.schema_current.message,
                 },
+                "wizard_reset": {
+                    "passed": result.wizard_reset.passed,
+                    "message": result.wizard_reset.message,
+                },
             },
         )
     except Exception as e:

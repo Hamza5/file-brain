@@ -3,8 +3,9 @@
   <h1>File Brain</h1>
   <p><strong>Your Local AI Search Engine</strong></p>
 
-  [![CI](https://github.com/hamza5/file-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/ci.yml)
-  [![Release](https://github.com/hamza5/file-brain/actions/workflows/release.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/release.yml)
+[![CI](https://github.com/hamza5/file-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/ci.yml)
+[![Release](https://github.com/hamza5/file-brain/actions/workflows/release.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/release.yml)
+
 </div>
 
 <p align="center">
@@ -83,17 +84,13 @@ Search naturally, like "Airplane ticket" to find relevant documents even if the 
 
 ![Semantic Search](docs/images/search.png)
 
-## Pro Version
+## **PRO** Version
 
-Want more power? The Pro version is coming soon with advanced capabilities:
+Want more power? The **PRO** version is on the way with advanced capabilities:
 
 - **Chat with Files**: Ask questions and get answers from your documents.
 - **Search by File**: Find semantically similar files.
 - **Video Search**: Find scenes in your videos.
 - **Cloud & Network Drives**: Connect Google Drive, Dropbox, Box, and network drives.
 
-[Check out the website](https://hamza5.github.io/file-brain/) to learn more.
-
-## License
-
-This project is licensed under the GPL-3.0-or-later license.
+[Check out the website](https://file-brain.com/) to learn more.

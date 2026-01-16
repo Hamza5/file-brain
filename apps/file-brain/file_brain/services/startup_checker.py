@@ -12,6 +12,10 @@ from typing import Optional
 
 from file_brain.core.logging import logger
 from file_brain.core.typesense_schema import get_schema_version
+from file_brain.database.models import db_session
+from file_brain.database.repositories.wizard_state_repository import (
+    WizardStateRepository,
+)
 from file_brain.services.docker_manager import get_docker_manager
 from file_brain.services.model_downloader import get_model_downloader
 from file_brain.services.typesense_client import get_typesense_client
@@ -35,6 +39,7 @@ class StartupCheckResult:
     model_downloaded: CheckDetail
     collection_ready: CheckDetail
     schema_current: CheckDetail
+    wizard_reset: CheckDetail
 
     @property
     def all_checks_passed(self) -> bool:
@@ -47,6 +52,7 @@ class StartupCheckResult:
                 self.model_downloaded.passed,
                 self.collection_ready.passed,
                 self.schema_current.passed,
+                self.wizard_reset.passed,
             ]
         )
 
@@ -55,14 +61,20 @@ class StartupCheckResult:
         """
         Check if wizard needs to be shown.
 
-        The wizard is only needed for critical failures that require user intervention:
-        - Docker not available (need to install)
-        - Images missing (need to download)
-        - Model missing (need to download)
-        - Collection missing BUT ONLY if services are healthy (otherwise app will start services first)
+        The wizard is needed for:
+        1. Critical failures that require user intervention:
+           - Docker not available (need to install)
+           - Images missing (need to download)
+           - Model missing (need to download)
+           - Collection missing BUT ONLY if services are healthy (otherwise app will start services first)
+        2. When user deliberately resets wizard via the "Resetup Wizard" button
 
         Services not running is NOT a wizard-worthy issue - the app can start them automatically.
         """
+        # If wizard was deliberately reset via the database, show it
+        if not self.wizard_reset.passed:
+            return True
+
         # Critical checks that always require wizard
         always_critical = [
             self.docker_available.passed,
@@ -113,6 +125,10 @@ class StartupCheckResult:
         4: Collection Create
         5: Complete
         """
+        # If wizard was deliberately reset, start from the beginning
+        if not self.wizard_reset.passed:
+            return 0
+
         if not self.docker_available.passed:
             return 0
         if not self.docker_images.passed:
@@ -230,6 +246,32 @@ class StartupChecker:
             logger.error(f"Error checking schema version: {e}")
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
+    async def check_wizard_reset(self) -> CheckDetail:
+        """
+        Check if wizard was completed or deliberately reset.
+
+        This checks the database wizard_completed flag. If it's False,
+        it means either the wizard was never completed or the user
+        deliberately reset it via the "Resetup Wizard" button.
+
+        Returns:
+            CheckDetail with passed=True if wizard is completed, False otherwise
+        """
+        try:
+            with db_session() as db:
+                repo = WizardStateRepository(db)
+                state = repo.get()
+
+                if state and state.wizard_completed:
+                    return CheckDetail(passed=True, message="Wizard completed")
+                else:
+                    return CheckDetail(passed=False, message="Wizard not completed or was reset")
+
+        except Exception as e:
+            logger.error(f"Error checking wizard reset status: {e}")
+            # If we can't check, assume wizard is completed to avoid unnecessary wizard display
+            return CheckDetail(passed=True, message=f"Could not check wizard status: {str(e)}")
+
     async def perform_all_checks(self) -> StartupCheckResult:
         """
         Perform all startup checks concurrently.
@@ -247,6 +289,7 @@ class StartupChecker:
             self.check_model_downloaded(),
             self.check_collection_ready(),
             self.check_schema_current(),
+            self.check_wizard_reset(),
             return_exceptions=True,
         )
 
@@ -265,6 +308,7 @@ class StartupChecker:
             model_downloaded=safe_result(3, "Model check failed"),
             collection_ready=safe_result(4, "Collection check failed"),
             schema_current=safe_result(5, "Schema check failed"),
+            wizard_reset=safe_result(6, "Wizard reset check failed"),
         )
 
         logger.info(f"Startup checks complete. All passed: {check_result.all_checks_passed}")
