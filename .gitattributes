@@ -1,0 +1,2 @@
+# Mark PrimeReact themes as vendored to exclude from language stats
+apps/file-brain/frontend/public/themes/** linguist-vendored

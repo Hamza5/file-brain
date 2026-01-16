@@ -26,6 +26,7 @@ dist-ssr
 # Hidden files except some
 .*
 !.gitignore
+!.gitattributes
 !.kilocode/
 !.env.example
 !.github/
