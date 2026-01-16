@@ -201,7 +201,7 @@ def get_available_port(start_port: int, max_attempts: int = 100) -> int:
 
 def cli_main():
     """Entry point for packaged distribution (production mode only)."""
-    from flaskwebgui import FlaskUI
+    from file_brain.lib.flaskwebgui import FlaskUI
 
     port = get_available_port(settings.port)
     logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     if settings.debug:
         uvicorn.run("file_brain.main:app", host=settings.host, port=port, reload=True, log_level="info")
     else:
-        from flaskwebgui import FlaskUI
+        from file_brain.lib.flaskwebgui import FlaskUI
 
         FlaskUI(
             app=app,
