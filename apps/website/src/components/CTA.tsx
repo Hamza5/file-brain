@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { Button } from 'primereact/button';
+import posthog from 'posthog-js';
 
 export const CTA: React.FC = () => {
     return (
@@ -16,13 +17,25 @@ export const CTA: React.FC = () => {
                             label="Check Installation Instructions"
                             icon="fa-brands fa-github"
                             className="p-button-rounded p-button-lg shadow-4"
-                            onClick={() => window.location.href = 'https://github.com/Hamza5/file-brain'}
+                            onClick={() => {
+                                posthog.capture('cta_check_installation_clicked', {
+                                    location: 'cta_section',
+                                    destination_url: 'https://github.com/Hamza5/file-brain',
+                                });
+                                window.location.href = 'https://github.com/Hamza5/file-brain';
+                            }}
                         />
                         <Button
                             label="Contact Us"
                             icon="fa-solid fa-envelope"
                             className="p-button-rounded p-button-lg shadow-4"
-                            onClick={() => window.location.href = `mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL}?subject=File%20Brain%20Inquiry`}
+                            onClick={() => {
+                                posthog.capture('cta_contact_us_clicked', {
+                                    location: 'cta_section',
+                                    subject: 'File Brain Inquiry',
+                                });
+                                window.location.href = `mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL}?subject=File%20Brain%20Inquiry`;
+                            }}
                         />
                     </div>
                 </div>

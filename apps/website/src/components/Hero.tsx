@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
+import posthog from 'posthog-js';
 
 export const Hero: React.FC = () => {
     return (
@@ -22,21 +23,39 @@ export const Hero: React.FC = () => {
                             label="Get Started"
                             icon="fa-brands fa-github"
                             className="p-button-rounded p-button-lg shadow-2"
-                            onClick={() => window.location.href = 'https://github.com/Hamza5/file-brain'}
+                            onClick={() => {
+                                posthog.capture('cta_get_started_clicked', {
+                                    location: 'hero_section',
+                                    destination_url: 'https://github.com/Hamza5/file-brain',
+                                });
+                                window.location.href = 'https://github.com/Hamza5/file-brain';
+                            }}
                         />
                         <Button
                             label="Explore Features"
                             icon="fa-solid fa-arrow-down"
                             className="p-button-rounded p-button-outlined p-button-lg"
                             style={{ color: 'var(--primary-color)' }}
-                            onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                            onClick={() => {
+                                posthog.capture('cta_explore_features_clicked', {
+                                    location: 'hero_section',
+                                    target_section: 'features',
+                                });
+                                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
                         />
                         <Button
                             label="See Use Cases"
                             icon="fa-solid fa-lightbulb"
                             className="p-button-rounded p-button-outlined p-button-lg"
                             style={{ color: 'var(--primary-color)' }}
-                            onClick={() => document.getElementById('use-cases')?.scrollIntoView({ behavior: 'smooth' })}
+                            onClick={() => {
+                                posthog.capture('cta_see_use_cases_clicked', {
+                                    location: 'hero_section',
+                                    target_section: 'use-cases',
+                                });
+                                document.getElementById('use-cases')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
                         />
                     </div>
                 </div>

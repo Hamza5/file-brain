@@ -13,6 +13,7 @@
     "@fortawesome/fontawesome-free": "^7.1.0",
     "chart.js": "^4.5.1",
     "next": "16.1.1",
+    "posthog-js": "^1.324.1",
     "primeflex": "^4.0.0",
     "primereact": "^10.9.7",
     "react": "19.2.3",

@@ -3,6 +3,7 @@ import React from "react";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
 import { ButtonProps } from "primereact/button";
+import posthog from "posthog-js";
 
 export const ProVersion = () => {
   const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
@@ -244,11 +245,17 @@ export const ProVersion = () => {
                   icon="fa-solid fa-envelope"
                   className="p-button-rounded w-full shadow-2"
                   severity={tier.severity}
-                  onClick={() =>
-                    (window.location.href = `mailto:${contactEmail}?subject=File%20Brain%20Pro%20Preorder%20-%20${encodeURIComponent(
+                  onClick={() => {
+                    posthog.capture("pro_tier_preorder_clicked", {
+                      tier_name: tier.name,
+                      tier_price: tier.preorderPrice,
+                      tier_launch_price: tier.launchPrice,
+                      location: "pro_version_section",
+                    });
+                    window.location.href = `mailto:${contactEmail}?subject=File%20Brain%20Pro%20Preorder%20-%20${encodeURIComponent(
                       tier.name
-                    )}`)
-                  }
+                    )}`;
+                  }}
                 />
               </div>
             </div>
