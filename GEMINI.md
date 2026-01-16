@@ -1,1 +1,1 @@
-ALWAYS READ `AGENTS.md` to understand the rules of working on this project.
+NO MATTER WHAT, ALWAYS FOLLOW THE RULES IN `AGENTS.md`.

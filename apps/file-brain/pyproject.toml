@@ -85,9 +85,6 @@ include = [
     ] },
 ]
 
-[tool.poetry.build]
-script = "build.py"
-generate-setup-file = false
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"

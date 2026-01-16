@@ -75,7 +75,7 @@ jobs:
 
       - name: Build Package
         if: steps.version_check.outputs.changed == 'true'
-        run: poetry build
+        run: python build.py
 
       - name: Create Git Tag
         if: steps.version_check.outputs.changed == 'true'
@@ -93,7 +93,7 @@ jobs:
           files: |
             apps/file-brain/dist/*.whl
             apps/file-brain/dist/*.tar.gz
-          generate_release_notes: true
+          fail_on_unmatched_files: true
 
       - name: Publish to PyPI
         if: steps.version_check.outputs.changed == 'true'

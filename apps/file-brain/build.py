@@ -16,8 +16,8 @@ def build():
     package_dir = project_root / "file_brain"
 
     if not frontend_dir.exists():
-        print("⚠️  Frontend directory not found, skipping frontend build")
-        return
+        print("❌ Frontend directory not found!")
+        sys.exit(1)
 
     print("🔨 Building frontend...")
     print(f"   Frontend directory: {frontend_dir}")
@@ -65,14 +65,26 @@ def build():
             print(f"📦 Copying frontend to package: {package_frontend_dir}")
             shutil.copytree(dist_dir, package_frontend_dir)
             print("✅ Frontend copied to package successfully")
+
+            # Run poetry build
+            print("🚀 Running poetry build...")
+            subprocess.run(
+                ["poetry", "build"],
+                cwd=project_root,
+                check=True,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            print("✅ Package built successfully")
+
         else:
             print("⚠️  Warning: dist directory not found after build")
 
     except subprocess.CalledProcessError as e:
-        print(f"❌ Frontend build failed: {e}")
+        print(f"❌ Build failed: {e}")
         sys.exit(1)
     except FileNotFoundError:
-        print("❌ npm not found. Please install Node.js and npm.")
+        print("❌ npm or poetry not found. Please install Node.js, npm, and poetry.")
         sys.exit(1)
 
 
