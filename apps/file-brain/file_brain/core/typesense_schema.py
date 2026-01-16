@@ -11,8 +11,9 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
     """
     Get Typesense collection schema for chunk-based file indexing.
 
-    Note: Metadata (extension, size, dates, etc.) is stored only in chunk_index=0
-    to minimize storage. Other chunks contain only file_path, content, and chunk fields.
+    All chunks contain complete metadata for simplified querying and filtering.
+    This allows faceted search and filtering on any field without needing to
+    filter by chunk_index.
 
     Args:
         collection_name: Name of the collection
@@ -23,51 +24,49 @@ def get_collection_schema(collection_name: str) -> Dict[str, Any]:
     return {
         "name": collection_name,
         "fields": [
-            # File identification (required for all chunks)
+            # File identification
             {"name": "file_path", "type": "string", "facet": True},  # Must be facet for group_by
-            # Chunk metadata (required for all chunks)
+            # Chunk metadata
             {"name": "chunk_index", "type": "int32", "facet": False},
             {"name": "chunk_total", "type": "int32", "facet": False},
             {"name": "chunk_hash", "type": "string", "facet": False},
-            # Essential metadata (required for all chunks - needed for UI display)
+            # Essential metadata (needed for UI display)
             {"name": "file_extension", "type": "string", "facet": True},
             {"name": "file_size", "type": "int64", "facet": False},
             {"name": "mime_type", "type": "string", "facet": True},
             {"name": "modified_time", "type": "int64", "facet": False},
-            # Content (required for all chunks)
+            # Content
             {"name": "content", "type": "string", "facet": False},
-            # Additional metadata (optional - only in chunk 0)
-            {"name": "file_hash", "type": "string", "optional": True, "facet": False},
-            {"name": "created_time", "type": "int64", "facet": False, "optional": True},
-            {"name": "indexed_at", "type": "int64", "facet": False, "optional": True},
-            # Enhanced metadata from Tika extraction (optional - only in chunk 0)
-            {"name": "title", "type": "string", "facet": False, "optional": True},
-            {"name": "author", "type": "string", "facet": True, "optional": True},
-            {"name": "description", "type": "string", "facet": False, "optional": True},
-            {"name": "subject", "type": "string", "facet": True, "optional": True},
-            {"name": "language", "type": "string", "facet": True, "optional": True},
-            {"name": "producer", "type": "string", "facet": True, "optional": True},
-            {"name": "application", "type": "string", "facet": True, "optional": True},
-            {"name": "comments", "type": "string", "facet": False, "optional": True},
-            {"name": "revision", "type": "string", "facet": False, "optional": True},
-            # Date metadata from document content (optional - only in chunk 0)
+            # Additional metadata
+            {"name": "file_hash", "type": "string", "facet": False},
+            {"name": "created_time", "type": "int64", "facet": False},
+            {"name": "indexed_at", "type": "int64", "facet": False},
+            # Enhanced metadata from Tika extraction
+            {"name": "title", "type": "string", "facet": False},
+            {"name": "author", "type": "string", "facet": True},
+            {"name": "description", "type": "string", "facet": False},
+            {"name": "subject", "type": "string", "facet": True},
+            {"name": "language", "type": "string", "facet": True},
+            {"name": "producer", "type": "string", "facet": True},
+            {"name": "application", "type": "string", "facet": True},
+            {"name": "comments", "type": "string", "facet": False},
+            {"name": "revision", "type": "string", "facet": False},
+            # Date metadata from document content
             {
                 "name": "document_created_date",
                 "type": "string",
                 "facet": False,
-                "optional": True,
             },
             {
                 "name": "document_modified_date",
                 "type": "string",
                 "facet": False,
-                "optional": True,
             },
-            # Keywords as array for faceted search (optional - only in chunk 0)
-            {"name": "keywords", "type": "string[]", "facet": True, "optional": True},
-            # Content type information (optional - only in chunk 0)
-            {"name": "content_type", "type": "string", "facet": True, "optional": True},
-            # Embedding for semantic search (required for all chunks)
+            # Keywords as array for faceted search
+            {"name": "keywords", "type": "string[]", "facet": True},
+            # Content type information
+            {"name": "content_type", "type": "string", "facet": True},
+            # Embedding for semantic search
             {
                 "name": "embedding",
                 "type": "float[]",

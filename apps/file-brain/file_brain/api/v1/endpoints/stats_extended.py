@@ -28,7 +28,8 @@ async def get_recent_files(limit: int = Query(default=10, ge=1, le=50)):
         results = client.client.collections[client.collection_name].documents.search(
             {
                 "q": "*",
-                "filter_by": "chunk_index:=0",
+                "group_by": "file_path",
+                "group_limit": 1,
                 "sort_by": "indexed_at:desc",
                 "per_page": limit,
                 "include_fields": "file_path,file_extension,file_size,mime_type,modified_time,indexed_at",
@@ -119,7 +120,9 @@ async def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default
         results = client.client.collections[client.collection_name].documents.search(
             {
                 "q": "*",
-                "filter_by": f"chunk_index:=0 && indexed_at:>={start_ms}",
+                "group_by": "file_path",
+                "group_limit": 1,
+                "filter_by": f"indexed_at:>={start_ms}",
                 "per_page": 250,  # Single page for stats might be enough if not excessively huge activity
                 "include_fields": "indexed_at",
                 "limit": 1000,  # Increased limit for stats
@@ -211,7 +214,9 @@ async def get_files_by_type(
         results = client.client.collections[client.collection_name].documents.search(
             {
                 "q": "*",
-                "filter_by": f"chunk_index:=0 && file_extension:={ext}",
+                "group_by": "file_path",
+                "group_limit": 1,
+                "filter_by": f"file_extension:={ext}",
                 "sort_by": "indexed_at:desc",
                 "page": page,
                 "per_page": per_page,
@@ -285,11 +290,13 @@ async def get_files_by_age(
             start_ms = 0
             end_ms = now_ms - (365 * day_ms)
 
-        filter_by = f"chunk_index:=0 && modified_time:>={start_ms} && modified_time:<{end_ms}"
+        filter_by = f"modified_time:>={start_ms} && modified_time:<{end_ms}"
 
         results = client.client.collections[client.collection_name].documents.search(
             {
                 "q": "*",
+                "group_by": "file_path",
+                "group_limit": 1,
                 "filter_by": filter_by,
                 "sort_by": "modified_time:desc",
                 "page": page,
@@ -359,7 +366,9 @@ async def get_file_age_distribution():
             results = client.client.collections[client.collection_name].documents.search(
                 {
                     "q": "*",
-                    "filter_by": f"chunk_index:=0 && modified_time:>={start_ms} && modified_time:<{end_ms}",
+                    "group_by": "file_path",
+                    "group_limit": 1,
+                    "filter_by": f"modified_time:>={start_ms} && modified_time:<{end_ms}",
                     "per_page": 0,
                 }
             )
@@ -391,7 +400,8 @@ async def get_storage_by_type():
             results = client.client.collections[client.collection_name].documents.search(
                 {
                     "q": "*",
-                    "filter_by": "chunk_index:=0",
+                    "group_by": "file_path",
+                    "group_limit": 1,
                     "per_page": 250,
                     "page": page,
                     "include_fields": "file_extension,file_size",

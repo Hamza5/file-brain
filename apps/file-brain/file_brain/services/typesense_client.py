@@ -228,9 +228,10 @@ class TypesenseClient:
 
     async def get_doc_by_path(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
-        Get the first chunk (chunk 0) of an indexed file by its file_path.
+        Get any chunk of an indexed file by its file_path.
 
-        Chunk 0 contains all file metadata, so this gives us complete file information.
+        Since all chunks now contain complete metadata, we can return any chunk.
+        We return chunk 0 by convention for consistency.
 
         Returns:
             Document dict if found, otherwise None.
@@ -252,20 +253,19 @@ class TypesenseClient:
         chunk_index: int,
         chunk_total: int,
         chunk_hash: str,
-        # Optional metadata (only provided for chunk 0)
-        file_extension: Optional[str] = None,
-        file_size: Optional[int] = None,
-        mime_type: Optional[str] = None,
-        modified_time: Optional[int] = None,
-        created_time: Optional[int] = None,
-        file_hash: Optional[str] = None,
+        # Metadata (now required for all chunks)
+        file_extension: str,
+        file_size: int,
+        mime_type: str,
+        modified_time: int,
+        created_time: int,
+        file_hash: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Index (upsert) a file chunk in Typesense.
 
-        For storage efficiency, metadata is only included in chunk_index=0.
-        Other chunks contain only file_path, content, and chunk fields.
+        All chunks contain complete metadata for simplified querying and filtering.
 
         Args:
             file_path: Full path to file
@@ -273,17 +273,17 @@ class TypesenseClient:
             chunk_index: Index of this chunk (0-based)
             chunk_total: Total number of chunks for this file
             chunk_hash: Unique hash for this chunk
-            file_extension: File extension (only for chunk 0)
-            file_size: File size in bytes (only for chunk 0)
-            mime_type: MIME type (only for chunk 0)
-            modified_time: Modified timestamp in ms (only for chunk 0)
-            created_time: Created timestamp in ms (only for chunk 0)
-            file_hash: File content hash (only for chunk 0)
-            metadata: Additional metadata from extraction (only for chunk 0)
+            file_extension: File extension
+            file_size: File size in bytes
+            mime_type: MIME type
+            modified_time: Modified timestamp in ms
+            created_time: Created timestamp in ms
+            file_hash: File content hash
+            metadata: Additional metadata from extraction (Tika fields)
         """
         doc_id = self.generate_doc_id(file_path, chunk_index)
 
-        # Base document (all chunks have these fields)
+        # All chunks get complete metadata
         document: Dict[str, Any] = {
             "id": doc_id,
             "file_path": file_path,
@@ -291,38 +291,53 @@ class TypesenseClient:
             "chunk_index": chunk_index,
             "chunk_total": chunk_total,
             "chunk_hash": chunk_hash,
+            "file_extension": file_extension,
+            "file_size": file_size,
+            "mime_type": mime_type,
+            "modified_time": modified_time,
+            "created_time": created_time,
+            "indexed_at": int(time.time() * 1000),
+            "file_hash": file_hash,
         }
 
-        # Add essential metadata to ALL chunks (required for UI display)
-        if file_extension is not None:
-            document["file_extension"] = file_extension
-            document["file_size"] = file_size
-            document["mime_type"] = mime_type
-            document["modified_time"] = modified_time
+        # Add Tika metadata fields (use empty strings for missing values)
+        if metadata:
+            document["title"] = metadata.get("title", "")
+            document["author"] = metadata.get("author", "")
+            document["description"] = metadata.get("description", "")
+            document["subject"] = metadata.get("subject", "")
+            document["language"] = metadata.get("language", "")
+            document["producer"] = metadata.get("producer", "")
+            document["application"] = metadata.get("application", "")
+            document["comments"] = metadata.get("comments", "")
+            document["revision"] = metadata.get("revision", "")
+            document["document_created_date"] = metadata.get("document_created_date", "")
+            document["document_modified_date"] = metadata.get("document_modified_date", "")
+            document["content_type"] = metadata.get("content_type", "")
 
-        # Add additional metadata only for chunk 0
-        if chunk_index == 0:
-            document["created_time"] = created_time
-            document["indexed_at"] = int(time.time() * 1000)
-            document["file_hash"] = file_hash
-
-            # Add Tika metadata fields
-            if metadata:
-                if title := metadata.get("title"):
-                    document["title"] = title
-                if author := metadata.get("author"):
-                    document["author"] = author
-                if subject := metadata.get("subject"):
-                    document["subject"] = subject
-                if language := metadata.get("language"):
-                    document["language"] = language
-
-                # Keywords array
-                if keywords := metadata.get("keywords"):
-                    if isinstance(keywords, list):
-                        document["keywords"] = keywords
-                    elif isinstance(keywords, str):
-                        document["keywords"] = [k.strip() for k in keywords.split(",")]
+            # Keywords array
+            keywords = metadata.get("keywords", [])
+            if isinstance(keywords, list):
+                document["keywords"] = keywords
+            elif isinstance(keywords, str):
+                document["keywords"] = [k.strip() for k in keywords.split(",")] if keywords else []
+            else:
+                document["keywords"] = []
+        else:
+            # No metadata provided - use empty defaults
+            document["title"] = ""
+            document["author"] = ""
+            document["description"] = ""
+            document["subject"] = ""
+            document["language"] = ""
+            document["producer"] = ""
+            document["application"] = ""
+            document["comments"] = ""
+            document["revision"] = ""
+            document["document_created_date"] = ""
+            document["document_modified_date"] = ""
+            document["content_type"] = ""
+            document["keywords"] = []
 
         try:
             # Use upsert to handle both create and update
@@ -378,15 +393,16 @@ class TypesenseClient:
         """
         Get collection statistics.
 
-        Returns file count (not chunk count) by filtering for chunk_index=0.
+        Returns file count (not chunk count) by grouping by file_path.
         """
         try:
-            # Count only chunk 0 documents (one per file)
+            # Use group_by to count unique files
             results = self.client.collections[self.collection_name].documents.search(
                 {
                     "q": "*",
-                    "filter_by": "chunk_index:=0",
-                    "per_page": 1,
+                    "group_by": "file_path",
+                    "group_limit": 1,
+                    "per_page": 0,  # We only need the count
                 }
             )
             file_count = results.get("found", 0)
@@ -418,17 +434,18 @@ class TypesenseClient:
         """
         Get distribution of indexed files by file extension via faceting.
 
-        Returns file count (not chunk count) by filtering for chunk_index=0.
+        Returns file count (not chunk count) by grouping by file_path.
 
         Returns:
             Dict mapping file_extension to count, e.g. {".pdf": 42, ".txt": 15}
         """
         try:
-            # Search only chunk 0 documents and facet by extension
+            # Use group_by to get unique files, then facet by extension
             results = self.client.collections[self.collection_name].documents.search(
                 {
                     "q": "*",
-                    "filter_by": "chunk_index:=0",
+                    "group_by": "file_path",
+                    "group_limit": 1,
                     "facet_by": "file_extension",
                     "max_facet_values": 100,
                     "per_page": 0,  # We only want facet counts, not documents
@@ -499,14 +516,15 @@ class TypesenseClient:
         """
         Get all indexed files with pagination for verification.
 
-        Returns only chunk 0 documents (one per file) with metadata.
+        Returns unique files by grouping by file_path.
         Used to detect orphaned index entries by comparing with filesystem.
         """
         try:
             results = self.client.collections[self.collection_name].documents.search(
                 {
                     "q": "*",
-                    "filter_by": "chunk_index:=0",  # Only get chunk 0 (one per file)
+                    "group_by": "file_path",
+                    "group_limit": 1,
                     "per_page": limit,
                     "page": (offset // limit) + 1,
                     "include_fields": "file_path,file_hash,file_size,modified_time,indexed_at",
@@ -523,14 +541,15 @@ class TypesenseClient:
         """
         Get total count of indexed files (not chunks) for verification progress tracking.
 
-        Counts only chunk_index=0 documents.
+        Uses group_by to count unique files.
         """
         try:
             results = self.client.collections[self.collection_name].documents.search(
                 {
                     "q": "*",
-                    "filter_by": "chunk_index:=0",
-                    "per_page": 1,
+                    "group_by": "file_path",
+                    "group_limit": 1,
+                    "per_page": 0,
                 }
             )
             return results.get("found", 0)
