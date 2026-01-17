@@ -68,3 +68,5 @@ When working on this project, strictly adhere to the following technologies and 
   - When updating the root `README.md`, apply the same changes to `apps/file-brain/README.md`.
   - **PyPI Compatibility**: `apps/file-brain/README.md` must use **absolute URLs** pointing to the GitHub `main` branch for all images to ensure they render correctly on PyPI (e.g., `https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/logo.svg`).
   - The root `README.md` may continue to use relative paths.
+- **Website README Sync**: The `apps/website/README.md` must reflect the actual website structure and content.
+  - When modifying website sections (Hero, Features, Use Cases, Pro Version, etc.), update the website README accordingly.

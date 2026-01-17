@@ -7,19 +7,23 @@ import posthog from "posthog-js";
 
 export const ProVersion = () => {
   const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
+  // Tier color CSS variable names (using PrimeReact color palette)
+  const tierColors: Record<string, string> = {
+    info: "var(--blue-500)",
+    help: "var(--purple-500)",
+    warning: "var(--orange-500)",
+  };
+
   const pricingTiers = [
     {
       name: "Knowledge Engine",
       icon: "fa-solid fa-brain",
       preorderPrice: "$99",
       launchPrice: "$149",
-      color: "#06b6d4",
       features: [
         "Everything in Free",
         "Chat with files",
         "Find similar files by text",
-        "Auto-updates (1 year)",
-        "Priority support (1 year)",
       ],
       severity: "info" as ButtonProps["severity"],
     },
@@ -28,13 +32,10 @@ export const ProVersion = () => {
       icon: "fa-solid fa-film",
       preorderPrice: "$129",
       launchPrice: "$199",
-      color: "#8b5cf6",
       features: [
         "Everything in Knowledge Engine",
         "Image search by text/image",
         "Video scene search",
-        "Auto-updates (1 year)",
-        "Priority support (1 year)",
       ],
       severity: "help" as ButtonProps["severity"],
     },
@@ -43,13 +44,10 @@ export const ProVersion = () => {
       icon: "fa-solid fa-cloud",
       preorderPrice: "$159",
       launchPrice: "$249",
-      color: "#f59e0b",
       features: [
         "Everything in Media Suite",
         "Network drives (FTP, SFTP, SMB, WebDAV)",
         "Cloud storage (Google Drive, Dropbox, S3, OneDrive, Box)",
-        "Auto-updates (1 year)",
-        "Priority support (1 year)",
       ],
       severity: "warning" as ButtonProps["severity"],
     },
@@ -192,8 +190,8 @@ export const ProVersion = () => {
                   <div
                     className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mx-auto mb-3"
                     style={{
-                      backgroundColor: `${tier.color}15`,
-                      color: tier.color,
+                      backgroundColor: `color-mix(in srgb, ${tierColors[tier.severity!]} 15%, transparent)`,
+                      color: tierColors[tier.severity!],
                     }}
                   >
                     <i className={`${tier.icon} text-2xl`}></i>
@@ -207,7 +205,7 @@ export const ProVersion = () => {
                   <div className="mb-2">
                     <span
                       className="text-4xl font-bold"
-                      style={{ color: tier.color }}
+                      style={{ color: tierColors[tier.severity!] }}
                     >
                       {tier.preorderPrice}
                     </span>
@@ -231,7 +229,7 @@ export const ProVersion = () => {
                     <li key={i} className="flex align-items-start mb-3">
                       <i
                         className="fa-solid fa-check mr-2 mt-1"
-                        style={{ color: tier.color }}
+                        style={{ color: tierColors[tier.severity!] }}
                       ></i>
                       <span style={{ color: "var(--text-color-secondary)" }}>
                         {feature}
@@ -351,7 +349,7 @@ export const ProVersion = () => {
                         feature.knowledge ? (
                           <i
                             className="fa-solid fa-check text-xl"
-                            style={{ color: "#06b6d4" }}
+                            style={{ color: tierColors.info }}
                           ></i>
                         ) : (
                           <i
@@ -370,7 +368,7 @@ export const ProVersion = () => {
                         feature.media ? (
                           <i
                             className="fa-solid fa-check text-xl"
-                            style={{ color: "#8b5cf6" }}
+                            style={{ color: tierColors.help }}
                           ></i>
                         ) : (
                           <i
@@ -389,7 +387,7 @@ export const ProVersion = () => {
                         feature.cloud ? (
                           <i
                             className="fa-solid fa-check text-xl"
-                            style={{ color: "#f59e0b" }}
+                            style={{ color: tierColors.warning }}
                           ></i>
                         ) : (
                           <i

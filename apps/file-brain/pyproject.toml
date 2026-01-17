@@ -2,7 +2,7 @@
 name = "file-brain"
 version = "0.1.2"
 description = "Advanced file search engine powered by AI"
-authors = [{ name = "Hamza Abbad", email = "hamza.abbad@gmail.com" }]
+authors = [{ name = "Hamza Abbad", email = "contact@file-brain.com" }]
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 license = { text = "GPL-3.0-or-later" }
@@ -61,7 +61,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Hamza5/file-brain"
+Homepage = "https://file-brain.com"
 Repository = "https://github.com/Hamza5/file-brain"
 Issues = "https://github.com/Hamza5/file-brain/issues"
 

@@ -37,7 +37,7 @@ File Brain is a desktop application that helps you find files instantly using na
 Install File Brain easily using pip:
 
 ```bash
-pip install file-brain
+pip install -U file-brain
 ```
 
 ## Getting Started
@@ -50,7 +50,6 @@ pip install file-brain
 
 2.  **Initialization Wizard**:
     On the first run, a simple wizard will guide you:
-
     1.  **System Check**: Verifies Docker is running.
     2.  **Download Components**: Downloads the necessary search services.
     3.  **Initialize Engine**: Starts the background search components.
@@ -64,7 +63,6 @@ pip install file-brain
     Choose the folders you want to index via the dashboard settings.
 
 4.  **Indexing**:
-
     - **Manual Indexing**: Performs a deep scan of all files. Great for initial setup.
     - **Auto-Indexing**: Watches for new or changed files and processes them instantly.
 

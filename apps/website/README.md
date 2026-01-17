@@ -1,36 +1,118 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Master Your Data with File Brain
 
-## Getting Started
+> UNLOCK YOUR PRODUCTIVITY POTENTIAL
 
-First, run the development server:
+Empower your file search with AI-backed semantic intelligence. Find anything, anywhere, instantly.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+[Get Started](https://github.com/Hamza5/file-brain) | [Explore Features](#powerful-capabilities) | [See Use Cases](#real-world-scenarios)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Powerful Capabilities
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Everything you need to master your data.
 
-## Learn More
+### ✨ Typo Resistance
 
-To learn more about Next.js, take a look at the following resources:
+Robust against typos. Search for "iphone" even if you typed "ipnone" and still get perfect results.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 🧠 Semantic Intelligence
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Search by concepts, meanings, and context—not just matching exact keywords.
 
-## Deploy on Vercel
+### 📄 Extensive Format Support
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Supports over 1400+ file formats including documents, archives, and binary files.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 🌐 Cross-Language Search
+
+Search in one language and find documents written in another automatically.
+
+### 🔍 OCR & Image Analysis
+
+Find text inside screenshots, scanned documents, and images effortlessly.
+
+### 🛡️ Privacy First
+
+Your data never leaves your machine. All indexing and processing stays local and secure.
+
+---
+
+## Real World Scenarios
+
+How can File Brain help you?
+
+### Recover Lost Work
+
+Forgot where you saved that important report? Describe it in a few words, and File Brain will find it instantly.
+
+### Deduplicate Your Drive
+
+File Brain identifies duplicate files by content, even if they have different names, helping you reclaim storage space.
+
+### Digitize Your Life
+
+Take a photo of a document or whiteboard. File Brain's OCR makes the text inside searchable immediately.
+
+### Connect Knowledge
+
+Researching a topic? Find connections between scattered documents and notes to build a complete picture.
+
+---
+
+## Choose Your Pro Tier
+
+One-time payment. Auto-updates and priority support for one year.
+
+### 🧠 Knowledge Engine
+
+**$99** (Preorder) / ~~$149~~
+
+- Everything in Free
+- Chat with files
+- Find similar files by text
+
+### 🎬 Media Suite
+
+**$129** (Preorder) / ~~$199~~
+
+- Everything in Knowledge Engine
+- Image search by text/image
+- Video scene search
+
+### ☁️ Cloud Connect
+
+**$159** (Preorder) / ~~$249~~
+
+- Everything in Media Suite
+- Network drives (FTP, SFTP, SMB, WebDAV)
+- Cloud storage (Google Drive, Dropbox, S3, OneDrive, Box)
+
+[Contact to Preorder](mailto:hamza.abbad@scrapingbrain.com?subject=File%20Brain%20Pro%20Preorder)
+
+### Compare Features
+
+| Feature                       |  Free  | Knowledge Engine |  Media Suite  | Cloud Connect |
+| :---------------------------- | :----: | :--------------: | :-----------: | :-----------: |
+| Local File Search             |   ✅   |        ✅        |      ✅       |      ✅       |
+| Fuzzy & typo-resistant search |   ✅   |        ✅        |      ✅       |      ✅       |
+| Text-based semantic search    |   ✅   |        ✅        |      ✅       |      ✅       |
+| Auto-indexing                 |   ✅   |        ✅        |      ✅       |      ✅       |
+| Chat with files               |   ❌   |        ✅        |      ✅       |      ✅       |
+| Find similar files by text    |   ❌   |        ✅        |      ✅       |      ✅       |
+| Image search by text/image    |   ❌   |        ❌        |      ✅       |      ✅       |
+| Video scene search            |   ❌   |        ❌        |      ✅       |      ✅       |
+| Network drives                |   ❌   |        ❌        |      ❌       |      ✅       |
+| Cloud storage                 |   ❌   |        ❌        |      ❌       |      ✅       |
+| Updates                       | Manual |  Auto (1 year)   | Auto (1 year) | Auto (1 year) |
+| Priority support              |   ❌   |      1 year      |    1 year     |    1 year     |
+
+---
+
+## Ready to master your data?
+
+Get started with File Brain today and experience the future of local file search.
+
+[Check Installation Instructions](https://github.com/Hamza5/file-brain) | [Contact Us](mailto:hamza.abbad@scrapingbrain.com?subject=File%20Brain%20Inquiry)
+
+---

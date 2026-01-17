@@ -97,16 +97,16 @@ export const AppMockup: React.FC = () => {
                     <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-2xl blur opacity-20 transition duration-1000 group-hover:opacity-100"></div>
                     
                     {/* Mockup Container */}
-                    <div className="relative p-1 bg-white border-round-2xl shadow-8 border-1 border-gray-100">
-                        <div className="bg-white border-round-xl overflow-hidden flex flex-column" style={{ minHeight: '40rem', position: 'relative' }}>
+                    <div className="relative p-1 surface-card border-round-2xl shadow-8">
+                        <div className="surface-card border-round-xl overflow-hidden flex flex-column" style={{ minHeight: '40rem', position: 'relative' }}>
                             {/* Transparent overlay to prevent interaction */}
                             <div style={{ position: 'absolute', inset: 0, zIndex: 999, cursor: 'default' }} />
                             
                             {/* App Header */}
-                            <header className="flex align-items-center justify-content-between px-4 py-3 border-bottom-1 border-200 bg-white">
+                            <header className="flex align-items-center justify-content-between px-4 py-3 border-bottom-1 surface-border surface-card">
                                 <div className="flex align-items-center gap-2">
                                     <Image src={logo} alt="Logo" width={32} height={32} />
-                                    <span className="font-bold text-xl text-900">File Brain</span>
+                                    <span className="font-bold text-xl text-color">File Brain</span>
                                 </div>
                                 <div className="flex-1 flex justify-content-center px-4">
                                     <div className="relative w-full max-w-30rem">
@@ -198,57 +198,57 @@ export const AppMockup: React.FC = () => {
                             </header>
                             
                             {/* App Content */}
-                            <div className="flex-1 bg-gray-50 p-4">
+                            <div className="flex-1 surface-ground p-4">
                                 <div className="max-w-full mx-auto">
                                     {/* Stat Cards */}
                                     <div className="grid mb-4">
                                         <div className="col-6 md:col-3">
-                                            <Card className="text-center border-1 border-100 shadow-2 py-3 h-full flex flex-column align-items-center justify-content-center">
-                                                <div className="flex align-items-center justify-content-center bg-blue-50 border-round-xl w-full mb-2">
+                                            <Card className="surface-card border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1">
+                                                <div className="flex align-items-center justify-content-center bg-primary-reverse border-round-xl">
                                                     <i className="fa-solid fa-file-circle-check text-3xl text-primary" />
                                                 </div>
-                                                <div className="text-2xl font-bold text-900 mb-1">1,248</div>
+                                                <div className="text-2xl font-bold text-color">1,248</div>
                                                 <div className="flex align-items-center gap-1">
-                                                    <span className="text-xs text-600 font-semibold uppercase tracking-wider">Indexed</span>
-                                                    <i className="fa-solid fa-circle-question text-600 text-xs cursor-help" />
+                                                    <span className="text-xs text-color-secondary font-semibold uppercase tracking-wider">Indexed</span>
+                                                    <i className="fa-solid fa-circle-question text-color-secondary text-xs cursor-help" />
                                                 </div>
                                             </Card>
                                         </div>
                                         <div className="col-6 md:col-3">
-                                            <Card className="text-center border-1 border-100 shadow-2 py-3 h-full flex flex-column align-items-center justify-content-center">
-                                                <div className="flex align-items-center justify-content-center bg-blue-50 border-round-xl w-full mb-2">
+                                            <Card className="surface-card border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1">
+                                                <div className="flex align-items-center justify-content-center bg-primary-reverse border-round-xl">
                                                     <i className="fa-solid fa-magnifying-glass text-3xl text-primary" />
                                                 </div>
-                                                <div className="text-2xl font-bold text-900 mb-1">3,142</div>
+                                                <div className="text-2xl font-bold text-color">3,142</div>
                                                 <div className="flex align-items-center gap-1">
-                                                    <span className="text-xs text-600 font-semibold uppercase tracking-wider">Discovered</span>
-                                                    <i className="fa-solid fa-circle-question text-600 text-xs cursor-help" />
+                                                    <span className="text-xs text-color-secondary font-semibold uppercase tracking-wider">Discovered</span>
+                                                    <i className="fa-solid fa-circle-question text-color-secondary text-xs cursor-help" />
                                                 </div>
                                             </Card>
                                         </div>
                                         <div className="col-6 md:col-3">
-                                            <Card className="text-center border-1 border-100 shadow-2 py-3 h-full flex flex-column align-items-center justify-content-center">
-                                                <div className="flex align-items-center justify-content-center bg-blue-50 border-round-xl w-full mb-2">
+                                            <Card className="surface-card border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1">
+                                                <div className="flex align-items-center justify-content-center bg-primary-reverse border-round-xl">
                                                     <i className="fa-solid fa-database text-3xl text-primary" />
                                                 </div>
-                                                <div className="text-2xl font-bold text-900 mb-1">1.2 GB</div>
+                                                <div className="text-2xl font-bold text-color">1.2 GB</div>
                                                 <div className="flex align-items-center gap-1">
-                                                    <span className="text-xs text-600 font-semibold uppercase tracking-wider">Storage</span>
-                                                    <i className="fa-solid fa-circle-question text-600 text-xs cursor-help" />
+                                                    <span className="text-xs text-color-secondary font-semibold uppercase tracking-wider">Storage</span>
+                                                    <i className="fa-solid fa-circle-question text-color-secondary text-xs cursor-help" />
                                                 </div>
                                             </Card>
                                         </div>
                                         <div className="col-6 md:col-3">
-                                            <Card className="text-center border-1 border-100 shadow-2 py-3 h-full flex flex-column align-items-center justify-content-center">
-                                                <div className="flex align-items-center justify-content-center bg-blue-50 border-round-xl w-full mb-2">
+                                            <Card className="surface-card border-round-2xl p-3 shadow-2 flex flex-column align-items-center justify-content-center text-center h-full gap-1">
+                                                <div className="flex align-items-center justify-content-center bg-primary-reverse border-round-xl">
                                                     <i className="fa-solid fa-folder-open text-3xl text-primary" />
                                                 </div>
-                                                <div className="text-2xl font-bold text-900 mb-1">5</div>
+                                                <div className="text-2xl font-bold text-color">5</div>
                                                 <div className="flex align-items-center gap-1">
-                                                    <span className="text-xs text-600 font-semibold uppercase tracking-wider">Folders</span>
-                                                    <i className="fa-solid fa-circle-question text-600 text-xs cursor-help" />
+                                                    <span className="text-xs text-color-secondary font-semibold uppercase tracking-wider">Folders</span>
+                                                    <i className="fa-solid fa-circle-question text-color-secondary text-xs cursor-help" />
                                                 </div>
-                                                <div className="text-xs text-600 opacity-70 mt-1" style={{ fontSize: '10px' }}>Watching</div>
+                                                <div className="text-xs text-color-secondary opacity-70" style={{ fontSize: '10px' }}>Watching</div>
                                             </Card>
                                         </div>
                                     </div>
@@ -260,11 +260,11 @@ export const AppMockup: React.FC = () => {
                                             <div className="grid">
                                                 {/* Processing Activity Chart */}
                                                 <div className="col-12 lg:col-6">
-                                                    <Card className="h-full border-round-2xl shadow-2 border-1 border-100" style={{ padding: '0.75rem' }}>
+                                                    <Card className="surface-card h-full border-round-2xl shadow-2" style={{ padding: '0.75rem' }}>
                                                         <div className="flex justify-content-between align-items-center mb-3">
                                                             <div className="flex align-items-center gap-1">
-                                                                <span className="font-semibold text-900">Processing Activity</span>
-                                                                <i className="fa-solid fa-circle-question text-600 text-xs cursor-help" />
+                                                                <span className="font-semibold text-color">Processing Activity</span>
+                                                                <i className="fa-solid fa-circle-question text-color-secondary text-xs cursor-help" />
                                                             </div>
                                                             <SelectButton
                                                                 value="24h"
@@ -283,11 +283,11 @@ export const AppMockup: React.FC = () => {
 
                                                 {/* File Types Chart */}
                                                 <div className="col-12 lg:col-6">
-                                                    <Card className="h-full border-round-2xl shadow-2 border-1 border-100" style={{ padding: '0.75rem' }}>
+                                                    <Card className="surface-card h-full border-round-2xl shadow-2" style={{ padding: '0.75rem' }}>
                                                         <div className="flex justify-content-between align-items-center mb-3">
                                                             <div className="flex align-items-center gap-1">
-                                                                <span className="font-semibold text-900">File Types</span>
-                                                                <i className="fa-solid fa-circle-question text-600 text-xs cursor-help" />
+                                                                <span className="font-semibold text-color">File Types</span>
+                                                                <i className="fa-solid fa-circle-question text-color-secondary text-xs cursor-help" />
                                                             </div>
                                                             <SelectButton
                                                                 value="count"
@@ -308,7 +308,7 @@ export const AppMockup: React.FC = () => {
                                                                 />
                                                             </div>
                                                         </div>
-                                                        <div className="text-center text-xs text-600 mt-2 opacity-70">
+                                                        <div className="text-center text-xs text-color-secondary mt-2 opacity-70">
                                                             Click on a segment to explore files
                                                         </div>
                                                     </Card>
@@ -318,25 +318,26 @@ export const AppMockup: React.FC = () => {
 
                                         {/* Right Column: Recent Files */}
                                         <div className="col-12 xl:col-4">
-                                            <div className="flex flex-column gap-3 h-full">
-                                                <div className="flex align-items-center justify-content-between px-2">
-                                                    <span className="font-bold text-lg text-900">Recent Activity</span>
-                                                    <span className="text-xs text-600">{recentFiles.length} items</span>
+                                            <div className="surface-card border-round-2xl p-3 shadow-2 h-full flex flex-column gap-3">
+                                                <div className="flex align-items-center justify-content-between">
+                                                    <span className="font-bold text-lg text-color">Recently Indexed</span>
+                                                    <span className="text-xs text-color-secondary">{recentFiles.length} files</span>
                                                 </div>
-                                                <div className="flex flex-column gap-2">
+                                                <div className="flex flex-column gap-2 overflow-y-auto pr-1" style={{ flex: '1 1 0', minHeight: '300px' }}>
                                                     {recentFiles.map((file, index) => (
                                                         <div
                                                             key={index}
-                                                            className="flex align-items-center gap-3 p-2 border-round-xl bg-white border-1 border-100 shadow-1"
+                                                            className="flex align-items-center gap-3 p-2 border-round-xl surface-card border-1 border-transparent shadow-1 hover:shadow-2 hover:border-primary"
+                                                            style={{ transition: "all 0.2s ease" }}
                                                         >
-                                                            <div className="flex align-items-center justify-content-center bg-blue-50 border-round-lg" style={{ width: '36px', height: '36px', flexShrink: 0 }}>
+                                                            <div className="flex align-items-center justify-content-center bg-primary-reverse border-round-lg" style={{ width: '36px', height: '36px', flexShrink: 0 }}>
                                                                 <i className={`${getFileIcon(file.ext)} text-lg text-primary`} />
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="font-semibold text-sm text-overflow-ellipsis white-space-nowrap overflow-hidden text-900" title={file.name}>
+                                                                <div className="font-semibold text-sm text-overflow-ellipsis white-space-nowrap overflow-hidden text-color" title={file.name}>
                                                                     {file.name}
                                                                 </div>
-                                                                <div className="text-xs text-600 mt-0 flex align-items-center gap-1 opacity-80" style={{ fontSize: '11px' }}>
+                                                                <div className="text-xs text-color-secondary mt-0 flex align-items-center gap-1 opacity-80" style={{ fontSize: '11px' }}>
                                                                     <span>{file.size}</span>
                                                                     <span className="opacity-50">•</span>
                                                                     <span>{file.time}</span>
@@ -363,14 +364,14 @@ export const AppMockup: React.FC = () => {
                             
                             {/* Status Bar */}
                             <div 
-                                className="px-4 py-3 border-top-1 border-200 bg-white"
+                                className="px-4 py-3 border-top-1 surface-border surface-card"
                                 style={{ backdropFilter: 'blur(8px)' }}
                             >
                                 <div className="flex align-items-center justify-content-between gap-3">
                                     {/* Left: Status message with icon */}
                                     <div className="flex align-items-center gap-2 flex-shrink-0">
                                         <i className="fas fa-check-circle text-green-500" />
-                                        <span className="font-medium text-600 text-sm">
+                                        <span className="font-medium text-color-secondary text-sm">
                                             Ready • 1,248 files indexed
                                         </span>
                                     </div>
