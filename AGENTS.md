@@ -64,3 +64,6 @@ When working on this project, strictly adhere to the following technologies and 
 ## Maintenance
 
 - **Keep this file updated**: When making significant updates to the code or project structure, always check if this file needs to be updated to reflect the new state or conventions.
+- **README Sync**: The root `README.md` and `apps/file-brain/README.md` must be kept in sync.
+  - When updating the root `README.md`, apply the same changes to `apps/file-brain/README.md`.
+  - Be mindful of relative paths for images in `apps/file-brain/README.md` (e.g., use `../../docs/images/` instead of `docs/images/`).
