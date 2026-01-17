@@ -266,11 +266,21 @@ async def init_crawl_manager_for_wizard():
 
 async def health_monitoring_loop():
     """Background health monitoring loop."""
+    from file_brain.database.repositories import WizardStateRepository
     from file_brain.services.service_manager import get_service_manager
 
     service_manager = get_service_manager()
     while True:
         try:
+            # OPTIMIZATION: Skip health checks if wizard not completed
+            # This prevents repeated failed connection attempts to Typesense/Tika
+            # during initial setup when Docker containers aren't running yet
+            with db_session() as db:
+                wizard_state = WizardStateRepository(db).get()
+                if not wizard_state or not wizard_state.wizard_completed:
+                    await asyncio.sleep(30)
+                    continue
+
             await service_manager.check_all_services_health()
             await asyncio.sleep(30)
         except Exception as e:

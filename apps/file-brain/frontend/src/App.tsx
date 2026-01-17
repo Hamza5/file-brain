@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import TypesenseInstantSearchAdapter from "typesense-instantsearch-adapter";
 import { InstantSearch, Configure } from "react-instantsearch";
-import { PrimeReactProvider } from 'primereact/api';
+import { PrimeReactProvider } from "primereact/api";
 import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
 import { useNotification } from "./context/NotificationContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
-import { ProgressSpinner } from 'primereact/progressspinner';
-import { Button } from 'primereact/button';
-import { Message } from 'primereact/message';
+import { ProgressSpinner } from "primereact/progressspinner";
+import { Button } from "primereact/button";
+import { Message } from "primereact/message";
 import { type SearchHit } from "./types/search";
 import { Header } from "./components/layout/Header";
 import { MainContent } from "./components/layout/MainContent";
@@ -17,14 +17,24 @@ import { PreviewSidebar } from "./components/sidebars/PreviewSidebar";
 import { InitializationWizard } from "./components/wizard/InitializationWizard";
 import { StatusBar } from "./components/layout/StatusBar";
 import { ContainerInitOverlay } from "./components/container/ContainerInitOverlay";
-import { startCrawler, stopCrawler, startFileMonitoring, stopFileMonitoring, checkStartupRequirements, getAppConfig, type CrawlStatus } from "./api/client";
+import {
+  startCrawler,
+  stopCrawler,
+  startFileMonitoring,
+  stopFileMonitoring,
+  checkStartupRequirements,
+  getAppConfig,
+  type CrawlStatus,
+} from "./api/client";
 
 function AppContent({ searchClient }: { searchClient: any }) {
   const { status, stats, watchPaths } = useStatus();
   const { showSuccess, showInfo, showError } = useNotification();
   const [isCrawlerActive, setIsCrawlerActive] = useState(false);
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [crawlerStatus, setCrawlerStatus] = useState<CrawlStatus["status"] | null>(null);
+  const [crawlerStatus, setCrawlerStatus] = useState<
+    CrawlStatus["status"] | null
+  >(null);
   // Derived state for header
   const hasIndexedFiles = (stats?.totals?.discovered || 0) > 0;
   const hasFoldersConfigured = (watchPaths?.length || 0) > 0;
@@ -48,11 +58,17 @@ function AppContent({ searchClient }: { searchClient: any }) {
         showInfo("Indexing Stopped", "The indexer has been stopped.");
       } else {
         await startCrawler();
-        showSuccess("Indexing Started", "The indexer is now scanning your files.");
+        showSuccess(
+          "Indexing Started",
+          "The indexer is now scanning your files.",
+        );
       }
     } catch (error) {
       console.error("Failed to toggle crawler:", error);
-      showError("Indexing Error", "Failed to toggle the indexer. Please try again.");
+      showError(
+        "Indexing Error",
+        "Failed to toggle the indexer. Please try again.",
+      );
     }
   };
 
@@ -81,13 +97,15 @@ function AppContent({ searchClient }: { searchClient: any }) {
     >
       <Configure hitsPerPage={24} />
 
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        overflow: 'hidden',
-        backgroundColor: 'var(--surface-ground)'
-      }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          overflow: "hidden",
+          backgroundColor: "var(--surface-ground)",
+        }}
+      >
         <Header
           isCrawlerActive={isCrawlerActive}
           onToggleCrawler={handleToggleCrawler}
@@ -98,7 +116,10 @@ function AppContent({ searchClient }: { searchClient: any }) {
           hasFoldersConfigured={hasFoldersConfigured}
         />
 
-        <MainContent onResultClick={handleResultClick} isCrawlerActive={isCrawlerActive} />
+        <MainContent
+          onResultClick={handleResultClick}
+          isCrawlerActive={isCrawlerActive}
+        />
 
         <PreviewSidebar
           visible={previewVisible}
@@ -117,19 +138,24 @@ export default function App() {
   const [containersReady, setContainersReady] = useState<boolean>(false);
   const [searchClient, setSearchClient] = useState<any>(null);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [startupCheckError, setStartupCheckError] = useState<string | null>(null);
+  const [startupCheckError, setStartupCheckError] = useState<string | null>(
+    null,
+  );
   const [retryCount, setRetryCount] = useState<number>(0);
 
   // Check startup requirements on mount with timeout and retry logic
   useEffect(() => {
     const MAX_RETRIES = 3;
-    const TIMEOUT_MS = 15000; // 15 seconds per attempt
+    const TIMEOUT_MS = 5000; // 5 seconds per attempt (reduced from 15s - backend is now faster)
 
     const checkStartupWithTimeout = async (): Promise<any> => {
       return Promise.race([
         checkStartupRequirements(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Startup check timed out')), TIMEOUT_MS)
+          setTimeout(
+            () => reject(new Error("Startup check timed out")),
+            TIMEOUT_MS,
+          ),
         ),
       ]);
     };
@@ -145,7 +171,10 @@ export default function App() {
         setIsUpgrade(result.is_upgrade);
         setStartupCheckError(null);
       } catch (error) {
-        console.error(`Failed to check startup requirements (attempt ${attemptNumber + 1}/${MAX_RETRIES}):`, error);
+        console.error(
+          `Failed to check startup requirements (attempt ${attemptNumber + 1}/${MAX_RETRIES}):`,
+          error,
+        );
 
         if (attemptNumber < MAX_RETRIES - 1) {
           // Retry with exponential backoff
@@ -154,7 +183,8 @@ export default function App() {
           setTimeout(() => checkStartup(attemptNumber + 1), delayMs);
         } else {
           // All retries exhausted - assume wizard is needed and show error
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
           setStartupCheckError(errorMessage);
           setWizardNeeded(true);
           setWizardStartStep(0);
@@ -173,33 +203,37 @@ export default function App() {
         setConfigError(null);
         try {
           const config = await getAppConfig();
-          const typesenseInstantsearchAdapter = new TypesenseInstantSearchAdapter({
-            server: {
-              apiKey: config.typesense.api_key,
-              nodes: [
-                {
-                  host: config.typesense.host,
-                  port: config.typesense.port,
-                  path: "",
-                  protocol: config.typesense.protocol,
-                },
-              ],
-              cacheSearchResultsForSeconds: 0,
-              connectionTimeoutSeconds: 30,
-            },
-            additionalSearchParameters: {
-              query_by: "file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
-              exclude_fields: "embedding",
-              group_by: "file_path",
-              group_limit: 1,
-              per_page: 24,
-            },
-          });
+          const typesenseInstantsearchAdapter =
+            new TypesenseInstantSearchAdapter({
+              server: {
+                apiKey: config.typesense.api_key,
+                nodes: [
+                  {
+                    host: config.typesense.host,
+                    port: config.typesense.port,
+                    path: "",
+                    protocol: config.typesense.protocol,
+                  },
+                ],
+                cacheSearchResultsForSeconds: 0,
+                connectionTimeoutSeconds: 30,
+              },
+              additionalSearchParameters: {
+                query_by:
+                  "file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
+                exclude_fields: "embedding",
+                group_by: "file_path",
+                group_limit: 1,
+                per_page: 24,
+              },
+            });
           setSearchClient(typesenseInstantsearchAdapter.searchClient);
         } catch (error) {
           console.error("Failed to load app config:", error);
-          setConfigError(error instanceof Error ? error.message : String(error));
-          
+          setConfigError(
+            error instanceof Error ? error.message : String(error),
+          );
+
           // Retry after a delay if it's a network error (backend might be starting)
           setTimeout(initClient, 3000);
         }
@@ -211,31 +245,49 @@ export default function App() {
   // Show loading while checking startup requirements
   if (wizardNeeded === null) {
     return (
-      <div className="flex flex-column align-items-center justify-content-center h-screen gap-3" style={{ backgroundColor: 'var(--surface-ground)' }}>
-        <ProgressSpinner style={{width: '50px', height: '50px'}} strokeWidth="4" animationDuration=".5s" />
-        <p className="text-600">
-          {retryCount > 0 ? `Checking system status (attempt ${retryCount + 1}/3)...` : 'Checking system status...'}
-        </p>
-        {startupCheckError && (
-          <div className="flex flex-column align-items-center gap-3 mt-3 max-w-30rem">
-            <Message severity="error" text={`Failed to connect to backend: ${startupCheckError}`} className="w-full" />
-            <p className="text-center text-sm text-600">
-              Make sure the application backend is running. If this problem persists, try restarting the application.
-            </p>
-            <Button 
-              label="Start Setup Wizard Anyway" 
-              icon="fas fa-play" 
-              severity="info"
-              onClick={() => {
-                setWizardNeeded(true);
-                setWizardStartStep(0);
-                setIsUpgrade(false);
-                setStartupCheckError(null);
-              }}
+      <PrimeReactProvider>
+        <ThemeProvider>
+          <div
+            className="flex flex-column align-items-center justify-content-center h-screen gap-3"
+            style={{ backgroundColor: "var(--surface-ground)" }}
+          >
+            <ProgressSpinner
+              style={{ width: "50px", height: "50px" }}
+              strokeWidth="4"
+              animationDuration=".5s"
             />
+            <p className="text-600">
+              {retryCount > 0
+                ? `Checking system status (attempt ${retryCount + 1}/3)...`
+                : "Checking system status..."}
+            </p>
+            {startupCheckError && (
+              <div className="flex flex-column align-items-center gap-3 mt-3 max-w-30rem">
+                <Message
+                  severity="error"
+                  text={`Failed to connect to backend: ${startupCheckError}`}
+                  className="w-full"
+                />
+                <p className="text-center text-sm text-600">
+                  Make sure the application backend is running. If this problem
+                  persists, try restarting the application.
+                </p>
+                <Button
+                  label="Start Setup Wizard Anyway"
+                  icon="fas fa-play"
+                  severity="info"
+                  onClick={() => {
+                    setWizardNeeded(true);
+                    setWizardStartStep(0);
+                    setIsUpgrade(false);
+                    setStartupCheckError(null);
+                  }}
+                />
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </ThemeProvider>
+      </PrimeReactProvider>
     );
   }
 
@@ -244,8 +296,8 @@ export default function App() {
     return (
       <PrimeReactProvider>
         <ThemeProvider>
-          <InitializationWizard 
-            onComplete={() => setWizardNeeded(false)} 
+          <InitializationWizard
+            onComplete={() => setWizardNeeded(false)}
             startStep={wizardStartStep}
             isUpgrade={isUpgrade}
           />
@@ -263,25 +315,34 @@ export default function App() {
             {searchClient ? (
               <AppContent searchClient={searchClient} />
             ) : (
-              <div className="flex flex-column align-items-center justify-content-center h-screen" style={{ backgroundColor: 'var(--surface-ground)' }}>
-                <ProgressSpinner style={{width: '50px', height: '50px'}} strokeWidth="4" animationDuration=".5s" />
+              <div
+                className="flex flex-column align-items-center justify-content-center h-screen"
+                style={{ backgroundColor: "var(--surface-ground)" }}
+              >
+                <ProgressSpinner
+                  style={{ width: "50px", height: "50px" }}
+                  strokeWidth="4"
+                  animationDuration=".5s"
+                />
                 <p className="mt-3 text-600">
-                  {configError ? `Connection failed: ${configError}. Retrying...` : 'Loading Configuration...'}
+                  {configError
+                    ? `Connection failed: ${configError}. Retrying...`
+                    : "Loading Configuration..."}
                 </p>
                 {configError && (
-                  <Button 
-                    label="Retry Now" 
-                    icon="fas fa-sync" 
-                    className="p-button-text mt-2" 
-                    onClick={() => setWizardNeeded(prev => prev)} // Trigger effect
+                  <Button
+                    label="Retry Now"
+                    icon="fas fa-sync"
+                    className="p-button-text mt-2"
+                    onClick={() => setWizardNeeded((prev) => prev)} // Trigger effect
                   />
                 )}
               </div>
             )}
 
             {/* Container initialization overlay - blocks interaction until containers ready */}
-            <ContainerInitOverlay 
-              isVisible={!containersReady} 
+            <ContainerInitOverlay
+              isVisible={!containersReady}
               onReady={() => setContainersReady(true)}
             />
 

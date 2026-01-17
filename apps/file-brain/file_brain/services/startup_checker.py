@@ -274,16 +274,46 @@ class StartupChecker:
 
     async def perform_all_checks(self) -> StartupCheckResult:
         """
-        Perform all startup checks concurrently.
+        Perform all startup checks with smart short-circuiting.
+
+        If Docker is unavailable, we skip all Docker-dependent checks to avoid
+        long timeouts from network connection attempts to non-existent services.
 
         Returns:
             Complete startup check results
         """
         logger.info("Starting comprehensive startup checks...")
 
-        # Run all checks concurrently for speed
+        # OPTIMIZATION: Check Docker availability first
+        # If Docker is unavailable, skip all container-dependent checks to avoid timeouts
+        docker_check = await self.check_docker_available()
+
+        if not docker_check.passed:
+            logger.info("Docker not available - skipping container-dependent checks for fast startup")
+
+            # Still check local resources (model and wizard state)
+            model_check = await self.check_model_downloaded()
+            wizard_check = await self.check_wizard_reset()
+
+            # Return immediately without making network calls to unavailable services
+            check_result = StartupCheckResult(
+                docker_available=docker_check,
+                docker_images=CheckDetail(passed=False, message="Docker not available"),
+                services_healthy=CheckDetail(passed=False, message="Docker not available"),
+                model_downloaded=model_check,
+                collection_ready=CheckDetail(passed=False, message="Docker not available"),
+                schema_current=CheckDetail(passed=False, message="Docker not available"),
+                wizard_reset=wizard_check,
+            )
+
+            logger.info(f"Fast-path checks complete. Wizard needed: {check_result.needs_wizard}")
+            if check_result.needs_wizard:
+                logger.info(f"Wizard needed starting from step {check_result.get_first_failed_step()}")
+
+            return check_result
+
+        # Docker is available - run all checks concurrently for speed
         results = await asyncio.gather(
-            self.check_docker_available(),
             self.check_docker_images(),
             self.check_services_healthy(),
             self.check_model_downloaded(),
@@ -302,13 +332,13 @@ class StartupChecker:
             return result
 
         check_result = StartupCheckResult(
-            docker_available=safe_result(0, "Docker check failed"),
-            docker_images=safe_result(1, "Image check failed"),
-            services_healthy=safe_result(2, "Service check failed"),
-            model_downloaded=safe_result(3, "Model check failed"),
-            collection_ready=safe_result(4, "Collection check failed"),
-            schema_current=safe_result(5, "Schema check failed"),
-            wizard_reset=safe_result(6, "Wizard reset check failed"),
+            docker_available=docker_check,  # Already checked above
+            docker_images=safe_result(0, "Image check failed"),
+            services_healthy=safe_result(1, "Service check failed"),
+            model_downloaded=safe_result(2, "Model check failed"),
+            collection_ready=safe_result(3, "Collection check failed"),
+            schema_current=safe_result(4, "Schema check failed"),
+            wizard_reset=safe_result(5, "Wizard reset check failed"),
         )
 
         logger.info(f"Startup checks complete. All passed: {check_result.all_checks_passed}")
