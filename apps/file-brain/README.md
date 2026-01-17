@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../../docs/images/logo.svg" alt="File Brain Logo" width="120" />
+  <img src="https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/logo.svg" alt="File Brain Logo" width="120" />
   <h1>File Brain</h1>
   <p><strong>Your Local AI Search Engine</strong></p>
 
@@ -57,7 +57,7 @@ pip install file-brain
     4.  **Download AI Model**: Fetches the AI model for intelligent search.
     5.  **Finalize Setup**: Initializes the search engine database.
 
-    ![Initialization Wizard](../../docs/images/wizard.png)
+    ![Initialization Wizard](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/wizard.png)
     _The easy-to-use setup wizard that guides you through downloading models and initializing the search database._
 
 3.  **Select Folders**:
@@ -76,13 +76,13 @@ pip install file-brain
 
 See all your indexed files, storage usage, and recently indexed files at a glance.
 
-![Dashboard Overview](../../docs/images/dashboard.png)
+![Dashboard Overview](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/dashboard.png)
 
 ### Semantic Search
 
 Search naturally, like "Airplane ticket" to find relevant documents even if the filename is different.
 
-![Semantic Search](../../docs/images/search.png)
+![Semantic Search](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/search.png)
 
 ## **PRO** Version
 
