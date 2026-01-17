@@ -10,6 +10,11 @@ on:
       - "package.json"
       - "package-lock.json"
   workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual rebuild"
+        required: false
+        default: "Manual trigger"
 
 permissions:
   contents: read
