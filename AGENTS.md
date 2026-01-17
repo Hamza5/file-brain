@@ -64,3 +64,7 @@ When working on this project, strictly adhere to the following technologies and 
 ## Maintenance
 
 - **Keep this file updated**: When making significant updates to the code or project structure, always check if this file needs to be updated to reflect the new state or conventions.
+- **README Sync**: The root `README.md` and `apps/file-brain/README.md` must be kept in sync.
+  - When updating the root `README.md`, apply the same changes to `apps/file-brain/README.md`.
+  - **PyPI Compatibility**: `apps/file-brain/README.md` must use **absolute URLs** pointing to the GitHub `main` branch for all images to ensure they render correctly on PyPI (e.g., `https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/logo.svg`).
+  - The root `README.md` may continue to use relative paths.
