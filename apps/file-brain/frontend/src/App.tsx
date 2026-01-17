@@ -9,6 +9,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { ProgressSpinner } from 'primereact/progressspinner';
 import { Button } from 'primereact/button';
+import { Message } from 'primereact/message';
 import { type SearchHit } from "./types/search";
 import { Header } from "./components/layout/Header";
 import { MainContent } from "./components/layout/MainContent";
@@ -116,23 +117,52 @@ export default function App() {
   const [containersReady, setContainersReady] = useState<boolean>(false);
   const [searchClient, setSearchClient] = useState<any>(null);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [startupCheckError, setStartupCheckError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
 
-  // Check startup requirements on mount
+  // Check startup requirements on mount with timeout and retry logic
   useEffect(() => {
-    const checkStartup = async () => {
+    const MAX_RETRIES = 3;
+    const TIMEOUT_MS = 15000; // 15 seconds per attempt
+
+    const checkStartupWithTimeout = async (): Promise<any> => {
+      return Promise.race([
+        checkStartupRequirements(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Startup check timed out')), TIMEOUT_MS)
+        ),
+      ]);
+    };
+
+    const checkStartup = async (attemptNumber: number = 0) => {
+      setRetryCount(attemptNumber);
+      setStartupCheckError(null);
+
       try {
-        const result = await checkStartupRequirements();
+        const result = await checkStartupWithTimeout();
         setWizardNeeded(result.needs_wizard);
         setWizardStartStep(result.start_step || 0);
         setIsUpgrade(result.is_upgrade);
+        setStartupCheckError(null);
       } catch (error) {
-        console.error("Failed to check startup requirements:", error);
-        // On error, assume wizard is needed from the beginning
-        setWizardNeeded(true);
-        setWizardStartStep(0);
-        setIsUpgrade(false);
+        console.error(`Failed to check startup requirements (attempt ${attemptNumber + 1}/${MAX_RETRIES}):`, error);
+
+        if (attemptNumber < MAX_RETRIES - 1) {
+          // Retry with exponential backoff
+          const delayMs = Math.min(1000 * Math.pow(2, attemptNumber), 5000);
+          console.log(`Retrying in ${delayMs}ms...`);
+          setTimeout(() => checkStartup(attemptNumber + 1), delayMs);
+        } else {
+          // All retries exhausted - assume wizard is needed and show error
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          setStartupCheckError(errorMessage);
+          setWizardNeeded(true);
+          setWizardStartStep(0);
+          setIsUpgrade(false);
+        }
       }
     };
+
     checkStartup();
   }, []);
 
@@ -181,8 +211,30 @@ export default function App() {
   // Show loading while checking startup requirements
   if (wizardNeeded === null) {
     return (
-      <div className="flex align-items-center justify-content-center h-screen" style={{ backgroundColor: 'var(--surface-ground)' }}>
-         <ProgressSpinner style={{width: '50px', height: '50px'}} strokeWidth="4" animationDuration=".5s" />
+      <div className="flex flex-column align-items-center justify-content-center h-screen gap-3" style={{ backgroundColor: 'var(--surface-ground)' }}>
+        <ProgressSpinner style={{width: '50px', height: '50px'}} strokeWidth="4" animationDuration=".5s" />
+        <p className="text-600">
+          {retryCount > 0 ? `Checking system status (attempt ${retryCount + 1}/3)...` : 'Checking system status...'}
+        </p>
+        {startupCheckError && (
+          <div className="flex flex-column align-items-center gap-3 mt-3 max-w-30rem">
+            <Message severity="error" text={`Failed to connect to backend: ${startupCheckError}`} className="w-full" />
+            <p className="text-center text-sm text-600">
+              Make sure the application backend is running. If this problem persists, try restarting the application.
+            </p>
+            <Button 
+              label="Start Setup Wizard Anyway" 
+              icon="fas fa-play" 
+              severity="info"
+              onClick={() => {
+                setWizardNeeded(true);
+                setWizardStartStep(0);
+                setIsUpgrade(false);
+                setStartupCheckError(null);
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   }
