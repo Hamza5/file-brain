@@ -769,9 +769,10 @@ export interface AppContainerStatus {
   healthy: boolean;
   services: DockerService[];
   error?: string;
-  timeout?: boolean;
+  retrying?: boolean;  // Indicates error but will retry
   message?: string;
   timestamp: number;
+  check_count?: number;  // Number of health check attempts
 }
 
 export function connectAppContainerStatusStream(
@@ -785,20 +786,19 @@ export function connectAppContainerStatusStream(
     try {
       const data: AppContainerStatus = JSON.parse(event.data);
 
-      if (data.error) {
+      // Always send status updates
+      onStatus(data);
+
+      if (data.error && !data.retrying) {
+        // Fatal error (non-retrying)
         if (onError) onError(data.error);
         eventSource.close();
-      } else if (data.timeout) {
-        onStatus(data);
-        if (onError) onError(data.message || "Container startup timed out");
-        eventSource.close();
       } else if (data.healthy) {
-        onStatus(data);
+        // Success - containers are healthy
         if (onComplete) onComplete();
         eventSource.close();
-      } else {
-        onStatus(data);
       }
+      // If retrying=true, just update status and keep stream open
     } catch {
       // Failed to parse container status event - silent failure
     }

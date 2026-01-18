@@ -3,14 +3,14 @@ import { Message } from 'primereact/message';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { Tag } from 'primereact/tag';
-import { startDockerServices, getDockerStatus, connectAppContainerStatusStream, type DockerStatusResult } from '../../../api/client';
+import { startDockerServices, getDockerStatus, connectAppContainerStatusStream, type AppContainerStatus } from '../../../api/client';
 
 interface ServiceStartStepProps {
   onComplete: () => void;
 }
 
 export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }) => {
-  const [dockerStatus, setDockerStatus] = useState<DockerStatusResult | null>(null);
+  const [dockerStatus, setDockerStatus] = useState<AppContainerStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +21,7 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
     setLoading(true);
     try {
       const status = await getDockerStatus();
-      setDockerStatus(status);
+      setDockerStatus({ ...status, timestamp: Date.now() });
       
       if (status.healthy) {
         setLoading(false);
@@ -50,6 +50,11 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
           (status) => {
             setDockerStatus(status);
             
+            // Clear error if we're retrying (show as warning instead)
+            if (status.error && status.retrying) {
+              setError(null);  // Don't show as fatal error
+            }
+            
             // Auto-proceed after services become healthy
             if (status.healthy) {
               setLoading(false);
@@ -59,19 +64,13 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
             }
           },
           (err) => {
-            // Only set error if we haven't already succeeded
-            if (!dockerStatus?.healthy) {
-              setError(err);
-              setLoading(false);
-            }
+            // Fatal error (non-retrying)
+            setError(err);
+            setLoading(false);
           },
           () => {
-            // Completion callback
-            if (!dockerStatus?.healthy) {
-               // Stream ended but not healthy? Likely timeout from backend
-               setError('Connection closed before services were ready.');
-               setLoading(false);
-            }
+            // Completion callback - containers are healthy
+            setLoading(false);
           }
         );
 
@@ -134,6 +133,11 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
             <div className="text-sm text-600 text-center">
               <i className="fas fa-info-circle mr-2" />
               Waiting for all components to become ready before proceeding...
+              {dockerStatus.check_count !== undefined && dockerStatus.check_count > 5 && (
+                <div className="mt-2 text-xs">
+                  (Health check attempt {dockerStatus.check_count + 1})
+                </div>
+              )}
             </div>
           )}
         </>

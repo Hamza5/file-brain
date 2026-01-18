@@ -929,11 +929,18 @@ async def stream_app_containers_status():
                 yield f"data: {json.dumps({'error': 'Docker/Podman not found'})}\n\n"
                 return
 
-            # Poll container status until all healthy or timeout
-            max_checks = 60  # 60 checks * 2 seconds = 2 minutes max
+            # Poll container status indefinitely with exponential backoff
+            # The wizard cannot proceed until containers are healthy, so we retry forever
             check_count = 0
+            base_delay = 2.0  # Start with 2 seconds
+            max_delay = 30.0  # Cap at 30 seconds between checks
 
-            while check_count < max_checks:
+            # Give containers a moment to initialize before first check
+            # Docker compose up returns before containers are fully ready
+            logger.info("Waiting 3 seconds for containers to initialize...")
+            await asyncio.sleep(3)
+
+            while True:  # Infinite retry loop
                 try:
                     status_result = await docker_manager.get_services_status()
 
@@ -944,6 +951,7 @@ async def stream_app_containers_status():
                         "healthy": status_result.get("healthy", False),
                         "services": status_result.get("services", []),
                         "timestamp": time.time(),
+                        "check_count": check_count,
                     }
                     yield f"data: {json.dumps(status_data)}\n\n"
 
@@ -952,19 +960,27 @@ async def stream_app_containers_status():
                         logger.info("All containers healthy - stopping status stream")
                         break
 
-                    # Wait before next check
-                    await asyncio.sleep(2)
+                    # Calculate exponential backoff delay
+                    # Delay increases: 2s, 4s, 8s, 16s, 30s (capped)
+                    delay = min(base_delay * (2 ** min(check_count // 3, 4)), max_delay)
+
+                    # Log retry attempts periodically
+                    if check_count % 10 == 0:
+                        logger.info(
+                            f"Containers not healthy yet (attempt {check_count + 1}), retrying in {delay:.1f}s..."
+                        )
+
+                    # Wait before next check with exponential backoff
+                    await asyncio.sleep(delay)
                     check_count += 1
 
                 except Exception as e:
                     logger.error(f"Error checking container status: {e}")
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
-                    break
+                    # Don't break on errors, just log and retry after a delay
+                    yield f"data: {json.dumps({'error': str(e), 'retrying': True})}\n\n"
+                    await asyncio.sleep(5)  # Wait 5 seconds before retrying after error
 
-            # Send final completion event
-            if check_count >= max_checks:
-                timeout_data = {"timeout": True, "message": "Container startup timed out after 2 minutes"}
-                yield f"data: {json.dumps(timeout_data)}\n\n"
+            # No timeout - loop continues until containers are healthy or stream is closed
 
         except Exception as e:
             logger.error(f"Error in container status stream: {e}")

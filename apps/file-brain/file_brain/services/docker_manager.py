@@ -712,19 +712,50 @@ class DockerManager:
                 # Now perform application-level health checks via HTTP
                 import aiohttp
 
-                async def check_service_health(name: str, url: str, headers: dict = None) -> bool:
-                    """Check if a service is actually responding to HTTP requests"""
-                    try:
-                        async with aiohttp.ClientSession() as session:
-                            async with session.get(
-                                url, headers=headers or {}, timeout=aiohttp.ClientTimeout(total=3)
-                            ) as resp:
-                                healthy = resp.status < 400
-                                logger.debug(f"Health check {name}: {url} -> status {resp.status}, healthy={healthy}")
-                                return healthy
-                    except Exception as e:
-                        logger.debug(f"Health check {name}: {url} -> failed: {e}")
-                        return False
+                async def check_service_health(
+                    name: str,
+                    url: str,
+                    headers: dict = None,
+                    timeout: float = 5.0,
+                    max_retries: int = 3,
+                    retry_delay: float = 1.0,
+                ) -> bool:
+                    """
+                    Check if a service is actually responding to HTTP requests.
+                    Uses retry logic to handle slow container startup.
+
+                    Args:
+                        name: Service name for logging
+                        url: URL to check
+                        headers: Optional HTTP headers
+                        timeout: Timeout for each attempt in seconds
+                        max_retries: Number of retry attempts
+                        retry_delay: Delay between retries in seconds
+                    """
+                    for attempt in range(max_retries):
+                        try:
+                            async with aiohttp.ClientSession() as session:
+                                async with session.get(
+                                    url,
+                                    headers=headers or {},
+                                    timeout=aiohttp.ClientTimeout(total=timeout),
+                                ) as resp:
+                                    healthy = resp.status < 400
+                                    if healthy:
+                                        logger.info(f"Health check {name}: {url} -> status {resp.status}, healthy=True")
+                                        return True
+                                    logger.debug(f"Health check {name}: {url} -> status {resp.status}, unhealthy")
+                        except Exception as e:
+                            logger.debug(
+                                f"Health check {name}: {url} -> attempt {attempt + 1}/{max_retries} failed: {e}"
+                            )
+
+                        # Wait before retry (except on last attempt)
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay)
+
+                    logger.info(f"Health check {name}: {url} -> failed after {max_retries} attempts")
+                    return False
 
                 # Check Tika
                 tika_healthy = await check_service_health("tika", f"{settings.tika_url}/version")
