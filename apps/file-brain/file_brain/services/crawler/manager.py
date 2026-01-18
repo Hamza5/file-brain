@@ -312,7 +312,21 @@ class CrawlJobManager:
         finally:
             # Important: Get final status while counters are still accurate
             final_status = self._get_live_status()
+            elapsed_time = (datetime.utcnow() - self._start_time).total_seconds() if self._start_time else 0
             self._running = False
+
+            # Capture crawl completion event with metrics
+            telemetry.capture_event(
+                "crawl_completed",
+                {
+                    "files_discovered": final_status["files_discovered"],
+                    "files_indexed": final_status["files_indexed"],
+                    "files_skipped": final_status["files_skipped"],
+                    "orphan_count": final_status.get("orphan_count", 0),
+                    "duration_seconds": round(elapsed_time, 2),
+                    "watch_path_count": len(self.watch_paths),
+                },
+            )
 
             with db_session() as db:
                 repo = CrawlerStateRepository(db)
@@ -393,6 +407,9 @@ class CrawlJobManager:
         try:
             self.monitor.start(self.watch_paths)
 
+            # Capture monitoring started event
+            telemetry.capture_event("file_monitoring_started")
+
             # Persist state
             with db_session() as db:
                 repo = CrawlerStateRepository(db)
@@ -408,6 +425,9 @@ class CrawlJobManager:
         logger.info("Stopping file monitoring...")
         try:
             self.monitor.stop()
+
+            # Capture monitoring stopped event
+            telemetry.capture_event("file_monitoring_stopped")
 
             # Persist state
             with db_session() as db:

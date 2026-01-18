@@ -179,10 +179,11 @@ class TelemetryManager:
             return
 
         try:
+            # Use PostHog standard properties for common metadata
             props = {
-                "environment": self.environment,
-                "app_version": settings.app_version,
-                "app_name": settings.app_name,
+                "$lib": "file-brain-backend",  # PostHog standard
+                "$lib_version": settings.app_version,  # PostHog standard
+                "install_type": self.environment,  # Custom: dev/packaged/production
                 **(properties or {}),
             }
 
@@ -237,24 +238,88 @@ class TelemetryManager:
         except Exception as e:
             logger.error(f"Failed to flush batched events: {e}")
 
-    def capture_exception(self, exception: Exception):
-        """Capture an exception."""
+    def set_user_properties(self, properties: Dict):
+        """
+        Set persistent user properties for analytics segmentation.
+
+        Uses PostHog standard properties (prefixed with $) for system info.
+        See: https://posthog.com/docs/product-analytics/person-properties
+        """
+        if not self.enabled or not self.posthog:
+            return
+
+        import platform
+
+        try:
+            # Use PostHog standard properties for system info
+            self.posthog.identify(
+                distinct_id=self.distinct_id,
+                properties={
+                    "$os": platform.system(),  # PostHog standard property
+                    "$os_version": platform.release(),  # PostHog standard property
+                    "$app_version": settings.app_version,  # PostHog standard property
+                    "install_type": self.environment,  # Custom property for dev/packaged/production
+                    **properties,
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to set user properties: {e}")
+
+    def capture_exception(self, exception: Exception, context: Optional[Dict] = None):
+        """
+        Capture an exception with PostHog's exception format.
+
+        PostHog recognizes exceptions when using the $exception event with
+        proper $exception_* properties for error tracking UI.
+        """
         if not self.enabled or not self.posthog:
             return
 
         try:
+            # PostHog's exception format uses $exception_* properties
+            props = {
+                "$exception_type": type(exception).__name__,
+                "$exception_message": str(exception)[:500],  # Truncate long messages
+                "$exception_list": [
+                    {
+                        "type": type(exception).__name__,
+                        "value": str(exception),
+                        "stacktrace": {"frames": self._parse_stack_frames(exception)},
+                    }
+                ],
+                # Use PostHog standard properties where applicable
+                "$lib": "file-brain-backend",  # PostHog standard property
+                "$lib_version": settings.app_version,  # PostHog standard property
+                "install_type": self.environment,  # Custom: development/packaged/production
+                **(context or {}),
+            }
+
+            # Use $exception event type for PostHog error tracking
             self.posthog.capture(
                 distinct_id=self.distinct_id,
-                event="exception",
-                properties={
-                    "exception_type": type(exception).__name__,
-                    "exception_message": str(exception),
-                    "environment": self.environment,
-                    "app_version": settings.app_version,
-                },
+                event="$exception",  # PostHog's special exception event type
+                properties=props,
             )
         except Exception as e:
             logger.debug(f"Failed to capture exception: {e}")
+
+    def _parse_stack_frames(self, exception: Exception) -> list:
+        """Parse exception stack frames for PostHog format."""
+        frames = []
+        tb = exception.__traceback__
+
+        while tb is not None:
+            frame = tb.tb_frame
+            frames.append(
+                {
+                    "filename": frame.f_code.co_filename,
+                    "function": frame.f_code.co_name,
+                    "lineno": tb.tb_lineno,
+                }
+            )
+            tb = tb.tb_next
+
+        return frames
 
     def shutdown(self):
         """Cleanly shutdown the PostHog client."""

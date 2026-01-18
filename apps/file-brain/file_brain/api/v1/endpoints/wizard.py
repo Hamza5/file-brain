@@ -837,6 +837,18 @@ async def complete_wizard():
                 },
             )
 
+            # Set user properties for segmentation
+            from datetime import datetime
+
+            from file_brain.core.config import settings
+
+            telemetry.set_user_properties(
+                {
+                    "first_install_version": settings.app_version,
+                    "wizard_completed_at": datetime.utcnow().isoformat(),
+                }
+            )
+
         return {
             "success": True,
             "message": "Wizard completed successfully",

@@ -96,7 +96,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                         textOverflow: 'ellipsis'
                     }}>
                         <Tooltip target=".preview-filename-tooltip" position="bottom" />
-                        <span className="preview-filename-tooltip" data-pr-tooltip={getFileName(file.file_path)}>
+                        <span className="preview-filename-tooltip" data-pr-tooltip={getFileName(file.file_path)} data-private>
                             {getFileName(file.file_path)}
                         </span>
                     </h2>
@@ -138,7 +138,9 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                                         <i className="fa-solid fa-font" style={{ fontSize: '0.9rem' }} />
                                         Content Match
                                     </div>
-                                    <Snippet hit={file as any} attribute="content" />
+                                    <div className="private">
+                                        <Snippet hit={file as any} attribute="content" />
+                                    </div>
                                 </div>
                             )}
 
@@ -195,7 +197,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                                 padding: '0.75rem',
                                 borderRadius: '4px',
                                 borderLeft: '3px solid var(--primary-color)'
-                            }}>
+                            }} className="private">
                                 {file.content}
                             </div>
                             <div style={{
@@ -245,7 +247,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                         <div style={{ color: 'var(--text-color-secondary)' }}>Path</div>
                         <div style={{ color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                              <Tooltip target=".preview-path-tooltip" position="top" />
-                             <span className="preview-path-tooltip" data-pr-tooltip={file.file_path}>
+                             <span className="preview-path-tooltip" data-pr-tooltip={file.file_path} data-private>
                                 {file.file_path}
                              </span>
                         </div>

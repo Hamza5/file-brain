@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useHits, useInstantSearch } from 'react-instantsearch';
+import React, { useState, useEffect } from 'react';
+import { useHits, useInstantSearch, useSearchBox } from 'react-instantsearch';
 import { FileContextMenu } from '../modals/FileContextMenu';
 import { fileOperationsService, type FileOperationRequest } from '../../services/fileOperations';
 import { type SearchHit } from '../../types/search';
 import { confirmDialog } from 'primereact/confirmdialog';
 import { Tooltip } from 'primereact/tooltip';
 import { pickIconClass, formatDate, getFileName } from '../../utils/fileUtils';
+import { usePostHog } from '../../context/PostHogProvider';
 
 interface ResultsGridProps {
     onResultClick: (result: SearchHit) => void;
@@ -15,6 +16,8 @@ interface ResultsGridProps {
 export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawlerActive = false }) => {
     const { results } = useHits();
     const { refresh, status } = useInstantSearch();
+    const { query } = useSearchBox();
+    const posthog = usePostHog();
     const isSearching = status === 'loading' || status === 'stalled';
     const [contextMenu, setContextMenu] = useState<{
         isOpen: boolean;
@@ -27,6 +30,18 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         filePath: '',
         file: null
     });
+
+    // Track search events when results change
+    useEffect(() => {
+        if (results && query && posthog && !isSearching) {
+            posthog.capture('search_performed', {
+                query_length: query.length,
+                result_count: results.hits.length,
+                has_results: results.hits.length > 0,
+                page: results.page,
+            });
+        }
+    }, [results, query, posthog, isSearching]);
 
     const handleContextMenu = (e: React.MouseEvent, hit: SearchHit) => {
         e.preventDefault();
@@ -200,7 +215,17 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                 height: '100%',
                                                 boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
                                             }}
-                                            onClick={() => onResultClick(searchHit)}
+                                            onClick={() => {
+                                                // Track search result click
+                                                if (posthog && query) {
+                                                    const hitIndex = results?.hits.findIndex(h => (h as SearchHit).objectID === searchHit.objectID) || 0;
+                                                    posthog.capture('search_result_clicked', {
+                                                        hit_position: hitIndex,
+                                                        query_length: query.length,
+                                                    });
+                                                }
+                                                onResultClick(searchHit);
+                                            }}
                                             onContextMenu={(e) => handleContextMenu(e, searchHit)}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
@@ -233,6 +258,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                 }}
                                                 className="grid-tooltip"
                                                 data-pr-tooltip={getFileName(searchHit.file_path)}
+                                                data-private  // Mask file name in session recordings
                                                 >
                                                     {getFileName(searchHit.file_path)}
                                                 </div>
@@ -245,6 +271,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                 }}
                                                 className="grid-tooltip"
                                                 data-pr-tooltip={searchHit.file_path}
+                                                data-private  // Mask file path in session recordings
                                                 >
                                                     {searchHit.file_path}
                                                 </div>
