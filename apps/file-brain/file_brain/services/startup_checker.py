@@ -207,16 +207,31 @@ class StartupChecker:
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
     async def check_collection_ready(self) -> CheckDetail:
-        """Check if Typesense collection exists"""
+        """
+        Check if Typesense collection exists.
+
+        Handles transient errors (503, connection errors) gracefully to avoid
+        incorrectly triggering the wizard during normal startup when Typesense
+        is still initializing.
+        """
         try:
             exists = await self.typesense_client.check_collection_exists()
             if exists:
                 return CheckDetail(passed=True, message="Collection exists")
             else:
+                # Collection truly doesn't exist (404)
                 return CheckDetail(passed=False, message="Collection not found")
         except Exception as e:
-            logger.error(f"Error checking collection: {e}")
-            return CheckDetail(passed=False, message=f"Error: {str(e)}")
+            # Transient errors (503, connection errors) during initialization
+            # Don't fail the check - let ContainerInitOverlay handle the wait
+            error_msg = str(e).lower()
+            if "503" in error_msg or "not ready" in error_msg or "lagging" in error_msg or "connection" in error_msg:
+                logger.info(f"Typesense initializing: {e}")
+                return CheckDetail(passed=True, message="Typesense initializing")
+            else:
+                # Unexpected error - log and fail the check
+                logger.error(f"Error checking collection: {e}")
+                return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
     async def check_schema_current(self) -> CheckDetail:
         """

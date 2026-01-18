@@ -39,16 +39,31 @@ class TypesenseClient:
         self.collection_ready = False
 
     async def check_collection_exists(self) -> bool:
-        """Check if collection exists in Typesense"""
+        """
+        Check if collection exists in Typesense.
+
+        Returns:
+            True if collection exists
+            False if collection doesn't exist (404 ObjectNotFound)
+
+        Raises:
+            Exception: For transient errors (503, connection errors) that should be retried
+        """
         try:
             self.client.collections[self.collection_name].retrieve()
             self.collection_ready = True
             return True
         except typesense.exceptions.ObjectNotFound:
+            # Collection truly doesn't exist (404)
             return False
+        except typesense.exceptions.ServerError as e:
+            # 503 or other server errors - Typesense is initializing
+            logger.info(f"Typesense not ready yet: {e}")
+            raise  # Let caller handle retry logic
         except Exception as e:
-            logger.warning(f"Error checking if collection exists: {e}")
-            return False
+            # Connection errors, timeouts, etc. - transient issues
+            logger.info(f"Transient error checking collection: {e}")
+            raise  # Let caller handle retry logic
 
     async def initialize_collection(
         self,
