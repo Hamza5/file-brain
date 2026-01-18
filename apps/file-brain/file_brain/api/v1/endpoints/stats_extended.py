@@ -37,18 +37,20 @@ async def get_recent_files(limit: int = Query(default=10, ge=1, le=50)):
         )
 
         files = []
-        for hit in results.get("hits", []):
-            doc = hit.get("document", {})
-            files.append(
-                {
-                    "file_path": doc.get("file_path"),
-                    "file_extension": doc.get("file_extension"),
-                    "file_size": doc.get("file_size"),
-                    "mime_type": doc.get("mime_type"),
-                    "modified_time": doc.get("modified_time"),
-                    "indexed_at": doc.get("indexed_at"),
-                }
-            )
+        for group in results.get("grouped_hits", []):
+            hits = group.get("hits", [])
+            if hits:
+                doc = hits[0].get("document", {})
+                files.append(
+                    {
+                        "file_path": doc.get("file_path"),
+                        "file_extension": doc.get("file_extension"),
+                        "file_size": doc.get("file_size"),
+                        "mime_type": doc.get("mime_type"),
+                        "modified_time": doc.get("modified_time"),
+                        "indexed_at": doc.get("indexed_at"),
+                    }
+                )
 
         return {"files": files, "total": results.get("found", 0)}
 
@@ -125,7 +127,6 @@ async def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default
                 "filter_by": f"indexed_at:>={start_ms}",
                 "per_page": 250,  # Single page for stats might be enough if not excessively huge activity
                 "include_fields": "indexed_at",
-                "limit": 1000,  # Increased limit for stats
             }
         )
 
@@ -137,7 +138,7 @@ async def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default
         # Typesense doesn't do histogram facets on numeric fields easily without pre-defined ranges.
         # We'll use a larger fetch limit for accuracy.
 
-        all_hits = results.get("hits", [])
+        all_groups = results.get("grouped_hits", [])
         found_total = results.get("found", 0)
 
         # Determine strict upper bound for buckets to avoid future-timestamp weirdness
@@ -154,16 +155,18 @@ async def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default
         # Actually, let's just paginate a few times if needed?
         # For simplicity/speed in this context, we'll stick to one large-ish page (500).
 
-        for hit in all_hits:
-            indexed_at = hit.get("document", {}).get("indexed_at", 0)
-            if indexed_at >= start_ms:
-                # Calculate which bucket index (0 to bucket_count-1)
-                # bucket 0 = start_ms to start_ms + size
-                diff = indexed_at - start_ms
-                bucket_index = int(diff // bucket_size_ms)
+        for group in all_groups:
+            hits = group.get("hits", [])
+            if hits:
+                indexed_at = hits[0].get("document", {}).get("indexed_at", 0)
+                if indexed_at >= start_ms:
+                    # Calculate which bucket index (0 to bucket_count-1)
+                    # bucket 0 = start_ms to start_ms + size
+                    diff = indexed_at - start_ms
+                    bucket_index = int(diff // bucket_size_ms)
 
-                if 0 <= bucket_index < bucket_count:
-                    buckets[bucket_index] += 1
+                    if 0 <= bucket_index < bucket_count:
+                        buckets[bucket_index] += 1
 
         # Build response filling gaps
         activity = []
@@ -225,18 +228,20 @@ async def get_files_by_type(
         )
 
         files = []
-        for hit in results.get("hits", []):
-            doc = hit.get("document", {})
-            files.append(
-                {
-                    "file_path": doc.get("file_path"),
-                    "file_extension": doc.get("file_extension"),
-                    "file_size": doc.get("file_size"),
-                    "mime_type": doc.get("mime_type"),
-                    "modified_time": doc.get("modified_time"),
-                    "indexed_at": doc.get("indexed_at"),
-                }
-            )
+        for group in results.get("grouped_hits", []):
+            hits = group.get("hits", [])
+            if hits:
+                doc = hits[0].get("document", {})
+                files.append(
+                    {
+                        "file_path": doc.get("file_path"),
+                        "file_extension": doc.get("file_extension"),
+                        "file_size": doc.get("file_size"),
+                        "mime_type": doc.get("mime_type"),
+                        "modified_time": doc.get("modified_time"),
+                        "indexed_at": doc.get("indexed_at"),
+                    }
+                )
 
         return {
             "files": files,
@@ -306,18 +311,20 @@ async def get_files_by_age(
         )
 
         files = []
-        for hit in results.get("hits", []):
-            doc = hit.get("document", {})
-            files.append(
-                {
-                    "file_path": doc.get("file_path"),
-                    "file_extension": doc.get("file_extension"),
-                    "file_size": doc.get("file_size"),
-                    "mime_type": doc.get("mime_type"),
-                    "modified_time": doc.get("modified_time"),
-                    "indexed_at": doc.get("indexed_at"),
-                }
-            )
+        for group in results.get("grouped_hits", []):
+            hits = group.get("hits", [])
+            if hits:
+                doc = hits[0].get("document", {})
+                files.append(
+                    {
+                        "file_path": doc.get("file_path"),
+                        "file_extension": doc.get("file_extension"),
+                        "file_size": doc.get("file_size"),
+                        "mime_type": doc.get("mime_type"),
+                        "modified_time": doc.get("modified_time"),
+                        "indexed_at": doc.get("indexed_at"),
+                    }
+                )
 
         return {
             "files": files,
@@ -408,12 +415,15 @@ async def get_storage_by_type():
                 }
             )
 
-            hits = results.get("hits", [])
-            if not hits:
+            groups = results.get("grouped_hits", [])
+            if not groups:
                 break
 
-            all_files.extend(hits)
-            if len(hits) < 250:
+            for group in groups:
+                hits = group.get("hits", [])
+                if hits:
+                    all_files.append(hits[0])
+            if len(groups) < 250:
                 break
             page += 1
 
