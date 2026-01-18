@@ -233,7 +233,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                 }}
               >
                  <Tooltip target=".hit-filename-tooltip" position="top" />
-                 <span className="hit-filename-tooltip" data-pr-tooltip={getFileName(hit.file_path)}>
+                 <span className="hit-filename-tooltip" data-pr-tooltip={getFileName(hit.file_path)} data-private>
                     {getFileName(hit.file_path)}
                  </span>
               </div>
@@ -267,7 +267,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
               }}
             >
               <Tooltip target=".hit-path-tooltip" position="top" />
-              <span className="hit-path-tooltip" data-pr-tooltip={filePath || ''}>
+              <span className="hit-path-tooltip" data-pr-tooltip={filePath || ''} data-private>
                 {filePath || 'Unknown path'}
               </span>
             </div>
@@ -286,6 +286,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical"
                 }}
+                className="private"  // Mask content snippets
               >
                 {shortSnippet}
               </div>

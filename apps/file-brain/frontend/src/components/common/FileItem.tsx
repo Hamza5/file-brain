@@ -26,7 +26,7 @@ export const FileItem: React.FC<FileItemProps> = ({ file, onContextMenu, onFileO
         <i className={`${getFileIcon(file.file_extension)} text-lg text-primary`} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-sm text-overflow-ellipsis white-space-nowrap overflow-hidden text-color" title={getFileName(file.file_path)}>
+        <div className="font-semibold text-sm text-overflow-ellipsis white-space-nowrap overflow-hidden text-color" title={getFileName(file.file_path)} data-private>
           {getFileName(file.file_path)}
         </div>
         <div className="text-xs text-color-secondary mt-0 flex align-items-center gap-1 opacity-80" style={{ fontSize: '11px' }}>

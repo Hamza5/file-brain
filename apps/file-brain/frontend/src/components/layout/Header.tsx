@@ -119,6 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
                             onKeyPress={handleKeyPress}
                             placeholder={getPlaceholder()}
                             disabled={!hasIndexedFiles}
+                            data-private  // Mask search queries in session recordings
                             style={{
                                 width: '100%',
                                 paddingLeft: '2.5rem',
