@@ -3,10 +3,8 @@ services:
   tika:
     image: hamza5/tika:latest-full
     container_name: file-brain-data-extractor
-    network_mode: "host"
-    environment:
-      # Tika runs on port 9998 by default
-      TIKA_PORT: 9998
+    ports:
+      - "9998:9998"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -18,7 +16,8 @@ services:
   typesense:
     image: hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
     container_name: file-brain-search-engine
-    network_mode: "host"
+    ports:
+      - "8108:8108"
     environment:
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}
       TYPESENSE_DATA_DIR: /data
@@ -33,7 +32,7 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [ gpu ]
+              capabilities: [gpu]
     restart: unless-stopped
     logging:
       driver: "json-file"
