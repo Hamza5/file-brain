@@ -276,33 +276,69 @@ class StartupChecker:
         """
         Perform all startup checks with smart short-circuiting.
 
-        If Docker is unavailable, we skip all Docker-dependent checks to avoid
-        long timeouts from network connection attempts to non-existent services.
+        OPTIMIZATION STRATEGY:
+        1. Run fast local checks first (wizard reset, model downloaded)
+        2. If wizard is already needed, skip slow network checks
+        3. Otherwise run Docker checks, then network checks
+
+        This avoids timeout delays when wizard is definitely needed.
 
         Returns:
             Complete startup check results
         """
         logger.info("Starting comprehensive startup checks...")
 
-        # OPTIMIZATION: Check Docker availability first
-        # If Docker is unavailable, skip all container-dependent checks to avoid timeouts
+        # PHASE 1: Fast local checks (no network required)
+        # Check these first because they're instant and might trigger early exit
+        wizard_check = await self.check_wizard_reset()
+        model_check = await self.check_model_downloaded()
+
+        # EARLY EXIT: If wizard was reset, skip all other checks
+        if not wizard_check.passed:
+            logger.info("Wizard was reset - skipping remaining checks for fast startup")
+            return StartupCheckResult(
+                docker_available=CheckDetail(passed=True, message="Skipped - wizard reset"),
+                docker_images=CheckDetail(passed=True, message="Skipped - wizard reset"),
+                services_healthy=CheckDetail(passed=True, message="Skipped - wizard reset"),
+                model_downloaded=model_check,
+                collection_ready=CheckDetail(passed=True, message="Skipped - wizard reset"),
+                schema_current=CheckDetail(passed=True, message="Skipped - wizard reset"),
+                wizard_reset=wizard_check,
+            )
+
+        # EARLY EXIT: If model is missing, wizard is needed - skip network checks
+        if not model_check.passed:
+            logger.info("Model missing - skipping network checks for fast startup")
+            # Still check Docker availability as it's fast and useful for wizard UI
+            docker_check = await self.check_docker_available()
+            # Check Docker images too since we're here and it's fast
+            if docker_check.passed:
+                images_check = await self.check_docker_images()
+            else:
+                images_check = CheckDetail(passed=True, message="Skipped - Docker not available")
+            return StartupCheckResult(
+                docker_available=docker_check,
+                docker_images=images_check,
+                services_healthy=CheckDetail(passed=True, message="Skipped - model missing"),
+                model_downloaded=model_check,
+                collection_ready=CheckDetail(passed=True, message="Skipped - model missing"),
+                schema_current=CheckDetail(passed=True, message="Skipped - model missing"),
+                wizard_reset=wizard_check,
+            )
+
+        # PHASE 2: Check Docker availability
         docker_check = await self.check_docker_available()
 
         if not docker_check.passed:
             logger.info("Docker not available - skipping container-dependent checks for fast startup")
-
-            # Still check local resources (model and wizard state)
-            model_check = await self.check_model_downloaded()
-            wizard_check = await self.check_wizard_reset()
-
             # Return immediately without making network calls to unavailable services
             check_result = StartupCheckResult(
                 docker_available=docker_check,
-                docker_images=CheckDetail(passed=False, message="Docker not available"),
-                services_healthy=CheckDetail(passed=False, message="Docker not available"),
+                docker_images=CheckDetail(passed=True, message="Skipped - Docker not available"),
+                services_healthy=CheckDetail(passed=True, message="Skipped - Docker not available"),
                 model_downloaded=model_check,
-                collection_ready=CheckDetail(passed=False, message="Docker not available"),
-                schema_current=CheckDetail(passed=False, message="Docker not available"),
+                collection_ready=CheckDetail(passed=True, message="Skipped - Docker not available"),
+                schema_current=CheckDetail(passed=True, message="Skipped - Docker not available"),
                 wizard_reset=wizard_check,
             )
 
@@ -312,33 +348,62 @@ class StartupChecker:
 
             return check_result
 
-        # Docker is available - run all checks concurrently for speed
-        results = await asyncio.gather(
-            self.check_docker_images(),
-            self.check_services_healthy(),
-            self.check_model_downloaded(),
-            self.check_collection_ready(),
-            self.check_schema_current(),
-            self.check_wizard_reset(),
-            return_exceptions=True,
-        )
+        # PHASE 3: Check Docker images (fast, no network)
+        images_check = await self.check_docker_images()
 
-        # Handle any exceptions from gather
-        def safe_result(idx: int, default_msg: str) -> CheckDetail:
-            result = results[idx]
-            if isinstance(result, Exception):
-                logger.error(f"Check {idx} raised exception: {result}")
-                return CheckDetail(passed=False, message=f"Error: {str(result)}")
-            return result
+        # EARLY EXIT: If images are missing, wizard is needed - skip network checks
+        if not images_check.passed:
+            logger.info("Docker images missing - skipping network checks for fast startup")
+            return StartupCheckResult(
+                docker_available=docker_check,
+                docker_images=images_check,
+                services_healthy=CheckDetail(passed=True, message="Skipped - images missing"),
+                model_downloaded=model_check,
+                collection_ready=CheckDetail(passed=True, message="Skipped - images missing"),
+                schema_current=CheckDetail(passed=True, message="Skipped - images missing"),
+                wizard_reset=wizard_check,
+            )
+
+        # PHASE 4: Run network-dependent checks (only if wizard might not be needed)
+        # All critical checks passed so far - now check if services are up
+        logger.info("Critical checks passed - running network health checks")
+
+        # Check service health first - if unhealthy, skip Typesense checks to avoid timeouts
+        services_check = await self.check_services_healthy()
+
+        if services_check.passed:
+            # Services are healthy - safe to check Typesense
+            logger.info("Services healthy - checking Typesense collection and schema")
+            results = await asyncio.gather(
+                self.check_collection_ready(),
+                self.check_schema_current(),
+                return_exceptions=True,
+            )
+
+            # Handle any exceptions from gather
+            def safe_result(idx: int, default_msg: str) -> CheckDetail:
+                result = results[idx]
+                if isinstance(result, Exception):
+                    logger.error(f"Typesense check {idx} raised exception: {result}")
+                    return CheckDetail(passed=False, message=f"Error: {str(result)}")
+                return result
+
+            collection_check = safe_result(0, "Collection check failed")
+            schema_check = safe_result(1, "Schema check failed")
+        else:
+            # Services not healthy - skip Typesense checks to avoid connection timeouts
+            logger.info("Services not healthy - skipping Typesense checks to avoid timeouts")
+            collection_check = CheckDetail(passed=True, message="Skipped - services not healthy")
+            schema_check = CheckDetail(passed=True, message="Skipped - services not healthy")
 
         check_result = StartupCheckResult(
-            docker_available=docker_check,  # Already checked above
-            docker_images=safe_result(0, "Image check failed"),
-            services_healthy=safe_result(1, "Service check failed"),
-            model_downloaded=safe_result(2, "Model check failed"),
-            collection_ready=safe_result(3, "Collection check failed"),
-            schema_current=safe_result(4, "Schema check failed"),
-            wizard_reset=safe_result(5, "Wizard reset check failed"),
+            docker_available=docker_check,
+            docker_images=images_check,
+            services_healthy=services_check,
+            model_downloaded=model_check,
+            collection_ready=collection_check,
+            schema_current=schema_check,
+            wizard_reset=wizard_check,
         )
 
         logger.info(f"Startup checks complete. All passed: {check_result.all_checks_passed}")

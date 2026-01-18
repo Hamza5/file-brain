@@ -394,6 +394,114 @@ async def test_perform_all_checks_collection_missing(
 
 
 # ============================================================================
+# Early Exit Optimization Tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_early_exit_wizard_reset(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Network checks are skipped when wizard was reset."""
+    # Mock wizard state as NOT completed (reset)
+    with (
+        patch("file_brain.services.startup_checker.db_session") as mock_db_session,
+        patch("file_brain.services.startup_checker.WizardStateRepository") as mock_repo_class,
+    ):
+        mock_db = MagicMock()
+        mock_db_session.return_value.__enter__.return_value = mock_db
+        mock_db_session.return_value.__exit__.return_value = None
+
+        mock_state = MagicMock()
+        mock_state.wizard_completed = False  # Wizard was reset
+        mock_repo = MagicMock()
+        mock_repo.get.return_value = mock_state
+        mock_repo_class.return_value = mock_repo
+
+        # Setup mocks - these should NOT be called because of early exit
+        mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+        mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+
+        result = await startup_checker.perform_all_checks()
+
+        # Verify wizard is needed
+        assert result.needs_wizard is True
+        assert result.get_first_failed_step() == 0
+
+        # Verify network checks were skipped (not called)
+        mock_docker_manager.check_required_images.assert_not_called()
+        mock_docker_manager.get_services_status.assert_not_called()
+        mock_typesense_client.check_collection_exists.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_early_exit_model_missing(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Network checks are skipped when model is missing."""
+    mock_model_downloader.check_model_exists.return_value = {"exists": False, "missing_files": ["model.safetensors"]}
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
+
+    result = await startup_checker.perform_all_checks()
+
+    # Verify wizard is needed
+    assert result.needs_wizard is True
+    assert result.get_first_failed_step() == 3  # Model download step
+
+    # Docker and images checks are fast, so they run even when model missing
+    # But network checks should be skipped
+    mock_docker_manager.get_services_status.assert_not_called()
+    mock_typesense_client.check_collection_exists.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_early_exit_images_missing(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Network checks are skipped when Docker images are missing."""
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {
+        "success": True,
+        "all_present": False,
+        "missing": ["hamza5/typesense-gpu:29.0"],
+    }
+
+    result = await startup_checker.perform_all_checks()
+
+    # Verify wizard is needed
+    assert result.needs_wizard is True
+    assert result.get_first_failed_step() == 1  # Image pull step
+
+    # Verify network checks were skipped (not called)
+    mock_docker_manager.get_services_status.assert_not_called()
+    mock_typesense_client.check_collection_exists.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_perform_all_checks_network_checks_run_when_needed(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+):
+    """Network checks ARE run when all critical checks pass (wizard might not be needed)."""
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
+    mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
+    mock_typesense_client.check_collection_exists.return_value = True
+
+    result = await startup_checker.perform_all_checks()
+
+    # Verify all checks passed
+    assert result.all_checks_passed is True
+    assert result.needs_wizard is False
+
+    # Verify network checks WERE called (not skipped)
+    mock_docker_manager.get_services_status.assert_called_once()
+    assert mock_typesense_client.check_collection_exists.call_count == 2  # Once for collection, once for schema
+
+
+# ============================================================================
 # CheckDetail and StartupCheckResult Tests
 # ============================================================================
 
