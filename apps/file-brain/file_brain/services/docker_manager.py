@@ -709,63 +709,76 @@ class DockerManager:
                         # Fallback to text parsing if JSON fails
                         logger.warning("Failed to parse docker ps JSON output")
 
-                # Now perform application-level health checks via HTTP
-                import aiohttp
+                # Check if any containers are actually running before performing HTTP health checks
+                # This prevents long timeouts on Windows when containers haven't started yet
+                any_running = any(s.get("state") == "running" for s in services)
 
-                async def check_service_health(
-                    name: str,
-                    url: str,
-                    headers: dict = None,
-                    timeout: float = 5.0,
-                    max_retries: int = 3,
-                    retry_delay: float = 1.0,
-                ) -> bool:
-                    """
-                    Check if a service is actually responding to HTTP requests.
-                    Uses retry logic to handle slow container startup.
+                # Only perform application-level health checks via HTTP if containers are running
+                if any_running:
+                    import aiohttp
 
-                    Args:
-                        name: Service name for logging
-                        url: URL to check
-                        headers: Optional HTTP headers
-                        timeout: Timeout for each attempt in seconds
-                        max_retries: Number of retry attempts
-                        retry_delay: Delay between retries in seconds
-                    """
-                    for attempt in range(max_retries):
-                        try:
-                            async with aiohttp.ClientSession() as session:
-                                async with session.get(
-                                    url,
-                                    headers=headers or {},
-                                    timeout=aiohttp.ClientTimeout(total=timeout),
-                                ) as resp:
-                                    healthy = resp.status < 400
-                                    if healthy:
-                                        logger.info(f"Health check {name}: {url} -> status {resp.status}, healthy=True")
-                                        return True
-                                    logger.debug(f"Health check {name}: {url} -> status {resp.status}, unhealthy")
-                        except Exception as e:
-                            logger.debug(
-                                f"Health check {name}: {url} -> attempt {attempt + 1}/{max_retries} failed: {e}"
-                            )
+                    async def check_service_health(
+                        name: str,
+                        url: str,
+                        headers: dict = None,
+                        timeout: float = 5.0,
+                        max_retries: int = 3,
+                        retry_delay: float = 1.0,
+                    ) -> bool:
+                        """
+                        Check if a service is actually responding to HTTP requests.
+                        Uses retry logic to handle slow container startup.
 
-                        # Wait before retry (except on last attempt)
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(retry_delay)
+                        Args:
+                            name: Service name for logging
+                            url: URL to check
+                            headers: Optional HTTP headers
+                            timeout: Timeout for each attempt in seconds
+                            max_retries: Number of retry attempts
+                            retry_delay: Delay between retries in seconds
+                        """
+                        for attempt in range(max_retries):
+                            try:
+                                async with aiohttp.ClientSession() as session:
+                                    async with session.get(
+                                        url,
+                                        headers=headers or {},
+                                        timeout=aiohttp.ClientTimeout(total=timeout),
+                                    ) as resp:
+                                        healthy = resp.status < 400
+                                        if healthy:
+                                            logger.info(
+                                                f"Health check {name}: {url} -> status {resp.status}, healthy=True"
+                                            )
+                                            return True
+                                        logger.debug(f"Health check {name}: {url} -> status {resp.status}, unhealthy")
+                            except Exception as e:
+                                logger.debug(
+                                    f"Health check {name}: {url} -> attempt {attempt + 1}/{max_retries} failed: {e}"
+                                )
 
-                    logger.info(f"Health check {name}: {url} -> failed after {max_retries} attempts")
-                    return False
+                            # Wait before retry (except on last attempt)
+                            if attempt < max_retries - 1:
+                                await asyncio.sleep(retry_delay)
 
-                # Check Tika
-                tika_healthy = await check_service_health("tika", f"{settings.tika_url}/version")
+                        logger.info(f"Health check {name}: {url} -> failed after {max_retries} attempts")
+                        return False
 
-                # Check Typesense
-                typesense_healthy = await check_service_health(
-                    "typesense",
-                    f"{settings.typesense_url}/debug",
-                    headers={"X-TYPESENSE-API-KEY": settings.typesense_api_key},
-                )
+                    # Check Tika
+                    tika_healthy = await check_service_health("tika", f"{settings.tika_url}/version")
+
+                    # Check Typesense
+                    typesense_healthy = await check_service_health(
+                        "typesense",
+                        f"{settings.typesense_url}/debug",
+                        headers={"X-TYPESENSE-API-KEY": settings.typesense_api_key},
+                    )
+                else:
+                    # Skip HTTP health checks when containers aren't running
+                    # This prevents long timeouts (15+ seconds on Windows) during startup
+                    logger.info("No containers running - skipping HTTP health checks")
+                    tika_healthy = False
+                    typesense_healthy = False
 
                 # Update services with actual health status
                 for service in services:
