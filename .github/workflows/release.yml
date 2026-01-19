@@ -34,6 +34,15 @@ jobs:
             echo "Manual trigger detected. Skipping version check."
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "version=$current_version" >> $GITHUB_OUTPUT
+
+            # Check for prerelease
+            if [[ "$current_version" =~ (a|b|rc|alpha|beta|dev|pre) ]] || [[ "$current_version" == *-* ]]; then
+               echo "Identified $current_version as a prerelease."
+               echo "prerelease=true" >> $GITHUB_OUTPUT
+            else
+               echo "Identified $current_version as a stable release."
+               echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
             exit 0
           fi
 
@@ -46,6 +55,15 @@ jobs:
             echo "Version changed from $previous_version to $current_version"
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "version=$current_version" >> $GITHUB_OUTPUT
+
+            # Check for prerelease
+            if [[ "$current_version" =~ (a|b|rc|alpha|beta|dev|pre) ]] || [[ "$current_version" == *-* ]]; then
+               echo "Identified $current_version as a prerelease."
+               echo "prerelease=true" >> $GITHUB_OUTPUT
+            else
+               echo "Identified $current_version as a stable release."
+               echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
           else
             echo "Version did not change ($current_version)"
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -94,6 +112,7 @@ jobs:
             apps/file-brain/dist/*.whl
             apps/file-brain/dist/*.tar.gz
           fail_on_unmatched_files: true
+          prerelease: ${{ steps.version_check.outputs.prerelease }}
 
       - name: Publish to PyPI
         if: steps.version_check.outputs.changed == 'true'

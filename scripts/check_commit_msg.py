@@ -41,7 +41,7 @@ def main():
     except FileNotFoundError:
         return 0
 
-    lines = [l for l in content.splitlines() if not l.strip().startswith("#")]
+    lines = [line for line in content.splitlines() if not line.strip().startswith("#")]
     if not lines:
         # Empty message or only comments
         return 0
