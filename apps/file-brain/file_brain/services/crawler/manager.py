@@ -132,12 +132,12 @@ class CrawlJobManager:
 
         # Indexing progress
         files_indexed = self.indexing_progress.files_indexed
-        # Use discoverer.files_found for the most up-to-date count from the background thread
+        # Use discoverer.files_found as the source of truth for discovered files
+        # Do NOT include files_to_index as it includes monitor events
         total_known = max(
             self.discoverer.files_found,
             self.discovery_progress.files_found,
-            self.indexing_progress.files_to_index,
-            files_indexed,
+            files_indexed,  # Ensure we never show less discovered than indexed
         )
 
         indexing_pct = self.tracker.get_indexing_percent(total_known)

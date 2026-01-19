@@ -5,6 +5,7 @@ import { PrimeReactProvider } from "primereact/api";
 import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
 import { useNotification } from "./context/NotificationContext";
+import { IndexingNotifier } from "./context/IndexingNotifier";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { ProgressSpinner } from "primereact/progressspinner";
@@ -312,6 +313,7 @@ export default function App() {
       <ThemeProvider>
         <StatusProvider enabled={wizardNeeded === false}>
           <NotificationProvider>
+            <IndexingNotifier />
             {searchClient ? (
               <AppContent searchClient={searchClient} />
             ) : (

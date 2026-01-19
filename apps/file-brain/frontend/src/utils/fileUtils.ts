@@ -103,6 +103,6 @@ export function getFileIcon(ext: string | null | undefined): string {
  */
 export const getFileName = (filePath: string | null | undefined): string => {
     if (!filePath) return 'Unknown File';
-    const parts = filePath.split('/');
+    const parts = filePath.split(/[\\/]/);  // Handle both Unix and Windows paths
     return parts[parts.length - 1] || 'Unknown File';
 };
