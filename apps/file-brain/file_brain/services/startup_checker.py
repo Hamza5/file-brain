@@ -57,39 +57,37 @@ class StartupCheckResult:
         )
 
     @property
+    def is_first_run(self) -> bool:
+        """
+        Check if this is the first run (wizard was never completed).
+
+        Returns True when:
+        - Wizard was never completed (wizard_reset.passed is False)
+
+        This is distinct from user-requested reset, which we detect by checking
+        if the wizard was previously completed but is now reset.
+        """
+        return not self.wizard_reset.passed
+
+    @property
     def needs_wizard(self) -> bool:
         """
         Check if wizard needs to be shown.
 
-        The wizard is needed for:
-        1. Critical failures that require user intervention:
-           - Docker not available (need to install)
-           - Images missing (need to download)
-           - Model missing (need to download)
-           - Collection missing BUT ONLY if services are healthy (otherwise app will start services first)
-        2. When user deliberately resets wizard via the "Resetup Wizard" button
+        The wizard is needed ONLY for:
+        1. First run (wizard was never completed)
+        2. User explicitly reset the wizard via "Reset Wizard" button
 
-        Services not running is NOT a wizard-worthy issue - the app can start them automatically.
+        On normal runs, even if checks fail (Docker issues, services down, etc.),
+        we show the main app with retry UI instead of forcing the wizard.
+        This gives users control to fix issues without going through the full wizard.
         """
-        # If wizard was deliberately reset via the database, show it
-        if not self.wizard_reset.passed:
+        # Show wizard if it was never completed (first run)
+        if self.is_first_run:
             return True
 
-        # Critical checks that always require wizard
-        always_critical = [
-            self.docker_available.passed,
-            self.docker_images.passed,
-            self.model_downloaded.passed,
-        ]
-
-        if not all(always_critical):
-            return True
-
-        # Collection check only matters if services are healthy
-        # If services aren't healthy, the app will start them first, then check collection
-        if self.services_healthy.passed and not self.collection_ready.passed:
-            return True
-
+        # If wizard was completed before, never auto-show it again
+        # Even if checks fail, let the app handle it with retry UI
         return False
 
     @property

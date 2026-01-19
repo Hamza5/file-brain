@@ -479,22 +479,16 @@ export interface CheckDetail {
   message: string;
 }
 
-export interface StartupCheckResult {
+export interface StartupCheckResponse {
   all_checks_passed: boolean;
   needs_wizard: boolean;
+  is_first_run: boolean;  // True if wizard was never completed
   start_step: number | null;
   is_upgrade: boolean;
-  checks: {
-    docker_available: CheckDetail;
-    docker_images: CheckDetail;
-    services_healthy: CheckDetail;
-    model_downloaded: CheckDetail;
-    collection_ready: CheckDetail;
-    schema_current: CheckDetail;
-  };
+  checks: Record<string, CheckDetail>;
 }
 
-export async function checkStartupRequirements(): Promise<StartupCheckResult> {
+export async function checkStartupRequirements(): Promise<StartupCheckResponse> {
   return requestJSON("/api/v1/wizard/startup-check");
 }
 export async function checkDockerInstallation(): Promise<DockerCheckResult> {

@@ -272,6 +272,7 @@ async def test_perform_all_checks_all_pass(
 
     assert result.all_checks_passed is True
     assert result.needs_wizard is False
+    assert result.is_first_run is False  # Wizard was completed
     assert result.get_first_failed_step() is None
     assert result.is_upgrade is False
 
@@ -287,7 +288,8 @@ async def test_perform_all_checks_docker_missing(startup_checker, mock_docker_ma
     result = await startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
-    assert result.needs_wizard is True
+    assert result.needs_wizard is False  # Docker missing doesn't trigger wizard on normal runs
+    assert result.is_first_run is False  # Wizard was completed before
     assert result.get_first_failed_step() == 0  # Docker check step
     assert result.is_upgrade is False  # No upgrade if Docker isn't available
 
@@ -311,7 +313,8 @@ async def test_perform_all_checks_images_missing(
     result = await startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
-    assert result.needs_wizard is True
+    assert result.needs_wizard is False  # Images missing doesn't trigger wizard on normal runs
+    assert result.is_first_run is False  # Wizard was completed before
     assert result.get_first_failed_step() == 1  # Image pull step
     assert result.is_upgrade is True  # Docker available + some checks passed
 
@@ -369,7 +372,8 @@ async def test_perform_all_checks_model_missing(
     result = await startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
-    assert result.needs_wizard is True
+    assert result.needs_wizard is False  # Model missing doesn't trigger wizard on normal runs
+    assert result.is_first_run is False  # Wizard was completed before
     assert result.get_first_failed_step() == 3  # Model download step
     assert result.is_upgrade is True
 
@@ -388,7 +392,8 @@ async def test_perform_all_checks_collection_missing(
     result = await startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
-    assert result.needs_wizard is True
+    assert result.needs_wizard is False  # Collection missing doesn't trigger wizard on normal runs
+    assert result.is_first_run is False  # Wizard was completed before
     assert result.get_first_failed_step() == 4  # Collection create step
     assert result.is_upgrade is True
 
@@ -424,8 +429,9 @@ async def test_perform_all_checks_early_exit_wizard_reset(
 
         result = await startup_checker.perform_all_checks()
 
-        # Verify wizard is needed
+        # Verify wizard is needed (first run)
         assert result.needs_wizard is True
+        assert result.is_first_run is True
         assert result.get_first_failed_step() == 0
 
         # Verify network checks were skipped (not called)
@@ -445,8 +451,9 @@ async def test_perform_all_checks_early_exit_model_missing(
 
     result = await startup_checker.perform_all_checks()
 
-    # Verify wizard is needed
-    assert result.needs_wizard is True
+    # Model missing but wizard was completed - no wizard needed
+    assert result.needs_wizard is False
+    assert result.is_first_run is False
     assert result.get_first_failed_step() == 3  # Model download step
 
     # Docker and images checks are fast, so they run even when model missing
@@ -470,8 +477,9 @@ async def test_perform_all_checks_early_exit_images_missing(
 
     result = await startup_checker.perform_all_checks()
 
-    # Verify wizard is needed
-    assert result.needs_wizard is True
+    # Images missing but wizard was completed - no wizard needed
+    assert result.needs_wizard is False
+    assert result.is_first_run is False
     assert result.get_first_failed_step() == 1  # Image pull step
 
     # Verify network checks were skipped (not called)
@@ -541,7 +549,7 @@ def test_startup_check_result_all_checks_passed():
         wizard_reset=CheckDetail(True, "ok"),
     )
     assert result.all_checks_passed is False
-    assert result.needs_wizard is True
+    assert result.needs_wizard is False  # Images missing but wizard was completed
 
 
 def test_startup_check_result_is_upgrade():

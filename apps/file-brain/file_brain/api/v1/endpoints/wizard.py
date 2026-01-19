@@ -86,6 +86,7 @@ class StartupCheckResponse(BaseModel):
 
     all_checks_passed: bool
     needs_wizard: bool
+    is_first_run: bool  # True if wizard was never completed
     start_step: Optional[int] = None
     is_upgrade: bool
     checks: dict  # Maps check name to CheckDetailResponse
@@ -162,6 +163,7 @@ async def check_startup_requirements():
         return StartupCheckResponse(
             all_checks_passed=result.all_checks_passed,
             needs_wizard=result.needs_wizard,
+            is_first_run=result.is_first_run,
             start_step=result.get_first_failed_step(),
             is_upgrade=result.is_upgrade,
             checks={

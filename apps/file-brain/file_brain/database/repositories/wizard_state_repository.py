@@ -96,3 +96,8 @@ class WizardStateRepository:
         """Check if wizard is completed"""
         state = self.get()
         return state.wizard_completed if state else False
+
+    def has_ever_completed(self) -> bool:
+        """Check if wizard was ever completed (has completed_at timestamp)"""
+        state = self.get()
+        return state.completed_at is not None if state else False
