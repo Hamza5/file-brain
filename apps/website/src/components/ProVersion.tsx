@@ -173,6 +173,22 @@ export const ProVersion = () => {
           >
             One-time payment. Auto-updates and priority support for one year.
           </p>
+          <div
+            className="mt-4 p-3 border-round-xl inline-block"
+            style={{
+              backgroundColor: "rgba(6, 182, 212, 0.1)",
+              border: "1px solid var(--primary-color)",
+            }}
+          >
+            <p
+              className="m-0 text-lg"
+              style={{ color: "var(--primary-color)" }}
+            >
+              <i className="fa-solid fa-lightbulb mr-2"></i>
+              <strong>Preorder Bonus:</strong> Request specific features and we
+              will consider them for the Pro release!
+            </p>
+          </div>
         </div>
 
         {/* Pricing Cards */}
