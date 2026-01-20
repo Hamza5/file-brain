@@ -3,7 +3,7 @@ Tests for telemetry device ID generation with fallbacks
 """
 
 import hashlib
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 class TestDeviceIDGeneration:
@@ -191,3 +191,111 @@ class TestDeviceIDGeneration:
 
                 # Should be the same (deterministic)
                 assert device_id_1 == device_id_2
+
+
+class TestEnvironmentDetection:
+    """Test environment detection for install_type tracking"""
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    def test_development_environment(self, mock_config_dir, tmp_path):
+        """Test that debug mode is detected as development"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+            mock_settings.debug = True  # Debug mode enabled
+
+            manager = TelemetryManager()
+            assert manager.environment == "development"
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    def test_packaged_pip_installed(self, mock_config_dir, tmp_path):
+        """Test that pip-installed packages are detected as packaged"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+            mock_settings.debug = False  # Not in debug mode
+
+            # Mock file_brain module to appear as if installed in site-packages
+            mock_file_brain = MagicMock()
+            mock_file_brain.__file__ = "/usr/lib/python3.11/site-packages/file_brain/__init__.py"
+
+            with patch.dict("sys.modules", {"file_brain": mock_file_brain}):
+                manager = TelemetryManager()
+                assert manager.environment == "packaged"
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    def test_packaged_frozen_executable(self, mock_config_dir, tmp_path):
+        """Test that PyInstaller frozen executables are detected as packaged"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+            mock_settings.debug = False  # Not in debug mode
+
+            # Mock sys.frozen = True for PyInstaller
+            with patch("file_brain.core.telemetry.sys") as mock_sys:
+                mock_sys.frozen = True
+
+                manager = TelemetryManager()
+                assert manager.environment == "packaged"
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    def test_production_environment(self, mock_config_dir, tmp_path):
+        """Test that non-frozen, non-pip, non-debug installs are production"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+            mock_settings.debug = False  # Not in debug mode
+
+            # Mock file_brain module NOT in site-packages (e.g., running from source in production)
+            mock_file_brain = MagicMock()
+            mock_file_brain.__file__ = "/home/user/file-brain/apps/file-brain/file_brain/__init__.py"
+
+            with patch.dict("sys.modules", {"file_brain": mock_file_brain}):
+                manager = TelemetryManager()
+                assert manager.environment == "production"
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    def test_debug_overrides_pip_install(self, mock_config_dir, tmp_path):
+        """Test that debug mode takes precedence over pip installation detection"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+            mock_settings.debug = True  # Debug mode enabled
+
+            # Even if installed in site-packages, debug mode should win
+            mock_file_brain = MagicMock()
+            mock_file_brain.__file__ = "/usr/lib/python3.11/site-packages/file_brain/__init__.py"
+
+            with patch.dict("sys.modules", {"file_brain": mock_file_brain}):
+                manager = TelemetryManager()
+                assert manager.environment == "development"

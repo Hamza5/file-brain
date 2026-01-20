@@ -61,10 +61,24 @@ class TelemetryManager:
 
     def _determine_environment(self):
         """Determine the application environment."""
+        import os
+
         is_frozen = getattr(sys, "frozen", False)
+
+        # Check if running from a pip-installed package
+        # (module installed in site-packages or dist-packages)
+        is_pip_installed = False
+        try:
+            import file_brain
+
+            module_path = os.path.dirname(os.path.abspath(file_brain.__file__))
+            is_pip_installed = "site-packages" in module_path or "dist-packages" in module_path
+        except Exception:
+            pass
+
         if settings.debug:
             self.environment = "development"
-        elif is_frozen:
+        elif is_frozen or is_pip_installed:
             self.environment = "packaged"
         else:
             self.environment = "production"
