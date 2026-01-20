@@ -142,9 +142,12 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
       contentStyle={{ backdropFilter: 'blur(8px)' }}
       maskStyle={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
       header={
-        <div className="flex align-items-center gap-2">
-          <i className="fas fa-cog fa-spin text-primary" />
-          <span>Starting Components</span>
+        <div className="flex align-items-center gap-3">
+          <div className="premium-loader-mini-container">
+            <div className="premium-loader-mini-outer"></div>
+            <div className="premium-loader-mini-inner"></div>
+          </div>
+          <span className="font-semibold">Starting Components</span>
         </div>
       }
     >
@@ -175,9 +178,12 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
 
         {/* Loading state when no services yet */}
         {!containerStatus?.services?.length && !error && (
-          <div className="flex align-items-center gap-2 p-3 surface-100 border-round">
-            <i className="fas fa-spinner fa-spin text-primary" />
-            <span className="text-600">Initializing components...</span>
+          <div className="flex align-items-center gap-3 p-3 surface-100 border-round">
+            <div className="premium-loader-mini-container">
+              <div className="premium-loader-mini-outer"></div>
+              <div className="premium-loader-mini-inner"></div>
+            </div>
+            <span className="text-600 pulse-text">Initializing components...</span>
           </div>
         )}
 

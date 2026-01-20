@@ -8,7 +8,6 @@ import { useNotification } from "./context/NotificationContext";
 import { IndexingNotifier } from "./context/IndexingNotifier";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
-import { ProgressSpinner } from "primereact/progressspinner";
 import { Button } from "primereact/button";
 import { Message } from "primereact/message";
 import { type SearchHit } from "./types/search";
@@ -18,6 +17,7 @@ import { PreviewSidebar } from "./components/sidebars/PreviewSidebar";
 import { InitializationWizard } from "./components/wizard/InitializationWizard";
 import { StatusBar } from "./components/layout/StatusBar";
 import { ContainerInitOverlay } from "./components/container/ContainerInitOverlay";
+import { PremiumLoading } from "./components/shared/PremiumLoading";
 import {
   startCrawler,
   stopCrawler,
@@ -248,42 +248,39 @@ export default function App() {
     return (
       <PrimeReactProvider>
         <ThemeProvider>
-          <div
-            className="flex flex-column align-items-center justify-content-center h-screen gap-3"
-            style={{ backgroundColor: "var(--surface-ground)" }}
-          >
-            <ProgressSpinner
-              style={{ width: "50px", height: "50px" }}
-              strokeWidth="4"
-              animationDuration=".5s"
+          <div style={{ backgroundColor: "var(--surface-ground)" }}>
+            <PremiumLoading
+              message="FileBrain is starting..."
+              subMessage={
+                retryCount > 0
+                  ? `Checking system status (attempt ${retryCount + 1}/3)...`
+                  : "Checking system status..."
+              }
             />
-            <p className="text-600">
-              {retryCount > 0
-                ? `Checking system status (attempt ${retryCount + 1}/3)...`
-                : "Checking system status..."}
-            </p>
             {startupCheckError && (
-              <div className="flex flex-column align-items-center gap-3 mt-3 max-w-30rem">
-                <Message
-                  severity="error"
-                  text={`Failed to connect to backend: ${startupCheckError}`}
-                  className="w-full"
-                />
-                <p className="text-center text-sm text-600">
-                  Make sure the application backend is running. If this problem
-                  persists, try restarting the application.
-                </p>
-                <Button
-                  label="Start Setup Wizard Anyway"
-                  icon="fas fa-play"
-                  severity="info"
-                  onClick={() => {
-                    setWizardNeeded(true);
-                    setWizardStartStep(0);
-                    setIsUpgrade(false);
-                    setStartupCheckError(null);
-                  }}
-                />
+              <div className="fixed bottom-0 left-0 right-0 flex justify-content-center pb-8">
+                <div className="flex flex-column align-items-center gap-3 p-4 border-round-xl shadow-4" style={{ backgroundColor: 'var(--surface-overlay)', maxWidth: '450px', width: '90%', border: '1px solid var(--surface-border)' }}>
+                  <Message
+                    severity="error"
+                    text={`Failed to connect to backend: ${startupCheckError}`}
+                    className="w-full"
+                  />
+                  <p className="text-center text-sm text-600 m-0">
+                    Make sure the application backend is running.
+                  </p>
+                  <Button
+                    label="Start Setup Wizard Anyway"
+                    icon="fas fa-play"
+                    severity="info"
+                    size="small"
+                    onClick={() => {
+                      setWizardNeeded(true);
+                      setWizardStartStep(0);
+                      setIsUpgrade(false);
+                      setStartupCheckError(null);
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -317,27 +314,24 @@ export default function App() {
             {searchClient ? (
               <AppContent searchClient={searchClient} />
             ) : (
-              <div
-                className="flex flex-column align-items-center justify-content-center h-screen"
-                style={{ backgroundColor: "var(--surface-ground)" }}
-              >
-                <ProgressSpinner
-                  style={{ width: "50px", height: "50px" }}
-                  strokeWidth="4"
-                  animationDuration=".5s"
+              <div style={{ backgroundColor: "var(--surface-ground)" }}>
+                <PremiumLoading
+                  message="Almost there..."
+                  subMessage={
+                    configError
+                      ? `Connection failed: ${configError}. Retrying...`
+                      : "Finalizing configuration..."
+                  }
                 />
-                <p className="mt-3 text-600">
-                  {configError
-                    ? `Connection failed: ${configError}. Retrying...`
-                    : "Loading Configuration..."}
-                </p>
                 {configError && (
-                  <Button
-                    label="Retry Now"
-                    icon="fas fa-sync"
-                    className="p-button-text mt-2"
-                    onClick={() => setWizardNeeded((prev) => prev)} // Trigger effect
-                  />
+                  <div className="fixed bottom-0 left-0 right-0 flex justify-content-center pb-8">
+                    <Button
+                      label="Retry Now"
+                      icon="fas fa-sync"
+                      severity="secondary"
+                      onClick={() => setWizardNeeded((prev) => prev)}
+                    />
+                  </div>
                 )}
               </div>
             )}

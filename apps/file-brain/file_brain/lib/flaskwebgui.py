@@ -236,9 +236,57 @@ class FlaskUI:
 
         self.profile_dir = os.path.join(tempfile.gettempdir(), self.profile_dir_prefix + uuid.uuid4().hex)
         self.url = f"http://127.0.0.1:{self.port}"
+        self.app_url = self.url
+
+        # Create loading page
+        os.makedirs(self.profile_dir, exist_ok=True)
+        loading_page_path = os.path.join(self.profile_dir, "loading.html")
+        import pathlib
+
+        self.create_loading_page(loading_page_path, self.app_url)
+        self.url = pathlib.Path(loading_page_path).as_uri()
 
         self.browser_path = self.browser_path or browser_path_dispacher.get(OPERATING_SYSTEM)()
         self.browser_command = self.browser_command or self.get_browser_command()
+
+    def create_loading_page(self, path: str, target_url: str):
+        # Use pkgutil to get resource content, works with zipapps/wheels/exes
+        import pkgutil
+
+        try:
+            # "apps.file-brain.file_brain.lib" is the full package path based on file structure
+            # but usually relative import works if we know the package name.
+            # Best is to rely on __package__ if set, or guess.
+
+            # Since this file is in file_brain/lib/flaskwebgui.py
+            packet_name = __name__.rsplit(".", 1)[0]
+            resource_data = pkgutil.get_data(packet_name, "loading_page.html")
+
+            if resource_data is None:
+                raise FileNotFoundError("Resource not found")
+
+            html_content = resource_data.decode("utf-8")
+
+        except Exception as e:
+            logger.warning(f"Could not load loading_page.html from package: {e}")
+            # Try filesystem fallback (useful for dev mode or if pkgutil fails)
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            template_path = os.path.join(current_dir, "loading_page.html")
+
+            if os.path.exists(template_path):
+                with open(template_path, "r", encoding="utf-8") as f:
+                    html_content = f.read()
+            else:
+                logger.warning(f"Loading page template not found at {template_path}")
+                html_content = (
+                    f'<html><body><h1>Loading...</h1><script>window.location.replace("{target_url}");'
+                    "</script></body></html>"
+                )
+
+        html_content = html_content.replace("__TARGET_URL__", target_url)
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(html_content)
 
     def wait_for_server(self, url: str, timeout: float = 30.0):
         """Wait for the server to be responsive before launching browser"""
@@ -296,8 +344,9 @@ class FlaskUI:
     def start_browser(self, server_process: Union[Thread, Process]):
         logger.info(f"Command: {' '.join(self.browser_command)}")
 
-        # Wait for server to be ready before opening browser
-        self.wait_for_server(self.url)
+        if not self.url.startswith("file://"):
+            # Wait for server to be ready before opening browser if not using loading page
+            self.wait_for_server(self.url)
 
         global FLASKWEBGUI_BROWSER_PROCESS
 
