@@ -18,7 +18,60 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "File Brain - Effortless Local File Search",
-  description: "File Brain indexes your local files and makes them searchable with AI-powered semantic search.",
+  description:
+    "File Brain indexes your local files and makes them searchable with AI-powered semantic search. Privacy-first, lightning-fast, and works completely offline.",
+  keywords: [
+    "file search",
+    "local search",
+    "AI search",
+    "semantic search",
+    "file indexing",
+    "privacy-first",
+    "offline search",
+    "desktop search",
+    "file management",
+    "document search",
+  ],
+  authors: [{ name: "Hamza Abbad" }],
+  creator: "Hamza Abbad",
+  publisher: "File Brain",
+  applicationName: "File Brain",
+  metadataBase: new URL("https://file-brain.com"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://file-brain.com",
+    siteName: "File Brain",
+    title: "File Brain - Effortless Local File Search",
+    description:
+      "File Brain indexes your local files and makes them searchable with AI-powered semantic search. Privacy-first, lightning-fast, and works completely offline.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "File Brain - Local AI-Powered File Search Engine",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "File Brain - Effortless Local File Search",
+    description:
+      "File Brain indexes your local files and makes them searchable with AI-powered semantic search. Privacy-first, lightning-fast, and works completely offline.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({
