@@ -210,6 +210,10 @@ def get_available_port(start_port: int, max_attempts: int = 100) -> int:
 
 def cli_main():
     """Entry point for packaged distribution (production mode only)."""
+    # Set DEBUG=false to ensure FlaskWebGUI suppresses third-party debug logs
+    # This must be set BEFORE importing FlaskWebGUI
+    os.environ["DEBUG"] = "false"
+
     from file_brain.lib.flaskwebgui import FlaskUI
 
     port = get_available_port(settings.port)

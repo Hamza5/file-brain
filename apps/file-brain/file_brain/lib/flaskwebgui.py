@@ -18,10 +18,12 @@ from typing import Any, Callable, Dict, List, Union
 
 import psutil
 
+# Determine if we're in packaged/production mode
+is_frozen = getattr(sys, "frozen", False)
+is_debug = os.environ.get("DEBUG", "true").lower() == "true"
+
 logger = logging.getLogger("flaskwebgui")
 if not logger.handlers:
-    is_frozen = getattr(sys, "frozen", False)
-    is_debug = os.environ.get("DEBUG", "true").lower() == "true"
     default_level = "INFO" if (is_frozen or not is_debug) else "DEBUG"
     log_level_str = os.environ.get("FLASKWEBGUI_LOG_LEVEL", default_level).upper()
     log_level = getattr(logging, log_level_str, logging.WARNING)
