@@ -14,7 +14,7 @@ class AppConfig(BaseModel):
 
 
 @router.get("", response_model=AppConfig)
-async def get_config():
+def get_config():
     """
     Get application configuration required for the frontend.
     This allows dynamic configuration (like API keys) to be passed to the UI.

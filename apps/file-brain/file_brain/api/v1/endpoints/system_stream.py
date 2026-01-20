@@ -2,7 +2,6 @@
 System initialization stream API
 """
 
-import asyncio
 import json
 import time
 
@@ -16,7 +15,7 @@ router = APIRouter(prefix="/system", tags=["system"])
 
 
 @router.get("/initialization/stream")
-async def stream_initialization_status():
+def stream_initialization_status():
     """
     Server-Sent Events stream for real-time initialization progress.
 
@@ -27,7 +26,7 @@ async def stream_initialization_status():
     - Overall system initialization progress
     """
 
-    async def event_generator():
+    def event_generator():
         previous_state = None
 
         while True:
@@ -87,16 +86,16 @@ async def stream_initialization_status():
 
                 # Fast polling during initialization, slow down if everything is ready
                 if current_state["overall_progress"] >= 100:
-                    await asyncio.sleep(5.0)  # Slow down when 100% complete
+                    time.sleep(5.0)  # Slow down when 100% complete
                 else:
-                    await asyncio.sleep(0.5)  # Fast updates during startup
+                    time.sleep(0.5)  # Fast updates during startup
 
             except Exception as e:
                 logger.error(f"Error in initialization stream: {e}")
                 # Emit error event
                 error_payload = json.dumps({"error": str(e)})
                 yield f"event: error\ndata: {error_payload}\n\n"
-                await asyncio.sleep(2.0)
+                time.sleep(2.0)
 
     return StreamingResponse(
         event_generator(),

@@ -5,14 +5,11 @@ Main application entry point. Initialization logic extracted to core/initializat
 and frontend routing to core/frontend.py.
 """
 
-import asyncio
 import os
 import socket
 import subprocess
 import sys
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
+import threading
 
 from file_brain.api.v1.router import api_router
 from file_brain.core.config import settings
@@ -26,10 +23,14 @@ from file_brain.core.logging import logger
 from file_brain.core.telemetry import telemetry
 from file_brain.services.crawler.manager import get_crawl_job_manager
 
+# Global variable to track Vite process
+_vite_process = None
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
+
+def startup_handler():
+    """Application startup handler."""
+    global _vite_process
+
     logger.info("=" * 50)
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info("=" * 50)
@@ -37,10 +38,8 @@ async def lifespan(app: FastAPI):
     # Capture startup event
     telemetry.capture_event("application_start")
 
-    vite_process = None
-
     try:
-        await critical_init()
+        critical_init()
         logger.info("🚀 Database ready - API starting immediately!")
 
         # Start Vite Dev Server in Debug Mode
@@ -48,29 +47,31 @@ async def lifespan(app: FastAPI):
             logger.info("🚧 Debug mode enabled: Starting Vite dev server...")
             # frontend is at apps/file-brain/frontend, main.py is at apps/file-brain/file_brain/main.py
             frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
-            vite_process = subprocess.Popen(
+            _vite_process = subprocess.Popen(
                 ["npm", "run", "dev", "--", "--port", str(settings.frontend_dev_port), "--strictPort"],
                 cwd=frontend_dir,
                 stdout=sys.stdout,
                 stderr=sys.stderr,
             )
-            logger.info(f"✅ Vite dev server started (PID: {vite_process.pid})")
+            logger.info(f"✅ Vite dev server started (PID: {_vite_process.pid})")
 
-        # Start health monitoring loop (no automatic service initialization)
-        asyncio.create_task(health_monitoring_loop())
+        # Start health monitoring loop in background thread
+        monitor_thread = threading.Thread(target=health_monitoring_loop, daemon=True, name="health_monitor")
+        monitor_thread.start()
         logger.info("ℹ️  Complete the initialization wizard to set up remaining services")
     except Exception as e:
         logger.error(f"❌ Critical initialization failed: {e}")
         telemetry.capture_exception(e)
         raise
 
-    yield
 
-    # Shutdown via lifespan (used in dev mode)
-    await perform_shutdown(vite_process)
+def shutdown_handler():
+    """Application shutdown handler."""
+    global _vite_process
+    perform_shutdown(_vite_process)
 
 
-async def perform_shutdown(vite_process=None):
+def perform_shutdown(vite_process=None):
     """Perform application shutdown tasks."""
     try:
         # Trigger Typesense snapshot before shutdown
@@ -81,7 +82,7 @@ async def perform_shutdown(vite_process=None):
             typesense = get_typesense_client()
             if typesense.collection_ready:
                 # Trigger snapshot via API (uses Typesense default behavior)
-                await asyncio.to_thread(typesense.client.operations.perform, "snapshot", {})
+                typesense.client.operations.perform("snapshot", {})
                 logger.info("✅ Snapshot created successfully")
             else:
                 logger.debug("ℹ️  Skipping snapshot: Collection not ready (first run or not completed)")
@@ -95,7 +96,7 @@ async def perform_shutdown(vite_process=None):
         docker_manager = get_docker_manager()
         if docker_manager.is_docker_available():
             logger.info("🛑 Stopping docker containers...")
-            result = await docker_manager.stop_services()
+            result = docker_manager.stop_services()
             if result.get("success"):
                 logger.info("✅ Docker containers stopped")
             else:
@@ -112,7 +113,7 @@ async def perform_shutdown(vite_process=None):
 
         crawl_manager = get_crawl_job_manager()
         if crawl_manager.is_running():
-            await crawl_manager.stop_crawl()
+            crawl_manager.stop_crawl()
             logger.info("✅ Crawl manager stopped")
 
         # Shutdown telemetry (flushes batched events and captures shutdown event)
@@ -126,15 +127,23 @@ async def perform_shutdown(vite_process=None):
     logger.info("👋 Application shutdown complete")
 
 
+def on_startup_sync():
+    """Sync wrapper for FlaskWebGUI's on_startup callback."""
+    startup_handler()
+
+
 def on_shutdown_sync():
     """Sync wrapper for FlaskWebGUI's on_shutdown callback."""
     logger.info("🛑 Browser closed, initiating shutdown...")
-    asyncio.run(perform_shutdown())
+    perform_shutdown()
 
 
 # Create FastAPI application
 app = create_app()
-app.router.lifespan_context = lifespan
+
+# Register startup and shutdown event handlers
+app.add_event_handler("startup", startup_handler)
+app.add_event_handler("shutdown", shutdown_handler)
 
 # Include API v1 router
 app.include_router(api_router)
@@ -171,12 +180,12 @@ setup_frontend_routes(app, frontend_dist_path)
 
 
 @app.get("/health")
-async def health_check():
+def health_check():
     """Combined health and info endpoint."""
     from file_brain.services.service_manager import get_service_manager
 
     service_manager = get_service_manager()
-    health_status = await service_manager.check_all_services_health()
+    health_status = service_manager.check_all_services_health()
 
     return {
         "name": settings.app_name,
@@ -213,6 +222,7 @@ def cli_main():
         port=port,
         width=1200,
         height=800,
+        on_startup=on_startup_sync,
         on_shutdown=on_shutdown_sync,
     ).run()
 
@@ -258,5 +268,6 @@ if __name__ == "__main__":
             port=port,
             width=1200,
             height=800,
+            on_startup=on_startup_sync,
             on_shutdown=on_shutdown_sync,
         ).run()

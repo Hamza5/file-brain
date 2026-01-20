@@ -2,8 +2,9 @@
 File Discoverer component
 """
 
-import asyncio
 import os
+import queue
+import threading
 import time
 from typing import List
 
@@ -20,28 +21,24 @@ class FileDiscoverer:
 
     def __init__(self, watch_paths: List[WatchPath]):
         self.watch_paths = watch_paths
-        self._stop_event = asyncio.Event()
-        self._sync_stop_event = False  # Used for thread-safe stopping
+        self._stop_event = threading.Event()
         self.files_found = 0
 
     def stop(self):
         """Signal the discovery process to stop."""
         self._stop_event.set()
-        self._sync_stop_event = True
 
     def reset(self):
         """Reset the discoverer state for a new crawl."""
         self._stop_event.clear()
-        self._sync_stop_event = False
         self.files_found = 0
 
-    async def discover(self):
+    def discover(self):
         """
         Discover files in watch paths and yield crawl operations.
-        Uses a thread pool and async queue for non-blocking traversal.
+        Uses a background thread and queue for non-blocking traversal.
         """
-        queue = asyncio.Queue(maxsize=1000)
-        loop = asyncio.get_running_loop()
+        result_queue = queue.Queue(maxsize=1000)
 
         # Separate included and excluded paths
         included_paths = [wp for wp in self.watch_paths if not wp.is_excluded]
@@ -57,7 +54,7 @@ class FileDiscoverer:
             """Blocking filesystem traversal run in a thread"""
             try:
                 for watch_path_model in included_paths:
-                    if self._sync_stop_event:
+                    if self._stop_event.is_set():
                         break
 
                     if not os.path.exists(watch_path_model.path):
@@ -65,7 +62,7 @@ class FileDiscoverer:
 
                     logger.info(f"Scanning directory: {watch_path_model.path}")
                     for root, dirs, files in os.walk(watch_path_model.path, topdown=True):
-                        if self._sync_stop_event:
+                        if self._stop_event.is_set():
                             return
 
                         # Prune excluded directories using shared PathFilter
@@ -76,7 +73,7 @@ class FileDiscoverer:
                             dirs[:] = []
 
                         for filename in files:
-                            if self._sync_stop_event:
+                            if self._stop_event.is_set():
                                 return
 
                             file_path = os.path.join(root, filename)
@@ -92,26 +89,27 @@ class FileDiscoverer:
                                     discovered_at=int(time.time() * 1000),
                                     source="crawl",
                                 )
-                                # Use thread-safe way to put into async queue
-                                # We use .result() to provide backpressure: if the queue is full, the thread will wait
-                                asyncio.run_coroutine_threadsafe(queue.put(op), loop).result()
+                                # Put into queue (blocking if full for backpressure)
+                                result_queue.put(op)
                             except FileNotFoundError:
                                 continue
                             except Exception as e:
                                 logger.warning(f"Error processing {file_path}: {e}")
             finally:
                 # Signal end of discovery
-                asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+                result_queue.put(None)
 
         # Start scanning in background thread
-        scan_task = loop.run_in_executor(None, scan_worker)
+        scan_thread = threading.Thread(target=scan_worker, daemon=True, name="file_discoverer")
+        scan_thread.start()
 
         # Yield items as they arrive
         while True:
-            item = await queue.get()
+            item = result_queue.get()
             if item is None:
                 break
             yield item
-            queue.task_done()
+            result_queue.task_done()
 
-        await scan_task
+        # Wait for thread to complete
+        scan_thread.join(timeout=1.0)

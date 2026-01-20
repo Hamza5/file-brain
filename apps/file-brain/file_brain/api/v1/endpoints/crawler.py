@@ -2,7 +2,6 @@
 Crawl control API endpoints (Database-backed)
 """
 
-import asyncio
 import os
 import time
 from typing import Any, Dict
@@ -38,7 +37,7 @@ class WatchPathResponse(BaseModel):
 
 
 @router.post("/start", response_model=MessageResponse)
-async def start_crawler(db: Session = Depends(get_db)):
+def start_crawler(db: Session = Depends(get_db)):
     """Start the crawl job with parallel discovery and indexing"""
     try:
         from file_brain.core.telemetry import telemetry
@@ -87,7 +86,7 @@ async def start_crawler(db: Session = Depends(get_db)):
 
         # Start the crawl job
         crawl_manager = get_crawl_job_manager(watch_paths=valid_paths)
-        success = await crawl_manager.start_crawl()
+        success = crawl_manager.start_crawl()
 
         if not success:
             raise HTTPException(status_code=500, detail="Failed to start crawl job")
@@ -115,7 +114,7 @@ async def start_crawler(db: Session = Depends(get_db)):
 
 
 @router.get("/status", response_model=CrawlStatusResponse)
-async def get_crawler_status(db: Session = Depends(get_db)):
+def get_crawler_status(db: Session = Depends(get_db)):
     """Get current crawl status and progress with service initialization info"""
     try:
         from file_brain.services.service_manager import get_service_manager
@@ -127,7 +126,7 @@ async def get_crawler_status(db: Session = Depends(get_db)):
         status_dict = crawl_manager.get_status()
 
         # Get service initialization status
-        services_health = await service_manager.check_all_services_health()
+        services_health = service_manager.check_all_services_health()
 
         # Create enhanced status with service info
         enhanced_status = status_dict.copy()
@@ -152,7 +151,7 @@ async def get_crawler_status(db: Session = Depends(get_db)):
 
 
 @router.post("/monitor/start", response_model=MessageResponse)
-async def start_file_monitoring(db: Session = Depends(get_db)):
+def start_file_monitoring(db: Session = Depends(get_db)):
     """Start the file monitoring service"""
     try:
         from file_brain.services.service_manager import require_service
@@ -171,7 +170,7 @@ async def start_file_monitoring(db: Session = Depends(get_db)):
 
         logger.info("Starting file monitoring via API...")
 
-        success = await crawl_manager.start_monitoring()
+        success = crawl_manager.start_monitoring()
 
         if not success:
             raise HTTPException(status_code=500, detail="Failed to start file monitoring. Check logs for details.")
@@ -192,7 +191,7 @@ async def start_file_monitoring(db: Session = Depends(get_db)):
 
 
 @router.post("/monitor/stop", response_model=MessageResponse)
-async def stop_file_monitoring(db: Session = Depends(get_db)):
+def stop_file_monitoring(db: Session = Depends(get_db)):
     """Stop the file monitoring service"""
     try:
         crawl_manager = get_crawl_job_manager()
@@ -206,7 +205,7 @@ async def stop_file_monitoring(db: Session = Depends(get_db)):
 
         logger.info("Stopping file monitoring via API...")
 
-        await crawl_manager.stop_monitoring()
+        crawl_manager.stop_monitoring()
 
         logger.info("File monitoring stopped successfully")
 
@@ -222,7 +221,7 @@ async def stop_file_monitoring(db: Session = Depends(get_db)):
 
 
 @router.post("/stop", response_model=MessageResponse)
-async def stop_crawler(db: Session = Depends(get_db)):
+def stop_crawler(db: Session = Depends(get_db)):
     """Stop the current crawl job immediately"""
     try:
         from file_brain.core.telemetry import telemetry
@@ -238,7 +237,7 @@ async def stop_crawler(db: Session = Depends(get_db)):
 
         logger.info("Stopping crawl job via API...")
 
-        await crawl_manager.stop_crawl()
+        crawl_manager.stop_crawl()
 
         logger.info("Enhanced crawl job stopped successfully")
 
@@ -260,7 +259,7 @@ async def stop_crawler(db: Session = Depends(get_db)):
 
 
 @router.post("/clear-indexes", response_model=ClearIndexesResponse)
-async def clear_all_indexes(db: Session = Depends(get_db)):
+def clear_all_indexes(db: Session = Depends(get_db)):
     """Clear all files from Typesense and reset indexed files tracking"""
     try:
         from file_brain.core.telemetry import telemetry
@@ -276,7 +275,7 @@ async def clear_all_indexes(db: Session = Depends(get_db)):
 
         logger.info("Clearing all indexes via API...")
 
-        success = await crawl_manager.clear_indexes()
+        success = crawl_manager.clear_indexes()
 
         if not success:
             raise HTTPException(status_code=500, detail="Failed to clear indexes")
@@ -301,7 +300,7 @@ async def clear_all_indexes(db: Session = Depends(get_db)):
 
 
 @router.get("/stats")
-async def get_crawler_stats(db: Session = Depends(get_db)):
+def get_crawler_stats(db: Session = Depends(get_db)):
     """
     Aggregate crawler statistics for UI using Typesense as the single source of truth.
     """
@@ -313,7 +312,7 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
 
         # Get stats from Typesense
         try:
-            ts_stats = await typesense_client.get_collection_stats()
+            ts_stats = typesense_client.get_collection_stats()
             total_indexed = ts_stats.get("num_documents", 0)
             healthy = True
         except Exception as e:
@@ -323,7 +322,7 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
 
         # Get file type distribution from Typesense
         try:
-            file_types = await typesense_client.get_file_type_distribution()
+            file_types = typesense_client.get_file_type_distribution()
         except Exception as e:
             logger.warning(f"Failed to get file type distribution: {e}")
             file_types = {}
@@ -358,12 +357,12 @@ async def get_crawler_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/stream")
-async def stream_crawler_status(db: Session = Depends(get_db)):
+def stream_crawler_status(db: Session = Depends(get_db)):
     """
     Server-Sent Events (SSE) stream that pushes crawl status + stats ONLY when state changes.
     """
 
-    async def event_generator():
+    def event_generator():
         import json as _json
 
         from fastapi.encoders import jsonable_encoder
@@ -390,7 +389,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
 
                 # Get stats from Typesense
                 try:
-                    ts_stats = await typesense_client.get_collection_stats()
+                    ts_stats = typesense_client.get_collection_stats()
                     total_indexed = ts_stats.get("num_documents", 0)
                     healthy = True
                 except Exception as e:
@@ -409,7 +408,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
 
                 # Get file type distribution from Typesense
                 try:
-                    file_types = await typesense_client.get_file_type_distribution()
+                    file_types = typesense_client.get_file_type_distribution()
                 except Exception as e:
                     logger.debug(f"Failed to get file type distribution in SSE: {e}")
                     file_types = {}
@@ -476,7 +475,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
                     # Responsive even when idle
                     poll_interval = 1.0
 
-                await asyncio.sleep(poll_interval)
+                time.sleep(poll_interval)
             except Exception as e:
                 logger.error(f"Error in crawler SSE stream: {e}")
                 break
@@ -494,7 +493,7 @@ async def stream_crawler_status(db: Session = Depends(get_db)):
 
 
 @router.get("/settings", response_model=Dict[str, Any])
-async def get_crawler_settings(db: Session = Depends(get_db)):
+def get_crawler_settings(db: Session = Depends(get_db)):
     """Get current crawler settings"""
     try:
         settings_repo = SettingsRepository(db)
@@ -517,7 +516,7 @@ async def get_crawler_settings(db: Session = Depends(get_db)):
 
 
 @router.put("/settings", response_model=MessageResponse)
-async def update_crawler_settings(settings: Dict[str, Any], db: Session = Depends(get_db)):
+def update_crawler_settings(settings: Dict[str, Any], db: Session = Depends(get_db)):
     """Update crawler settings"""
     try:
         settings_repo = SettingsRepository(db)
@@ -540,7 +539,7 @@ async def update_crawler_settings(settings: Dict[str, Any], db: Session = Depend
 
 
 @router.post("/verify-index", response_model=Dict[str, Any])
-async def verify_indexed_files(db: Session = Depends(get_db)):
+def verify_indexed_files(db: Session = Depends(get_db)):
     """
     Manually trigger index verification to detect and clean up orphaned entries.
     """
@@ -582,7 +581,7 @@ async def verify_indexed_files(db: Session = Depends(get_db)):
 
 
 @router.get("/verification-status")
-async def get_verification_status(db: Session = Depends(get_db)):
+def get_verification_status(db: Session = Depends(get_db)):
     """
     Get information about index verification settings and last verification stats.
     """
@@ -596,7 +595,7 @@ async def get_verification_status(db: Session = Depends(get_db)):
 
         typesense_client = get_typesense_client()
         try:
-            total_indexed = await typesense_client.get_indexed_files_count()
+            total_indexed = typesense_client.get_indexed_files_count()
         except Exception as e:
             logger.warning(f"Could not get index count: {e}")
             total_indexed = 0

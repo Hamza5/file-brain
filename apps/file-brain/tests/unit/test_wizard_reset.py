@@ -4,13 +4,10 @@ Unit tests for wizard reset functionality in StartupChecker.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from file_brain.services.startup_checker import StartupChecker
 
 
-@pytest.mark.asyncio
-async def test_check_wizard_reset_completed():
+def test_check_wizard_reset_completed():
     """Wizard reset check passes when wizard is completed."""
     # Mock the database session and repository
     mock_state = MagicMock()
@@ -38,14 +35,13 @@ async def test_check_wizard_reset_completed():
             patch("file_brain.services.startup_checker.get_typesense_client"),
         ):
             checker = StartupChecker()
-            result = await checker.check_wizard_reset()
+            result = checker.check_wizard_reset()
 
             assert result.passed is True
             assert "completed" in result.message.lower()
 
 
-@pytest.mark.asyncio
-async def test_check_wizard_reset_not_completed():
+def test_check_wizard_reset_not_completed():
     """Wizard reset check fails when wizard is not completed or was reset."""
     # Mock the database session and repository
     mock_state = MagicMock()
@@ -73,14 +69,13 @@ async def test_check_wizard_reset_not_completed():
             patch("file_brain.services.startup_checker.get_typesense_client"),
         ):
             checker = StartupChecker()
-            result = await checker.check_wizard_reset()
+            result = checker.check_wizard_reset()
 
             assert result.passed is False
             assert "not completed" in result.message.lower() or "reset" in result.message.lower()
 
 
-@pytest.mark.asyncio
-async def test_check_wizard_reset_no_state():
+def test_check_wizard_reset_no_state():
     """Wizard reset check fails when no wizard state exists in database."""
     mock_repo = MagicMock()
     mock_repo.get.return_value = None
@@ -104,14 +99,13 @@ async def test_check_wizard_reset_no_state():
             patch("file_brain.services.startup_checker.get_typesense_client"),
         ):
             checker = StartupChecker()
-            result = await checker.check_wizard_reset()
+            result = checker.check_wizard_reset()
 
             assert result.passed is False
             assert "not completed" in result.message.lower() or "reset" in result.message.lower()
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_wizard_reset():
+def test_perform_all_checks_wizard_reset():
     """All system checks pass but wizard was reset - should show wizard."""
     from unittest.mock import AsyncMock
 
@@ -148,7 +142,7 @@ async def test_perform_all_checks_wizard_reset():
         mock_repo_class.return_value = mock_repo
 
         checker = StartupChecker()
-        result = await checker.perform_all_checks()
+        result = checker.perform_all_checks()
 
         # All system checks passed but wizard was reset
         assert result.docker_available.passed is True

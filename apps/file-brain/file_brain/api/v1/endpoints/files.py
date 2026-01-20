@@ -2,7 +2,6 @@
 File operations API for cross-platform file opening functionality
 """
 
-import asyncio
 import os
 import platform
 import subprocess
@@ -49,7 +48,7 @@ class MultipleFileOperationRequest(BaseModel):
     operation: str  # "file", "folder", "delete", or "forget"
 
 
-async def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
+def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
     """Open a file with its associated application"""
     system = platform.system()
 
@@ -76,8 +75,7 @@ async def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
             return False, f"Unsupported operating system: {system}"
 
         # Run subprocess in executor to avoid GIL blocking
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(_file_ops_executor, _run_subprocess, args)
+        _file_ops_executor.submit(_run_subprocess, args)
 
         return True, "File opened successfully"
 
@@ -85,7 +83,7 @@ async def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
         return False, f"Error opening file: {str(e)}"
 
 
-async def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
+def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
     """Open the containing folder and select the file"""
     system = platform.system()
 
@@ -126,8 +124,7 @@ async def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
             return False, f"Unsupported operating system: {system}"
 
         # Run subprocess in executor to avoid GIL blocking
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(_file_ops_executor, _run_subprocess, args)
+        _file_ops_executor.submit(_run_subprocess, args)
 
         return True, "Folder opened successfully"
 
@@ -135,7 +132,7 @@ async def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
         return False, f"Error opening folder: {str(e)}"
 
 
-async def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
+def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
     """Delete a file from the filesystem with security validations"""
     try:
         # Validate file path exists
@@ -159,8 +156,7 @@ async def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
             return False, "Permission denied: cannot write to parent directory"
 
         # Delete file in executor to avoid GIL blocking
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(_file_ops_executor, _delete_file, file_path)
+        _file_ops_executor.submit(_delete_file, file_path)
 
         return True, "File deleted successfully"
 
@@ -172,7 +168,7 @@ async def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
         return False, f"Error deleting file: {str(e)}"
 
 
-async def forget_file_from_index(file_path: str, typesense_client: TypesenseClient) -> tuple[bool, str]:
+def forget_file_from_index(file_path: str, typesense_client: TypesenseClient) -> tuple[bool, str]:
     """Remove a file from the search index (but keep it on disk)"""
     try:
         # Validate file path
@@ -184,7 +180,7 @@ async def forget_file_from_index(file_path: str, typesense_client: TypesenseClie
             return False, "Invalid file path: directory traversal not allowed"
 
         # Remove from Typesense index
-        await typesense_client.remove_from_index(file_path)
+        typesense_client.remove_from_index(file_path)
 
         return True, "File removed from search index"
 
@@ -193,15 +189,15 @@ async def forget_file_from_index(file_path: str, typesense_client: TypesenseClie
 
 
 @router.post("/open")
-async def open_file_operation(request: FileOperationRequest):
+def open_file_operation(request: FileOperationRequest):
     """Open a single file or containing folder"""
     try:
         from file_brain.core.telemetry import telemetry
 
         if request.operation == "file":
-            success, message = await open_file_cross_platform(request.file_path)
+            success, message = open_file_cross_platform(request.file_path)
         elif request.operation == "folder":
-            success, message = await open_folder_cross_platform(request.file_path)
+            success, message = open_folder_cross_platform(request.file_path)
         else:
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'file' or 'folder'")
 
@@ -229,7 +225,7 @@ async def open_file_operation(request: FileOperationRequest):
 
 
 @router.post("/open-multiple")
-async def open_multiple_files_operation(request: MultipleFileOperationRequest):
+def open_multiple_files_operation(request: MultipleFileOperationRequest):
     """Open multiple files or containing folders"""
     results = []
     errors = []
@@ -246,9 +242,9 @@ async def open_multiple_files_operation(request: MultipleFileOperationRequest):
                 continue
 
             if request.operation == "file":
-                success, message = await open_file_cross_platform(file_path)
+                success, message = open_file_cross_platform(file_path)
             elif request.operation == "folder":
-                success, message = await open_folder_cross_platform(file_path)
+                success, message = open_folder_cross_platform(file_path)
             else:
                 errors.append(f"Invalid operation '{request.operation}' for: {file_path}")
                 continue
@@ -271,7 +267,7 @@ async def open_multiple_files_operation(request: MultipleFileOperationRequest):
 
 
 @router.get("/info")
-async def get_file_operation_info():
+def get_file_operation_info():
     """Get information about supported file operations for this system"""
     system = platform.system()
 
@@ -333,7 +329,7 @@ async def get_file_operation_info():
 
 
 @router.post("/delete")
-async def delete_file_operation(request: FileOperationRequest):
+def delete_file_operation(request: FileOperationRequest):
     """Delete a single file from the filesystem and remove from search index"""
     try:
         from file_brain.core.telemetry import telemetry
@@ -341,13 +337,13 @@ async def delete_file_operation(request: FileOperationRequest):
         if request.operation != "delete":
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'delete'")
 
-        success, message = await delete_file_cross_platform(request.file_path)
+        success, message = delete_file_cross_platform(request.file_path)
 
         if success:
             # Immediately remove from search index to avoid slow watcher processing
             try:
                 typesense_client = TypesenseClient()
-                await typesense_client.remove_from_index(request.file_path)
+                typesense_client.remove_from_index(request.file_path)
                 logger.info(f"Removed deleted file from search index: {request.file_path}")
             except Exception as e:
                 logger.warning(f"Failed to remove deleted file from index {request.file_path}: {e}")
@@ -372,7 +368,7 @@ async def delete_file_operation(request: FileOperationRequest):
 
 
 @router.post("/forget")
-async def forget_file_operation(request: FileOperationRequest):
+def forget_file_operation(request: FileOperationRequest):
     """Remove a single file from the search index"""
     try:
         if request.operation != "forget":
@@ -380,7 +376,7 @@ async def forget_file_operation(request: FileOperationRequest):
 
         # Initialize Typesense client
         typesense_client = TypesenseClient()
-        success, message = await forget_file_from_index(request.file_path, typesense_client)
+        success, message = forget_file_from_index(request.file_path, typesense_client)
 
         if success:
             return {
@@ -399,7 +395,7 @@ async def forget_file_operation(request: FileOperationRequest):
 
 
 @router.post("/delete-multiple")
-async def delete_multiple_files_operation(request: MultipleFileOperationRequest):
+def delete_multiple_files_operation(request: MultipleFileOperationRequest):
     """Delete multiple files from the filesystem and remove from search index"""
     results = []
     errors = []
@@ -410,14 +406,14 @@ async def delete_multiple_files_operation(request: MultipleFileOperationRequest)
 
         for file_path in request.file_paths:
             try:
-                success, message = await delete_file_cross_platform(file_path)
+                success, message = delete_file_cross_platform(file_path)
 
                 if success:
                     results.append(file_path)
                     # Immediately remove from search index
                     try:
                         typesense_client = TypesenseClient()
-                        await typesense_client.remove_from_index(file_path)
+                        typesense_client.remove_from_index(file_path)
                     except Exception as e:
                         logger.warning(f"Failed to remove deleted file from index {file_path}: {e}")
                 else:
@@ -447,7 +443,7 @@ async def delete_multiple_files_operation(request: MultipleFileOperationRequest)
 
 
 @router.post("/forget-multiple")
-async def forget_multiple_files_operation(request: MultipleFileOperationRequest):
+def forget_multiple_files_operation(request: MultipleFileOperationRequest):
     """Remove multiple files from the search index"""
     results = []
     errors = []
@@ -461,7 +457,7 @@ async def forget_multiple_files_operation(request: MultipleFileOperationRequest)
 
         for file_path in request.file_paths:
             try:
-                success, message = await forget_file_from_index(file_path, typesense_client)
+                success, message = forget_file_from_index(file_path, typesense_client)
 
                 if success:
                     results.append(file_path)

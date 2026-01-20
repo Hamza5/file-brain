@@ -5,7 +5,7 @@ Handles critical and background initialization for File Brain services.
 Extracted from main.py to improve maintainability.
 """
 
-import asyncio
+import time
 
 from file_brain.core.config import settings
 from file_brain.core.logging import logger
@@ -16,7 +16,7 @@ from file_brain.services.service_manager import get_service_manager
 from file_brain.services.typesense_client import get_typesense_client
 
 
-async def register_all_health_checkers():
+def register_all_health_checkers():
     """
     Register health check functions for all services at startup.
     This makes health checks work independently of wizard completion.
@@ -24,7 +24,7 @@ async def register_all_health_checkers():
     service_manager = get_service_manager()
 
     # Database health check
-    async def database_health_check():
+    def database_health_check():
         try:
             from sqlalchemy import text
 
@@ -37,10 +37,10 @@ async def register_all_health_checkers():
     service_manager.register_health_checker("database", database_health_check)
 
     # Typesense health check
-    async def typesense_health_check():
+    def typesense_health_check():
         try:
             typesense = get_typesense_client()
-            await typesense.get_collection_stats()
+            typesense.get_collection_stats()
             return {"healthy": True, "collection": typesense.collection_name}
         except Exception as e:
             return {"healthy": False, "error": str(e)}
@@ -50,26 +50,23 @@ async def register_all_health_checkers():
     # Tika health check
     if settings.tika_enabled:
 
-        async def tika_health_check():
+        def tika_health_check():
             try:
-                import aiohttp
+                import httpx
 
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        f"{settings.tika_url}/version",
-                        timeout=aiohttp.ClientTimeout(total=30),
-                    ) as response:
-                        if response.status == 200:
-                            return {
-                                "healthy": True,
-                                "endpoint": settings.tika_url,
-                                "client_only": settings.tika_client_only,
-                            }
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.get(f"{settings.tika_url}/version")
+                    if response.status_code == 200:
                         return {
-                            "healthy": False,
-                            "error": f"Tika server returned status {response.status}",
+                            "healthy": True,
+                            "endpoint": settings.tika_url,
+                            "client_only": settings.tika_client_only,
                         }
-            except asyncio.TimeoutError:
+                    return {
+                        "healthy": False,
+                        "error": f"Tika server returned status {response.status_code}",
+                    }
+            except httpx.TimeoutException:
                 # On timeout, mark as busy rather than failed
                 # Tika may be processing large files and unable to respond to health checks
                 return {
@@ -85,7 +82,7 @@ async def register_all_health_checkers():
         service_manager.set_disabled("tika", "Tika extraction disabled in settings")
 
     # Crawl manager health check
-    async def crawl_manager_health_check():
+    def crawl_manager_health_check():
         try:
             crawl_manager = get_crawl_job_manager()
             return {"healthy": True, "running": crawl_manager.is_running()}
@@ -97,7 +94,7 @@ async def register_all_health_checkers():
     logger.info("✅ All health checkers registered")
 
 
-async def critical_init():
+def critical_init():
     """
     Critical initialization that MUST complete before FastAPI startup.
     Initializes database and starts Docker containers if wizard is completed.
@@ -111,7 +108,7 @@ async def critical_init():
             init_default_data(db)
 
         # Register all health checkers at startup
-        await register_all_health_checkers()
+        register_all_health_checkers()
 
         service_manager.set_ready("database", details={"type": "sqlite", "tables": "created"})
         logger.info("✅ Database initialized")
@@ -139,7 +136,7 @@ async def critical_init():
     }
 
 
-async def init_typesense_for_wizard():
+def init_typesense_for_wizard():
     """
     Initialize Typesense for wizard (wizard-controlled).
     Returns success status and error message if any.
@@ -152,7 +149,7 @@ async def init_typesense_for_wizard():
         logger.info("Initializing Typesense...")
         typesense = get_typesense_client()
 
-        await typesense.initialize_collection()
+        typesense.initialize_collection()
         if typesense.collection_ready:
             service_manager.set_ready(
                 "typesense",
@@ -174,7 +171,7 @@ async def init_typesense_for_wizard():
         return {"success": False, "error": error_msg}
 
 
-async def init_tika_for_wizard():
+def init_tika_for_wizard():
     """
     Initialize Tika for wizard (wizard-controlled).
     Returns success status and error message if any.
@@ -208,7 +205,7 @@ async def init_tika_for_wizard():
         return {"success": False, "error": error_msg}
 
 
-async def init_crawl_manager_for_wizard():
+def init_crawl_manager_for_wizard():
     """
     Initialize crawl manager for wizard (wizard-controlled).
     Returns success status and error message if any.
@@ -228,7 +225,7 @@ async def init_crawl_manager_for_wizard():
 
         crawl_manager = get_crawl_job_manager(watch_paths=watch_paths)
 
-        async def crawl_manager_health_check():
+        def crawl_manager_health_check():
             return {"healthy": True, "running": crawl_manager.is_running()}
 
         service_manager.register_health_checker("crawl_manager", crawl_manager_health_check)
@@ -249,7 +246,7 @@ async def init_crawl_manager_for_wizard():
         # Auto-resume if there was a previous crawl
         if watch_paths and previous_state.crawl_job_running:
             logger.info("🔄 Detected previous in-progress crawl job; auto-resuming...")
-            success = await crawl_manager.start_crawl()
+            success = crawl_manager.start_crawl()
             if success:
                 logger.info("✅ Auto-resumed crawl based on previous state.")
             else:
@@ -264,7 +261,7 @@ async def init_crawl_manager_for_wizard():
         return {"success": False, "error": error_msg}
 
 
-async def health_monitoring_loop():
+def health_monitoring_loop():
     """Background health monitoring loop."""
     from file_brain.database.repositories import WizardStateRepository
     from file_brain.services.service_manager import get_service_manager
@@ -278,11 +275,11 @@ async def health_monitoring_loop():
             with db_session() as db:
                 wizard_state = WizardStateRepository(db).get()
                 if not wizard_state or not wizard_state.wizard_completed:
-                    await asyncio.sleep(30)
+                    time.sleep(30)
                     continue
 
-            await service_manager.check_all_services_health()
-            await asyncio.sleep(30)
+            service_manager.check_all_services_health()
+            time.sleep(30)
         except Exception as e:
             logger.error(f"Health monitoring loop error: {e}")
-            await asyncio.sleep(60)
+            time.sleep(60)

@@ -3,7 +3,6 @@ Service State Manager for tracking initialization and health of all services
 Enables instant FastAPI startup with parallel background initialization
 """
 
-import asyncio
 import threading
 import time
 from dataclasses import dataclass, field
@@ -96,7 +95,7 @@ class ServiceManager:
         }
         self._lock = threading.RLock()
         self._health_checkers: Dict[str, callable] = {}
-        self._initialization_tasks: Dict[str, asyncio.Task] = {}
+        self._initialization_threads: Dict[str, threading.Thread] = {}
 
     def register_health_checker(self, service_name: str, checker: callable):
         """Register a health check function for a service"""
@@ -260,7 +259,7 @@ class ServiceManager:
                 status.error_message = None
                 logger.info(f"Service {service_name} reset for retry")
 
-    async def check_service_health(self, service_name: str) -> Dict[str, Any]:
+    def check_service_health(self, service_name: str) -> Dict[str, Any]:
         """Perform health check for a specific service"""
         with self._lock:
             if service_name not in self._services:
@@ -317,7 +316,7 @@ class ServiceManager:
             if service_name in self._health_checkers:
                 try:
                     checker = self._health_checkers[service_name]
-                    result = await checker()
+                    result = checker()
 
                     if result.get("healthy", False):
                         # Check if service is busy (healthy but unresponsive)
@@ -354,11 +353,11 @@ class ServiceManager:
                     "retry_count": status.retry_count,
                 }
 
-    async def check_all_services_health(self) -> Dict[str, Any]:
+    def check_all_services_health(self) -> Dict[str, Any]:
         """Check health of all services"""
         results = {}
         for service_name in self._services.keys():
-            results[service_name] = await self.check_service_health(service_name)
+            results[service_name] = self.check_service_health(service_name)
 
         # Calculate overall system health
         healthy_count = sum(1 for result in results.values() if result.get("status") == "healthy")
@@ -419,13 +418,19 @@ class ServiceManager:
                     self._services[service_name] = ServiceStatus(user_friendly_name=service_name)
                 self._services[service_name].dependencies = dependencies
 
-        # Create and store the initialization task
-        task = asyncio.create_task(self._initialize_service_background(service_name, init_func))
+        # Create and start the initialization thread
+        thread = threading.Thread(
+            target=self._initialize_service_background,
+            args=(service_name, init_func),
+            daemon=True,
+            name=f"init_{service_name}",
+        )
+        thread.start()
         with self._lock:
-            self._initialization_tasks[service_name] = task
+            self._initialization_threads[service_name] = thread
 
-    async def _initialize_service_background(self, service_name: str, init_func: callable):
-        """Background task to initialize a service"""
+    def _initialize_service_background(self, service_name: str, init_func: callable):
+        """Background thread to initialize a service"""
         try:
             logger.info(f"Starting background initialization for {service_name}")
             self.set_initializing(service_name)
@@ -443,7 +448,7 @@ class ServiceManager:
                 # Wait for dependencies with timeout
                 start_wait = time.time()
                 while time.time() - start_wait < 60:  # 60s timeout for dependencies
-                    await asyncio.sleep(1)
+                    time.sleep(1)
                     dep_status = self.get_dependency_status(service_name)
                     if dep_status["ready"]:
                         break
@@ -454,11 +459,8 @@ class ServiceManager:
 
             self.set_service_phase(service_name, "Initializing", 10, "Starting initialization sequence")
 
-            # Run the initialization function
-            if asyncio.iscoroutinefunction(init_func):
-                result = await init_func()
-            else:
-                result = init_func()
+            # Run the initialization function (now always sync)
+            result = init_func()
 
             self.set_ready(service_name, details={"initialization_result": result})
             logger.info(f"Background initialization completed for {service_name}")
@@ -469,12 +471,12 @@ class ServiceManager:
             self.set_failed(service_name, error_msg)
 
         finally:
-            # Clean up the task
+            # Clean up the thread
             with self._lock:
-                if service_name in self._initialization_tasks:
-                    del self._initialization_tasks[service_name]
+                if service_name in self._initialization_threads:
+                    del self._initialization_threads[service_name]
 
-    async def wait_for_service(self, service_name: str, timeout: float = 30.0) -> bool:
+    def wait_for_service(self, service_name: str, timeout: float = 30.0) -> bool:
         """Wait for a service to become ready with timeout"""
         start_time = time.time()
         while time.time() - start_time < timeout:
@@ -484,7 +486,7 @@ class ServiceManager:
             elif status and status.state == ServiceState.FAILED:
                 return False
 
-            await asyncio.sleep(0.5)  # Check every 500ms
+            time.sleep(0.5)  # Check every 500ms
 
         return False
 

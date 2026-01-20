@@ -93,7 +93,7 @@ class StartupCheckResponse(BaseModel):
 
 
 @router.get("/status", response_model=WizardStatusResponse)
-async def get_wizard_status():
+def get_wizard_status():
     """Get current wizard completion status"""
     try:
         with db_session() as db:
@@ -127,7 +127,7 @@ async def get_wizard_status():
 
 
 @router.get("/startup-check", response_model=StartupCheckResponse)
-async def check_startup_requirements():
+def check_startup_requirements():
     """
     Perform comprehensive startup checks to determine if wizard is needed.
 
@@ -142,7 +142,7 @@ async def check_startup_requirements():
         from file_brain.core.telemetry import telemetry
 
         checker = get_startup_checker()
-        result = await checker.perform_all_checks()
+        result = checker.perform_all_checks()
 
         # Track wizard start if needed
         if result.needs_wizard:
@@ -203,7 +203,7 @@ async def check_startup_requirements():
 
 
 @router.get("/docker-check", response_model=DockerCheckResponse)
-async def check_docker():
+def check_docker():
     """Check if Docker/Podman is installed"""
     try:
         from file_brain.core.telemetry import telemetry
@@ -239,25 +239,26 @@ async def check_docker():
 
 
 @router.get("/docker-images-check")
-async def check_docker_images():
+def check_docker_images():
     """Check if required docker images are present locally"""
     try:
         docker_manager = get_docker_manager()
-        return await docker_manager.check_required_images()
+        return docker_manager.check_required_images()
     except Exception as e:
         logger.error(f"Error checking docker images: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/docker-pull")
-async def pull_docker_images():
+def pull_docker_images():
     """Pull docker images with real progress updates via SSE"""
     import json
-    from asyncio import Queue
+    import queue
+    import threading
 
     docker_manager = get_docker_manager()
 
-    async def event_generator():
+    def event_generator():
         """Generate SSE events from docker pull progress"""
 
         # Check if docker is available
@@ -266,30 +267,27 @@ async def pull_docker_images():
             return
 
         # Use a queue to collect progress events
-        progress_queue: Queue = Queue()
-        pull_complete = False
-        pull_error = None
+        progress_queue = queue.Queue()
+        pull_complete = threading.Event()
+        pull_error = [None]  # Use list to allow modification in nested function
 
-        async def progress_callback(data: dict):
+        def progress_callback(data: dict):
             """Callback for each progress event"""
-            await progress_queue.put(data)
+            progress_queue.put(data)
 
-        # Start pull in background task
-        import asyncio
-
-        async def do_pull():
-            nonlocal pull_complete, pull_error
+        # Start pull in background thread
+        def do_pull():
             try:
                 from file_brain.core.telemetry import telemetry
 
                 logger.info("Starting docker pull...")
                 start_time = time.time()
-                result = await docker_manager.pull_images_with_progress(progress_callback)
+                result = docker_manager.pull_images_with_progress(progress_callback)
                 duration = time.time() - start_time
                 logger.info(f"Docker pull completed: {result}")
 
                 if not result.get("success"):
-                    pull_error = result.get("error")
+                    pull_error[0] = result.get("error")
                 else:
                     # Track successful docker pull
                     telemetry.capture_event(
@@ -300,27 +298,28 @@ async def pull_docker_images():
                         },
                     )
 
-                pull_complete = True
-                await progress_queue.put(None)  # Signal completion
+                pull_complete.set()
+                progress_queue.put(None)  # Signal completion
             except Exception as e:
                 logger.error(f"Docker pull error: {e}", exc_info=True)
-                pull_error = str(e)
-                pull_complete = True
-                await progress_queue.put(None)
+                pull_error[0] = str(e)
+                pull_complete.set()
+                progress_queue.put(None)
 
-        asyncio.create_task(do_pull())
+        thread = threading.Thread(target=do_pull, daemon=True)
+        thread.start()
 
         # Stream progress events
         logger.info("Starting SSE stream...")
         while True:
             try:
-                data = await asyncio.wait_for(progress_queue.get(), timeout=60.0)
+                data = progress_queue.get(timeout=60.0)
                 if data is None:  # Completion signal
-                    if pull_error:
-                        yield "data: " + json.dumps({"error": pull_error}) + "\n\n"
+                    if pull_error[0]:
+                        yield "data: " + json.dumps({"error": pull_error[0]}) + "\n\n"
                     break
                 yield "data: " + json.dumps({**data, "timestamp": time.time()}) + "\n\n"
-            except asyncio.TimeoutError:
+            except queue.Empty:
                 yield "data: " + json.dumps({"heartbeat": True}) + "\n\n"
             except Exception as e:
                 logger.error(f"Error streaming docker pull: {e}")
@@ -338,7 +337,7 @@ async def pull_docker_images():
 
 
 @router.post("/docker-start", response_model=DockerStartResponse)
-async def start_docker_services():
+def start_docker_services():
     """Start docker-compose services"""
     try:
         from file_brain.core.telemetry import telemetry
@@ -353,7 +352,7 @@ async def start_docker_services():
             )
 
         # Start services
-        result = await docker_manager.start_services()
+        result = docker_manager.start_services()
 
         # Update wizard state if successful
         if result.get("success"):
@@ -381,11 +380,11 @@ async def start_docker_services():
 
 
 @router.get("/docker-status", response_model=DockerStatusResponse)
-async def get_docker_status():
+def get_docker_status():
     """Get status of docker-compose services"""
     try:
         docker_manager = get_docker_manager()
-        result = await docker_manager.get_services_status()
+        result = docker_manager.get_services_status()
 
         # Update wizard state if services are running
         if result.get("running"):
@@ -406,11 +405,17 @@ async def get_docker_status():
 
 
 @router.get("/docker-logs")
-async def stream_docker_logs():
+def stream_docker_logs():
     """Stream docker-compose logs via Server-Sent Events"""
 
-    async def event_generator():
+    def event_generator():
         """Generate SSE events from docker logs"""
+
+        import json
+        import queue
+        import threading
+        import time
+
         docker_manager = get_docker_manager()
 
         try:
@@ -419,15 +424,38 @@ async def stream_docker_logs():
                 yield "data: {'error': 'Docker/Podman not found'}\n\n"
                 return
 
-            async def log_callback(log_line: str):
-                """Callback for each log line"""
-                # Send as SSE event
-                import json
+            # Use a queue to communicate between threads
+            log_queue = queue.Queue()
+            stream_complete = threading.Event()
 
-                yield f"data: {json.dumps({'log': log_line, 'timestamp': time.time()})}\n\n"
+            def log_callback(log_line: str):
+                """Callback for each log line - runs in thread"""
+                log_queue.put(log_line)
 
-            # Stream logs
-            await docker_manager.stream_all_logs(log_callback)
+            def stream_thread():
+                """Thread to run synchronous stream_all_logs"""
+                try:
+                    docker_manager.stream_all_logs(log_callback)
+                except Exception as e:
+                    logger.error(f"Error in stream thread: {e}")
+                    log_queue.put(None)  # Signal error/completion
+                finally:
+                    stream_complete.set()
+
+            # Start streaming in background thread
+            thread = threading.Thread(target=stream_thread, daemon=True)
+            thread.start()
+
+            # Stream logs from queue
+            while not stream_complete.is_set() or not log_queue.empty():
+                try:
+                    log_line = log_queue.get(timeout=0.1)
+                    if log_line is None:
+                        break
+                    yield f"data: {json.dumps({'log': log_line, 'timestamp': time.time()})}\n\n"
+                except queue.Empty:
+                    time.sleep(0.05)
+                    continue
 
         except Exception as e:
             logger.error(f"Error streaming docker logs: {e}")
@@ -455,7 +483,7 @@ class ModelStatusResponse(BaseModel):
 
 
 @router.get("/model-status", response_model=ModelStatusResponse)
-async def get_model_status():
+def get_model_status():
     """Check if embedding model is already downloaded"""
     try:
         from file_brain.services.model_downloader import get_model_downloader
@@ -475,16 +503,15 @@ async def get_model_status():
 
 
 @router.get("/model-download")
-async def download_model():
+def download_model():
     """Download embedding model with progress updates via SSE"""
     import json
-    from asyncio import Queue
 
     from file_brain.services.model_downloader import get_model_downloader
 
     downloader = get_model_downloader()
 
-    async def event_generator():
+    def event_generator():
         """Generate SSE events from model download progress"""
 
         # First check if model already exists
@@ -505,30 +532,30 @@ async def download_model():
             return
 
         # Use a queue to collect progress events
-        progress_queue: Queue = Queue()
-        download_complete = False
-        download_error = None
+        import queue
+        import threading
 
-        async def progress_callback(data: dict):
+        progress_queue = queue.Queue()
+        download_complete = threading.Event()
+        download_error = [None]  # Use list to allow modification in nested function
+
+        def progress_callback(data: dict):
             """Callback for each progress event"""
-            await progress_queue.put(data)
+            progress_queue.put(data)
 
-        # Start download in background task
-        import asyncio
-
-        async def do_download():
-            nonlocal download_complete, download_error
+        # Start download in background thread
+        def do_download():
             try:
                 from file_brain.core.telemetry import telemetry
 
                 logger.info("Starting model download...")
                 start_time = time.time()
-                result = await downloader.download_model_with_progress(progress_callback)
+                result = downloader.download_model_with_progress(progress_callback)
                 duration = time.time() - start_time
                 logger.info(f"Model download completed: {result}")
 
                 if not result.get("success"):
-                    download_error = result.get("error")
+                    download_error[0] = result.get("error")
                 else:
                     # Track successful model download
                     telemetry.capture_event(
@@ -539,27 +566,28 @@ async def download_model():
                         },
                     )
 
-                download_complete = True
-                await progress_queue.put(None)  # Signal completion
+                download_complete.set()
+                progress_queue.put(None)  # Signal completion
             except Exception as e:
                 logger.error(f"Model download error: {e}", exc_info=True)
-                download_error = str(e)
-                download_complete = True
-                await progress_queue.put(None)
+                download_error[0] = str(e)
+                download_complete.set()
+                progress_queue.put(None)
 
-        asyncio.create_task(do_download())
+        thread = threading.Thread(target=do_download, daemon=True)
+        thread.start()
 
         # Stream progress events
         logger.info("Starting model download SSE stream...")
         while True:
             try:
-                data = await asyncio.wait_for(progress_queue.get(), timeout=120.0)
+                data = progress_queue.get(timeout=120.0)
                 if data is None:  # Completion signal
-                    if download_error:
-                        yield "data: " + json.dumps({"error": download_error}) + "\n\n"
+                    if download_error[0]:
+                        yield "data: " + json.dumps({"error": download_error[0]}) + "\n\n"
                     break
                 yield "data: " + json.dumps({**data, "timestamp": time.time()}) + "\n\n"
-            except asyncio.TimeoutError:
+            except queue.Empty:
                 yield "data: " + json.dumps({"heartbeat": True}) + "\n\n"
             except Exception as e:
                 logger.error(f"Error streaming model download: {e}")
@@ -577,11 +605,11 @@ async def download_model():
 
 
 @router.post("/collection-create", response_model=CollectionCreateResponse)
-async def create_collection():
+def create_collection():
     """Create Typesense collection (non-blocking - runs in background)"""
-    import asyncio
+    import threading
 
-    async def _create_collection_task():
+    def _create_collection_task():
         """Background task to create collection"""
         from file_brain.core.telemetry import telemetry
         from file_brain.services.service_manager import get_service_manager
@@ -594,7 +622,7 @@ async def create_collection():
             typesense = get_typesense_client()
 
             # Initialize collection
-            await typesense.initialize_collection()
+            typesense.initialize_collection()
 
             # Check if collection is ready
             if typesense.collection_ready:
@@ -617,8 +645,9 @@ async def create_collection():
             logger.error(f"Error creating collection: {e}", exc_info=True)
             telemetry.capture_exception(e)
 
-    # Start the background task
-    asyncio.create_task(_create_collection_task())
+    # Start the background thread
+    thread = threading.Thread(target=_create_collection_task, daemon=True)
+    thread.start()
 
     # Return immediately
     return CollectionCreateResponse(
@@ -628,20 +657,20 @@ async def create_collection():
 
 
 @router.get("/collection-status", response_model=CollectionStatusResponse)
-async def get_collection_status():
+def get_collection_status():
     """Get status of Typesense collection"""
     try:
         typesense = get_typesense_client()
 
         # Check if collection exists
         # We explicitly check against Typesense instead of relying on the local flag
-        ready = await typesense.check_collection_exists()
+        ready = typesense.check_collection_exists()
 
         # Get document count if available
         doc_count = None
         if ready:
             try:
-                result = await typesense.get_stats()
+                result = typesense.get_stats()
                 doc_count = result.get("totals", {}).get("indexed", 0)
             except Exception:
                 pass
@@ -661,10 +690,10 @@ async def get_collection_status():
 
 
 @router.post("/restart-typesense")
-async def restart_typesense():
+def restart_typesense():
     """Restart Typesense container with fresh volume to recover from errors"""
-    import asyncio
     import shutil
+    import subprocess
 
     from file_brain.core.paths import app_paths
 
@@ -702,17 +731,11 @@ async def restart_typesense():
 
         # Stop container first
         logger.info("Stopping Typesense...")
-        proc = await asyncio.create_subprocess_exec(
-            *stop_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        await proc.communicate()
+        subprocess.run(stop_cmd, capture_output=True, check=False)
 
         # Remove container
         logger.info("Removing Typesense container...")
-        proc = await asyncio.create_subprocess_exec(
-            *rm_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        await proc.communicate()
+        subprocess.run(rm_cmd, capture_output=True, check=False)
 
         # Clear the bind-mounted data directory (except models)
         # Since we now use a bind mount, we need to clear the host directory
@@ -735,13 +758,10 @@ async def restart_typesense():
                         logger.warning(f"Failed to remove {item}: {e}")
 
         logger.info("Starting fresh Typesense...")
-        proc = await asyncio.create_subprocess_exec(
-            *start_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await proc.communicate()
+        result = subprocess.run(start_cmd, capture_output=True, text=True)
 
-        if proc.returncode != 0:
-            error_msg = stderr.decode().strip()
+        if result.returncode != 0:
+            error_msg = result.stderr.strip()
             logger.error(f"Failed to restart Typesense: {error_msg}")
             return {"success": False, "error": error_msg}
 
@@ -754,12 +774,12 @@ async def restart_typesense():
 
 
 @router.get("/collection-logs")
-async def stream_collection_logs():
+def stream_collection_logs():
     """Stream Typesense Docker container logs via SSE"""
-    import asyncio
+
     import json
 
-    async def event_generator():
+    def event_generator():
         """Generate SSE events from Typesense container logs"""
         docker_manager = get_docker_manager()
 
@@ -782,29 +802,22 @@ async def stream_collection_logs():
             ]
 
             # Start streaming logs
-            proc = await asyncio.create_subprocess_exec(
-                *logs_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
-            )
+            import subprocess
+
+            proc = subprocess.Popen(logs_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             # Stream output line by line
-            while True:
-                line = await proc.stdout.readline()
-                if not line:
-                    break
-
-                log_line = line.decode().strip()
+            for line in proc.stdout:
+                log_line = line.strip()
                 if log_line:
                     yield f"data: {json.dumps({'log': log_line, 'timestamp': time.time()})}\n\n"
 
-        except asyncio.CancelledError:
-            logger.info("Collection logs stream cancelled")
-            if proc:
-                proc.terminate()
-                await proc.wait()
-            raise
         except Exception as e:
             logger.error(f"Error streaming collection logs: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            if "proc" in locals():
+                proc.terminate()
 
     return StreamingResponse(
         event_generator(),
@@ -818,7 +831,7 @@ async def stream_collection_logs():
 
 
 @router.post("/complete")
-async def complete_wizard():
+def complete_wizard():
     """Mark wizard as complete"""
     try:
         from file_brain.core.telemetry import telemetry
@@ -862,7 +875,7 @@ async def complete_wizard():
 
 
 @router.post("/reset")
-async def reset_wizard():
+def reset_wizard():
     """Reset wizard state (for testing/debugging)"""
     try:
         with db_session() as db:
@@ -885,15 +898,15 @@ async def reset_wizard():
 
 
 @router.post("/app-containers-start")
-async def start_app_containers():
+def start_app_containers():
     """
     Start Docker containers for the main app (after wizard is completed).
     This is called when the app loads to start containers in the background.
-    Returns immediately while containers start asynchronously.
+    Returns immediately while containers start in background thread.
     """
-    import asyncio
+    import threading
 
-    async def _start_containers_task():
+    def _start_containers_task():
         """Background task to start containers"""
         try:
             docker_manager = get_docker_manager()
@@ -903,7 +916,7 @@ async def start_app_containers():
                 return
 
             logger.info("Starting app containers in background...")
-            result = await docker_manager.start_services()
+            result = docker_manager.start_services()
 
             if result.get("success"):
                 logger.info("✅ App containers started successfully")
@@ -913,8 +926,9 @@ async def start_app_containers():
         except Exception as e:
             logger.error(f"Error in app container startup task: {e}", exc_info=True)
 
-    # Start the background task
-    asyncio.create_task(_start_containers_task())
+    # Start the background thread
+    thread = threading.Thread(target=_start_containers_task, daemon=True)
+    thread.start()
 
     # Return immediately
     return {
@@ -925,15 +939,15 @@ async def start_app_containers():
 
 
 @router.get("/app-containers-status")
-async def stream_app_containers_status():
+def stream_app_containers_status():
     """
     Stream container startup status via SSE.
     Provides real-time updates on container health until all are ready.
     """
-    import asyncio
+
     import json
 
-    async def event_generator():
+    def event_generator():
         """Generate SSE events for container status"""
         docker_manager = get_docker_manager()
 
@@ -952,11 +966,11 @@ async def stream_app_containers_status():
             # Give containers a moment to initialize before first check
             # Docker compose up returns before containers are fully ready
             logger.info("Waiting 3 seconds for containers to initialize...")
-            await asyncio.sleep(3)
+            time.sleep(3)
 
             while True:  # Infinite retry loop
                 try:
-                    status_result = await docker_manager.get_services_status()
+                    status_result = docker_manager.get_services_status()
 
                     # Send status update
                     status_data = {
@@ -985,14 +999,14 @@ async def stream_app_containers_status():
                         )
 
                     # Wait before next check with exponential backoff
-                    await asyncio.sleep(delay)
+                    time.sleep(delay)
                     check_count += 1
 
                 except Exception as e:
                     logger.error(f"Error checking container status: {e}")
                     # Don't break on errors, just log and retry after a delay
                     yield f"data: {json.dumps({'error': str(e), 'retrying': True})}\n\n"
-                    await asyncio.sleep(5)  # Wait 5 seconds before retrying after error
+                    time.sleep(5)  # Wait 5 seconds before retrying after error
 
             # No timeout - loop continues until containers are healthy or stream is closed
 

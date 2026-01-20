@@ -2,7 +2,7 @@
 Unit tests for StartupChecker service.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,8 +14,8 @@ def mock_docker_manager():
     """Mock docker manager for testing."""
     manager = MagicMock()
     manager.get_docker_info = MagicMock()
-    manager.check_required_images = AsyncMock()
-    manager.get_services_status = AsyncMock()
+    manager.check_required_images = MagicMock()
+    manager.get_services_status = MagicMock()
     return manager
 
 
@@ -31,7 +31,7 @@ def mock_model_downloader():
 def mock_typesense_client():
     """Mock typesense client for testing."""
     client = MagicMock()
-    client.check_collection_exists = AsyncMock()
+    client.check_collection_exists = MagicMock()
     return client
 
 
@@ -77,8 +77,7 @@ def startup_checker(mock_docker_manager, mock_model_downloader, mock_typesense_c
 # ============================================================================
 
 
-@pytest.mark.asyncio
-async def test_check_docker_available_success(startup_checker, mock_docker_manager):
+def test_check_docker_available_success(startup_checker, mock_docker_manager):
     """Docker check passes when Docker is available."""
     mock_docker_manager.get_docker_info.return_value = {
         "available": True,
@@ -86,28 +85,26 @@ async def test_check_docker_available_success(startup_checker, mock_docker_manag
         "version": "27.0.1",
     }
 
-    result = await startup_checker.check_docker_available()
+    result = startup_checker.check_docker_available()
 
     assert result.passed is True
     assert "docker 27.0.1" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_docker_available_failure(startup_checker, mock_docker_manager):
+def test_check_docker_available_failure(startup_checker, mock_docker_manager):
     """Docker check fails when Docker is not available."""
     mock_docker_manager.get_docker_info.return_value = {
         "available": False,
         "error": "Command not found",
     }
 
-    result = await startup_checker.check_docker_available()
+    result = startup_checker.check_docker_available()
 
     assert result.passed is False
     assert "not available" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_docker_images_success(startup_checker, mock_docker_manager):
+def test_check_docker_images_success(startup_checker, mock_docker_manager):
     """Images check passes when all images are present."""
     mock_docker_manager.check_required_images.return_value = {
         "success": True,
@@ -115,14 +112,13 @@ async def test_check_docker_images_success(startup_checker, mock_docker_manager)
         "missing": [],
     }
 
-    result = await startup_checker.check_docker_images()
+    result = startup_checker.check_docker_images()
 
     assert result.passed is True
     assert "All required images present" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_docker_images_failure(startup_checker, mock_docker_manager):
+def test_check_docker_images_failure(startup_checker, mock_docker_manager):
     """Images check fails when images are missing."""
     mock_docker_manager.check_required_images.return_value = {
         "success": True,
@@ -130,28 +126,26 @@ async def test_check_docker_images_failure(startup_checker, mock_docker_manager)
         "missing": ["hamza5/tika:latest-full", "hamza5/typesense-gpu:29.0"],
     }
 
-    result = await startup_checker.check_docker_images()
+    result = startup_checker.check_docker_images()
 
     assert result.passed is False
     assert "2 image(s) missing" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_services_healthy_success(startup_checker, mock_docker_manager):
+def test_check_services_healthy_success(startup_checker, mock_docker_manager):
     """Services check passes when all services are healthy."""
     mock_docker_manager.get_services_status.return_value = {
         "healthy": True,
         "running": True,
     }
 
-    result = await startup_checker.check_services_healthy()
+    result = startup_checker.check_services_healthy()
 
     assert result.passed is True
     assert "All services healthy" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_services_healthy_running_not_healthy(startup_checker, mock_docker_manager):
+def test_check_services_healthy_running_not_healthy(startup_checker, mock_docker_manager):
     """Services check fails when services are running but not healthy."""
     mock_docker_manager.get_services_status.return_value = {
         "healthy": False,
@@ -159,93 +153,86 @@ async def test_check_services_healthy_running_not_healthy(startup_checker, mock_
     }
     # Skip service start step - app will start services automatically
     # Only show this step if explicitly needed (which it never is now)
-    result = await startup_checker.check_services_healthy()
+    result = startup_checker.check_services_healthy()
 
     assert result.passed is False
     assert "running but not healthy" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_services_healthy_not_running(startup_checker, mock_docker_manager):
+def test_check_services_healthy_not_running(startup_checker, mock_docker_manager):
     """Services check fails when services are not running."""
     mock_docker_manager.get_services_status.return_value = {
         "healthy": False,
         "running": False,
     }
 
-    result = await startup_checker.check_services_healthy()
+    result = startup_checker.check_services_healthy()
 
     assert result.passed is False
     assert "not running" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_model_downloaded_success(startup_checker, mock_model_downloader):
+def test_check_model_downloaded_success(startup_checker, mock_model_downloader):
     """Model check passes when model exists."""
     mock_model_downloader.check_model_exists.return_value = {
         "exists": True,
         "missing_files": [],
     }
 
-    result = await startup_checker.check_model_downloaded()
+    result = startup_checker.check_model_downloaded()
 
     assert result.passed is True
     assert "ready" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_model_downloaded_failure(startup_checker, mock_model_downloader):
+def test_check_model_downloaded_failure(startup_checker, mock_model_downloader):
     """Model check fails when model files are missing."""
     mock_model_downloader.check_model_exists.return_value = {
         "exists": False,
         "missing_files": ["model.safetensors", "config.json", "tokenizer.json"],
     }
 
-    result = await startup_checker.check_model_downloaded()
+    result = startup_checker.check_model_downloaded()
 
     assert result.passed is False
     assert "3 model file(s) missing" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_collection_ready_success(startup_checker, mock_typesense_client):
+def test_check_collection_ready_success(startup_checker, mock_typesense_client):
     """Collection check passes when collection exists."""
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.check_collection_ready()
+    result = startup_checker.check_collection_ready()
 
     assert result.passed is True
     assert "exists" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_collection_ready_failure(startup_checker, mock_typesense_client):
+def test_check_collection_ready_failure(startup_checker, mock_typesense_client):
     """Collection check fails when collection doesn't exist."""
     mock_typesense_client.check_collection_exists.return_value = False
 
-    result = await startup_checker.check_collection_ready()
+    result = startup_checker.check_collection_ready()
 
     assert result.passed is False
     assert "not found" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_schema_current_success(startup_checker, mock_typesense_client):
+def test_check_schema_current_success(startup_checker, mock_typesense_client):
     """Schema check passes when collection exists (basic implementation)."""
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.check_schema_current()
+    result = startup_checker.check_schema_current()
 
     assert result.passed is True
     assert "Schema version" in result.message
 
 
-@pytest.mark.asyncio
-async def test_check_schema_current_no_collection(startup_checker, mock_typesense_client):
+def test_check_schema_current_no_collection(startup_checker, mock_typesense_client):
     """Schema check fails when collection doesn't exist."""
     mock_typesense_client.check_collection_exists.return_value = False
 
-    result = await startup_checker.check_schema_current()
+    result = startup_checker.check_schema_current()
 
     assert result.passed is False
     assert "does not exist" in result.message
@@ -256,8 +243,7 @@ async def test_check_schema_current_no_collection(startup_checker, mock_typesens
 # ============================================================================
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_all_pass(
+def test_perform_all_checks_all_pass(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """All checks pass in ideal scenario."""
@@ -268,7 +254,7 @@ async def test_perform_all_checks_all_pass(
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is True
     assert result.needs_wizard is False
@@ -277,15 +263,14 @@ async def test_perform_all_checks_all_pass(
     assert result.is_upgrade is False
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_docker_missing(startup_checker, mock_docker_manager):
+def test_perform_all_checks_docker_missing(startup_checker, mock_docker_manager):
     """First check fails when Docker is missing."""
     mock_docker_manager.get_docker_info.return_value = {"available": False, "error": "Not found"}
     # Other checks don't matter if Docker is missing
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
     assert result.needs_wizard is False  # Docker missing doesn't trigger wizard on normal runs
@@ -294,8 +279,7 @@ async def test_perform_all_checks_docker_missing(startup_checker, mock_docker_ma
     assert result.is_upgrade is False  # No upgrade if Docker isn't available
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_images_missing(
+def test_perform_all_checks_images_missing(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Images check fails in upgrade scenario."""
@@ -310,7 +294,7 @@ async def test_perform_all_checks_images_missing(
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
     assert result.needs_wizard is False  # Images missing doesn't trigger wizard on normal runs
@@ -319,8 +303,7 @@ async def test_perform_all_checks_images_missing(
     assert result.is_upgrade is True  # Docker available + some checks passed
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_services_not_healthy(
+def test_perform_all_checks_services_not_healthy(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Services check fails when containers are running but unhealthy - wizard should NOT show."""
@@ -330,7 +313,7 @@ async def test_perform_all_checks_services_not_healthy(
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
     # Services running but not healthy should NOT trigger wizard (critical checks passed)
@@ -339,8 +322,7 @@ async def test_perform_all_checks_services_not_healthy(
     assert result.is_upgrade is False  # All critical checks passed
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_services_not_running(
+def test_perform_all_checks_services_not_running(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Services not running should NOT trigger wizard - app will start them automatically."""
@@ -350,7 +332,7 @@ async def test_perform_all_checks_services_not_running(
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False  # Services check failed
     assert result.needs_wizard is False  # But wizard not needed - app will start services
@@ -358,8 +340,7 @@ async def test_perform_all_checks_services_not_running(
     assert result.is_upgrade is False  # All critical checks passed
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_model_missing(
+def test_perform_all_checks_model_missing(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Model check fails when model isn't downloaded."""
@@ -369,7 +350,7 @@ async def test_perform_all_checks_model_missing(
     mock_model_downloader.check_model_exists.return_value = {"exists": False, "missing_files": ["model.safetensors"]}
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
     assert result.needs_wizard is False  # Model missing doesn't trigger wizard on normal runs
@@ -378,8 +359,7 @@ async def test_perform_all_checks_model_missing(
     assert result.is_upgrade is True
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_collection_missing(
+def test_perform_all_checks_collection_missing(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Collection check fails when collection doesn't exist."""
@@ -389,7 +369,7 @@ async def test_perform_all_checks_collection_missing(
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
     mock_typesense_client.check_collection_exists.return_value = False
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     assert result.all_checks_passed is False
     assert result.needs_wizard is False  # Collection missing doesn't trigger wizard on normal runs
@@ -403,8 +383,7 @@ async def test_perform_all_checks_collection_missing(
 # ============================================================================
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_early_exit_wizard_reset(
+def test_perform_all_checks_early_exit_wizard_reset(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Network checks are skipped when wizard was reset."""
@@ -427,7 +406,7 @@ async def test_perform_all_checks_early_exit_wizard_reset(
         mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
         mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
 
-        result = await startup_checker.perform_all_checks()
+        result = startup_checker.perform_all_checks()
 
         # Verify wizard is needed (first run)
         assert result.needs_wizard is True
@@ -440,8 +419,7 @@ async def test_perform_all_checks_early_exit_wizard_reset(
         mock_typesense_client.check_collection_exists.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_early_exit_model_missing(
+def test_perform_all_checks_early_exit_model_missing(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Network checks are skipped when model is missing."""
@@ -449,7 +427,7 @@ async def test_perform_all_checks_early_exit_model_missing(
     mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     # Model missing but wizard was completed - no wizard needed
     assert result.needs_wizard is False
@@ -462,8 +440,7 @@ async def test_perform_all_checks_early_exit_model_missing(
     mock_typesense_client.check_collection_exists.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_early_exit_images_missing(
+def test_perform_all_checks_early_exit_images_missing(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Network checks are skipped when Docker images are missing."""
@@ -475,7 +452,7 @@ async def test_perform_all_checks_early_exit_images_missing(
         "missing": ["hamza5/typesense-gpu:29.0"],
     }
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     # Images missing but wizard was completed - no wizard needed
     assert result.needs_wizard is False
@@ -487,8 +464,7 @@ async def test_perform_all_checks_early_exit_images_missing(
     mock_typesense_client.check_collection_exists.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_perform_all_checks_network_checks_run_when_needed(
+def test_perform_all_checks_network_checks_run_when_needed(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Network checks ARE run when all critical checks pass (wizard might not be needed)."""
@@ -498,7 +474,7 @@ async def test_perform_all_checks_network_checks_run_when_needed(
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
     mock_typesense_client.check_collection_exists.return_value = True
 
-    result = await startup_checker.perform_all_checks()
+    result = startup_checker.perform_all_checks()
 
     # Verify all checks passed
     assert result.all_checks_passed is True

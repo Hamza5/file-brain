@@ -2,7 +2,6 @@
 Typesense client for search operations
 """
 
-import asyncio
 import hashlib
 import time
 from typing import Any, Dict, List, Optional
@@ -38,7 +37,7 @@ class TypesenseClient:
         # Flag to indicate whether the collection is confirmed ready.
         self.collection_ready = False
 
-    async def check_collection_exists(self) -> bool:
+    def check_collection_exists(self) -> bool:
         """
         Check if collection exists in Typesense.
 
@@ -65,7 +64,7 @@ class TypesenseClient:
             logger.info(f"Transient error checking collection: {e}")
             raise  # Let caller handle retry logic
 
-    async def initialize_collection(
+    def initialize_collection(
         self,
         max_attempts: int = 5,
         initial_backoff_seconds: float = 1.0,
@@ -109,8 +108,8 @@ class TypesenseClient:
                     "Checking if search collection exists",
                 )
 
-                # Run blocking SDK call in thread to avoid blocking event loop
-                await asyncio.to_thread(self.client.collections[self.collection_name].retrieve)
+                # Direct SDK call (blocking)
+                self.client.collections[self.collection_name].retrieve()
 
                 service_manager.append_service_log(service_name, f"Collection '{self.collection_name}' already exists")
                 logger.info(f"Collection '{self.collection_name}' already exists (attempt {attempt}/{max_attempts})")
@@ -145,9 +144,8 @@ class TypesenseClient:
                         }
                     )
 
-                    # Use the special client for collection creation
-                    # Run blocking SDK call in thread to avoid blocking event loop
-                    await asyncio.to_thread(collection_creation_client.collections.create, schema)
+                    # Direct SDK call (blocking)
+                    collection_creation_client.collections.create(schema)
 
                     # Log success
                     service_manager.append_service_log(
@@ -199,7 +197,7 @@ class TypesenseClient:
                 wait_msg = f"Retrying in {backoff} seconds..."
                 service_manager.append_service_log(service_name, wait_msg)
                 service_manager.set_service_phase(service_name, "Retrying Connection", 10, wait_msg)
-                await asyncio.sleep(backoff)
+                time.sleep(backoff)
                 backoff *= 2
 
         # If we reach here, all attempts failed.
@@ -229,7 +227,7 @@ class TypesenseClient:
             return f"{base_hash}_chunk_{chunk_index}"
         return base_hash
 
-    async def is_file_indexed(self, file_path: str) -> bool:
+    def is_file_indexed(self, file_path: str) -> bool:
         """Check if file is already indexed"""
         try:
             doc_id = self.generate_doc_id(file_path)
@@ -241,7 +239,7 @@ class TypesenseClient:
             logger.error(f"Error checking if file indexed: {e}")
             return False
 
-    async def get_doc_by_path(self, file_path: str) -> Optional[Dict[str, Any]]:
+    def get_doc_by_path(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
         Get any chunk of an indexed file by its file_path.
 
@@ -261,7 +259,7 @@ class TypesenseClient:
             logger.error(f"Error getting indexed file: {e}")
             return None
 
-    async def index_file(
+    def index_file(
         self,
         file_path: str,
         content: str,
@@ -362,7 +360,7 @@ class TypesenseClient:
             logger.error(f"Error indexing chunk {chunk_index} of {file_path}: {e}")
             raise
 
-    async def remove_from_index(self, file_path: str) -> None:
+    def remove_from_index(self, file_path: str) -> None:
         """
         Remove all chunks of a file from index.
 
@@ -376,7 +374,7 @@ class TypesenseClient:
             logger.error(f"Error removing {file_path}: {e}")
             raise
 
-    async def search_files(
+    def search_files(
         self,
         query: str,
         page: int = 1,
@@ -404,7 +402,7 @@ class TypesenseClient:
             logger.error(f"Search error: {e}")
             raise
 
-    async def get_collection_stats(self) -> Dict[str, Any]:
+    def get_collection_stats(self) -> Dict[str, Any]:
         """
         Get collection statistics.
 
@@ -445,7 +443,7 @@ class TypesenseClient:
                 logger.error(f"Error getting stats: {e}")
             raise
 
-    async def get_file_type_distribution(self) -> Dict[str, int]:
+    def get_file_type_distribution(self) -> Dict[str, int]:
         """
         Get distribution of indexed files by file extension via faceting.
 
@@ -487,7 +485,7 @@ class TypesenseClient:
                 logger.error(f"Error getting file type distribution: {e}")
             return {}
 
-    async def reset_collection(self) -> None:
+    def reset_collection(self) -> None:
         """
         Reset the collection by dropping and recreating it.
 
@@ -527,7 +525,7 @@ class TypesenseClient:
             logger.error(f"Error resetting collection: {e}")
             raise
 
-    async def get_all_indexed_files(self, limit: int = 1000, offset: int = 0) -> List[Dict[str, Any]]:
+    def get_all_indexed_files(self, limit: int = 1000, offset: int = 0) -> List[Dict[str, Any]]:
         """
         Get all indexed files with pagination for verification.
 
@@ -552,7 +550,7 @@ class TypesenseClient:
             logger.error(f"Error getting indexed files: {e}")
             return []
 
-    async def get_indexed_files_count(self) -> int:
+    def get_indexed_files_count(self) -> int:
         """
         Get total count of indexed files (not chunks) for verification progress tracking.
 
@@ -572,7 +570,7 @@ class TypesenseClient:
             logger.error(f"Error getting indexed files count: {e}")
             return 0
 
-    async def batch_remove_files(self, file_paths: List[str]) -> Dict[str, int]:
+    def batch_remove_files(self, file_paths: List[str]) -> Dict[str, int]:
         """
         Remove multiple files from index efficiently.
 

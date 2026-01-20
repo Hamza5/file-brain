@@ -13,11 +13,11 @@ router = APIRouter(prefix="/system", tags=["system"])
 
 
 @router.get("/initialization")
-async def get_initialization_status():
+def get_initialization_status():
     """Get detailed system initialization status"""
     try:
         service_manager = get_service_manager()
-        services_health = await service_manager.check_all_services_health()
+        services_health = service_manager.check_all_services_health()
 
         # Calculate initialization progress
         total_services = len(services_health["services"])
@@ -66,7 +66,7 @@ async def get_initialization_status():
 
 
 @router.get("/services")
-async def get_services_status():
+def get_services_status():
     """Get detailed status of all registered services"""
     try:
         service_manager = get_service_manager()
@@ -75,7 +75,7 @@ async def get_services_status():
         services_status = {}
 
         for service_name, status in all_services.items():
-            health_check = await service_manager.check_service_health(service_name)
+            health_check = service_manager.check_service_health(service_name)
             services_status[service_name] = {
                 "state": status.state.value,
                 "last_check": status.last_check,
@@ -97,7 +97,7 @@ async def get_services_status():
 
 
 @router.post("/services/{service_name}/retry")
-async def retry_service_initialization(service_name: str):
+def retry_service_initialization(service_name: str):
     """Manually retry initialization of a failed service"""
     try:
         from file_brain.services.service_manager import ServiceState
@@ -129,7 +129,7 @@ async def retry_service_initialization(service_name: str):
 
 
 @router.get("/services/{service_name}/logs")
-async def get_service_logs(service_name: str, limit: int = 100):
+def get_service_logs(service_name: str, limit: int = 100):
     """Get initialization logs for a specific service"""
     try:
         service_manager = get_service_manager()

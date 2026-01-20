@@ -8,7 +8,7 @@ Extracted from main.py to improve maintainability.
 import os
 from typing import TYPE_CHECKING
 
-import aiohttp
+import httpx
 from fastapi import Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -43,7 +43,7 @@ def setup_frontend_routes(app: "FastAPI", frontend_dist_path: str):
         return
 
     @app.get("/icon.svg")
-    async def serve_icon():
+    def serve_icon():
         """Serve the application icon."""
         icon_path = os.path.join(frontend_dist_path, "icon.svg")
         if os.path.exists(icon_path):
@@ -51,10 +51,10 @@ def setup_frontend_routes(app: "FastAPI", frontend_dist_path: str):
         return JSONResponse(status_code=404, content={"error": "Icon not found"})
 
     @app.get("/")
-    async def serve_frontend(request: Request):
+    def serve_frontend(request: Request):
         """Serve the frontend index page."""
         if settings.debug:
-            return await proxy_to_vite(request, "")
+            return proxy_to_vite(request, "")
 
         index_path = os.path.join(frontend_dist_path, "index.html")
         if os.path.exists(index_path):
@@ -66,7 +66,7 @@ def setup_frontend_routes(app: "FastAPI", frontend_dist_path: str):
         }
 
     @app.get("/{full_path:path}")
-    async def serve_spa(request: Request, full_path: str):
+    def serve_spa(request: Request, full_path: str):
         """
         Serve the single-page application.
         Handles all routes except for the API.
@@ -77,7 +77,7 @@ def setup_frontend_routes(app: "FastAPI", frontend_dist_path: str):
 
         # Proxy to Vite Dev Server if in debug mode
         if settings.debug:
-            return await proxy_to_vite(request, full_path)
+            return proxy_to_vite(request, full_path)
 
         index_path = os.path.join(frontend_dist_path, "index.html")
         if os.path.exists(index_path):
@@ -93,7 +93,7 @@ def setup_frontend_routes(app: "FastAPI", frontend_dist_path: str):
         )
 
 
-async def proxy_to_vite(request: Request, full_path: str):
+def proxy_to_vite(request: Request, full_path: str):
     """
     Proxy requests to the Vite development server.
 
@@ -108,14 +108,15 @@ async def proxy_to_vite(request: Request, full_path: str):
     if not full_path or full_path == "index.html":
         target_url = settings.frontend_dev_url
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            params = dict(request.query_params)
-            async with session.get(target_url, params=params) as resp:
-                content = await resp.read()
-                from fastapi import Response
+    try:
+        params = dict(request.query_params)
+        with httpx.Client() as client:
+            resp = client.get(target_url, params=params)
+            from fastapi import Response
 
-                return Response(content=content, status_code=resp.status, media_type=resp.content_type)
-        except Exception as e:
-            logger.error(f"Vite proxy error for {full_path}: {e}")
-            return JSONResponse(status_code=502, content={"error": "Vite dev server not accessible"})
+            return Response(
+                content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type")
+            )
+    except Exception as e:
+        logger.error(f"Vite proxy error for {full_path}: {e}")
+        return JSONResponse(status_code=502, content={"error": "Vite dev server not accessible"})

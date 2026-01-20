@@ -2,7 +2,6 @@
 File Monitor Service using Watchdog
 """
 
-import asyncio
 import os
 import time
 from typing import List
@@ -32,11 +31,9 @@ class FileEventHandler(FileSystemEventHandler):
     def __init__(
         self,
         queue: DedupQueue[CrawlOperation],
-        loop: asyncio.AbstractEventLoop,
         path_filter: PathFilter,
     ):
         self.queue = queue
-        self.loop = loop
         self.path_filter = path_filter
         self.last_event_time = {}
         self.cooldown_seconds = 1.0  # Debounce interval
@@ -65,14 +62,14 @@ class FileEventHandler(FileSystemEventHandler):
         try:
             if event_type == "deleted":
                 operation = CrawlOperation(operation=OperationType.DELETE, file_path=file_path, source="watch")
-                asyncio.run_coroutine_threadsafe(self.queue.put(file_path, operation), self.loop)
+                self.queue.put(file_path, operation)
             else:
                 target_path = file_path
                 if isinstance(event, FileMovedEvent):
                     target_path = event.dest_path
                     # Also handle the old path as delete
                     old_path_op = CrawlOperation(operation=OperationType.DELETE, file_path=file_path, source="watch")
-                    asyncio.run_coroutine_threadsafe(self.queue.put(file_path, old_path_op), self.loop)
+                    self.queue.put(file_path, old_path_op)
 
                 if os.path.exists(target_path):
                     # Construct operation for new/modified file
@@ -95,7 +92,7 @@ class FileEventHandler(FileSystemEventHandler):
                             created_time=int(stat.st_ctime * 1000),
                             source="watch",
                         )
-                        asyncio.run_coroutine_threadsafe(self.queue.put(target_path, operation), self.loop)
+                        self.queue.put(target_path, operation)
                     except Exception as e:
                         logger.warning(f"Failed to stat file {target_path}: {e}")
 
@@ -140,12 +137,6 @@ class FileMonitorService:
         self.observer = Observer()
         self.watches = {}
 
-        # Capture the current event loop to pass to the handler
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.get_event_loop()
-
         # Separate included and excluded
         included_paths = [wp for wp in watch_paths if not wp.is_excluded]
         excluded_paths = [wp.path for wp in watch_paths if wp.is_excluded]
@@ -156,7 +147,7 @@ class FileMonitorService:
             excluded_paths=excluded_paths,
         )
 
-        self.handler = FileEventHandler(self.queue, loop, path_filter=path_filter)
+        self.handler = FileEventHandler(self.queue, path_filter=path_filter)
 
         success_count = 0
         for wp in included_paths:

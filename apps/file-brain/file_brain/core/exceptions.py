@@ -40,14 +40,14 @@ def setup_exception_handlers(app: FastAPI):
     """Register global exception handlers"""
 
     @app.exception_handler(AppError)
-    async def app_error_handler(request: Request, exc: AppError):
+    def app_error_handler(request: Request, exc: AppError):
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": exc.message, "details": exc.details},
         )
 
     @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
+    def global_exception_handler(request: Request, exc: Exception):
         logger.error(f"Unhandled exception: {exc}", exc_info=True)
         return JSONResponse(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,

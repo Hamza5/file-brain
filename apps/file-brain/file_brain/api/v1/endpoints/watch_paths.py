@@ -38,7 +38,7 @@ class WatchPathUpdateRequest(BaseModel):
 
 
 @router.get("", response_model=List[WatchPathResponse])
-async def get_watch_paths(
+def get_watch_paths(
     enabled_only: bool = False,
     db: Session = Depends(get_db),
 ):
@@ -68,7 +68,7 @@ async def get_watch_paths(
 
 
 @router.post("", response_model=WatchPathResponse)
-async def create_watch_path(
+def create_watch_path(
     request: WatchPathCreateRequest,
     db: Session = Depends(get_db),
 ):
@@ -120,7 +120,7 @@ async def create_watch_path(
 
 
 @router.delete("", response_model=MessageResponse)
-async def clear_watch_paths(
+def clear_watch_paths(
     db: Session = Depends(get_db),
 ):
     """
@@ -145,7 +145,7 @@ async def clear_watch_paths(
 
 
 @router.put("/{path_id}", response_model=WatchPathResponse)
-async def update_watch_path_by_id(
+def update_watch_path_by_id(
     path_id: int,
     request: WatchPathUpdateRequest,
     db: Session = Depends(get_db),
@@ -179,7 +179,7 @@ async def update_watch_path_by_id(
 
 
 @router.delete("/{path_id}", response_model=MessageResponse)
-async def delete_watch_path_by_id(
+def delete_watch_path_by_id(
     path_id: int,
     db: Session = Depends(get_db),
 ):

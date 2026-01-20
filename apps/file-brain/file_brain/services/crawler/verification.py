@@ -2,8 +2,9 @@
 Index Verification Service
 """
 
-import asyncio
 import os
+import threading
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -34,7 +35,7 @@ class IndexVerifier:
 
     def __init__(self):
         self.typesense = get_typesense_client()
-        self._stop_event = asyncio.Event()
+        self._stop_event = threading.Event()
         self.progress = VerificationProgress()
 
     def stop(self):
@@ -46,14 +47,14 @@ class IndexVerifier:
         self._stop_event.clear()
         self.progress = VerificationProgress()
 
-    async def verify_index(self):
+    def verify_index(self):
         """
         Iterate through all indexed files and verify their existence.
         Yields progress updates.
         """
         try:
             # 1. Get total count for progress tracking
-            total_count = await self.typesense.get_indexed_files_count()
+            total_count = self.typesense.get_indexed_files_count()
             self.progress.total_indexed = total_count
 
             if total_count == 0:
@@ -87,7 +88,7 @@ class IndexVerifier:
                     break
 
                 # Fetch batch of documents
-                documents = await self.typesense.get_all_indexed_files(limit=batch_size, offset=offset)
+                documents = self.typesense.get_all_indexed_files(limit=batch_size, offset=offset)
 
                 if not documents:
                     break
@@ -126,12 +127,12 @@ class IndexVerifier:
                     logger.info(f"Removing {len(orphaned_ids)} orphaned files from index...")
                     # We can use the client to delete by ID or by path.
                     # typeense_client.batch_remove_files takes paths.
-                    await self.typesense.batch_remove_files(orphaned_paths)
+                    self.typesense.batch_remove_files(orphaned_paths)
 
                 offset += len(documents)
 
-                # Yield control to event loop
-                await asyncio.sleep(0.01)
+                # Small delay to avoid tight loop
+                time.sleep(0.01)
 
             self.progress.is_complete = True
             logger.info(

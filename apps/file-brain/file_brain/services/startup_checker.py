@@ -6,7 +6,6 @@ or if the initialization wizard needs to be shown. It replaces the simple DB fla
 approach with actual validation of external conditions.
 """
 
-import asyncio
 from dataclasses import dataclass
 from typing import Optional
 
@@ -148,7 +147,7 @@ class StartupChecker:
         self.model_downloader = get_model_downloader()
         self.typesense_client = get_typesense_client()
 
-    async def check_docker_available(self) -> CheckDetail:
+    def check_docker_available(self) -> CheckDetail:
         """Check if Docker/Podman is installed and accessible"""
         try:
             info = self.docker_manager.get_docker_info()
@@ -163,10 +162,10 @@ class StartupChecker:
             logger.error(f"Error checking Docker availability: {e}")
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
-    async def check_docker_images(self) -> CheckDetail:
+    def check_docker_images(self) -> CheckDetail:
         """Check if required Docker images are present locally"""
         try:
-            result = await self.docker_manager.check_required_images()
+            result = self.docker_manager.check_required_images()
             if result.get("success") and result.get("all_present"):
                 return CheckDetail(passed=True, message="All required images present")
             else:
@@ -177,10 +176,10 @@ class StartupChecker:
             logger.error(f"Error checking Docker images: {e}")
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
-    async def check_services_healthy(self) -> CheckDetail:
+    def check_services_healthy(self) -> CheckDetail:
         """Check if Docker services are running and healthy"""
         try:
-            result = await self.docker_manager.get_services_status()
+            result = self.docker_manager.get_services_status()
             if result.get("healthy"):
                 return CheckDetail(passed=True, message="All services healthy")
             elif result.get("running"):
@@ -191,7 +190,7 @@ class StartupChecker:
             logger.error(f"Error checking service health: {e}")
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
-    async def check_model_downloaded(self) -> CheckDetail:
+    def check_model_downloaded(self) -> CheckDetail:
         """Check if embedding model is downloaded"""
         try:
             status = self.model_downloader.check_model_exists()
@@ -204,7 +203,7 @@ class StartupChecker:
             logger.error(f"Error checking model status: {e}")
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
-    async def check_collection_ready(self) -> CheckDetail:
+    def check_collection_ready(self) -> CheckDetail:
         """
         Check if Typesense collection exists.
 
@@ -213,7 +212,7 @@ class StartupChecker:
         is still initializing.
         """
         try:
-            exists = await self.typesense_client.check_collection_exists()
+            exists = self.typesense_client.check_collection_exists()
             if exists:
                 return CheckDetail(passed=True, message="Collection exists")
             else:
@@ -231,7 +230,7 @@ class StartupChecker:
                 logger.error(f"Error checking collection: {e}")
                 return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
-    async def check_schema_current(self) -> CheckDetail:
+    def check_schema_current(self) -> CheckDetail:
         """
         Check if collection schema matches current version.
 
@@ -247,7 +246,7 @@ class StartupChecker:
             current_version = get_schema_version()
 
             # Check if collection exists
-            exists = await self.typesense_client.check_collection_exists()
+            exists = self.typesense_client.check_collection_exists()
 
             if not exists:
                 return CheckDetail(passed=False, message="Collection does not exist")
@@ -259,7 +258,7 @@ class StartupChecker:
             logger.error(f"Error checking schema version: {e}")
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
 
-    async def check_wizard_reset(self) -> CheckDetail:
+    def check_wizard_reset(self) -> CheckDetail:
         """
         Check if wizard was completed or deliberately reset.
 
@@ -285,7 +284,7 @@ class StartupChecker:
             # If we can't check, assume wizard is completed to avoid unnecessary wizard display
             return CheckDetail(passed=True, message=f"Could not check wizard status: {str(e)}")
 
-    async def perform_all_checks(self) -> StartupCheckResult:
+    def perform_all_checks(self) -> StartupCheckResult:
         """
         Perform all startup checks with smart short-circuiting.
 
@@ -303,8 +302,8 @@ class StartupChecker:
 
         # PHASE 1: Fast local checks (no network required)
         # Check these first because they're instant and might trigger early exit
-        wizard_check = await self.check_wizard_reset()
-        model_check = await self.check_model_downloaded()
+        wizard_check = self.check_wizard_reset()
+        model_check = self.check_model_downloaded()
 
         # EARLY EXIT: If wizard was reset, skip all other checks
         if not wizard_check.passed:
@@ -323,10 +322,10 @@ class StartupChecker:
         if not model_check.passed:
             logger.info("Model missing - skipping network checks for fast startup")
             # Still check Docker availability as it's fast and useful for wizard UI
-            docker_check = await self.check_docker_available()
+            docker_check = self.check_docker_available()
             # Check Docker images too since we're here and it's fast
             if docker_check.passed:
-                images_check = await self.check_docker_images()
+                images_check = self.check_docker_images()
             else:
                 images_check = CheckDetail(passed=True, message="Skipped - Docker not available")
             return StartupCheckResult(
@@ -340,7 +339,7 @@ class StartupChecker:
             )
 
         # PHASE 2: Check Docker availability
-        docker_check = await self.check_docker_available()
+        docker_check = self.check_docker_available()
 
         if not docker_check.passed:
             logger.info("Docker not available - skipping container-dependent checks for fast startup")
@@ -362,7 +361,7 @@ class StartupChecker:
             return check_result
 
         # PHASE 3: Check Docker images (fast, no network)
-        images_check = await self.check_docker_images()
+        images_check = self.check_docker_images()
 
         # EARLY EXIT: If images are missing, wizard is needed - skip network checks
         if not images_check.passed:
@@ -382,27 +381,19 @@ class StartupChecker:
         logger.info("Critical checks passed - running network health checks")
 
         # Check service health first - if unhealthy, skip Typesense checks to avoid timeouts
-        services_check = await self.check_services_healthy()
+        services_check = self.check_services_healthy()
 
         if services_check.passed:
             # Services are healthy - safe to check Typesense
             logger.info("Services healthy - checking Typesense collection and schema")
-            results = await asyncio.gather(
-                self.check_collection_ready(),
-                self.check_schema_current(),
-                return_exceptions=True,
-            )
-
-            # Handle any exceptions from gather
-            def safe_result(idx: int, default_msg: str) -> CheckDetail:
-                result = results[idx]
-                if isinstance(result, Exception):
-                    logger.error(f"Typesense check {idx} raised exception: {result}")
-                    return CheckDetail(passed=False, message=f"Error: {str(result)}")
-                return result
-
-            collection_check = safe_result(0, "Collection check failed")
-            schema_check = safe_result(1, "Schema check failed")
+            # Run checks sequentially
+            try:
+                collection_check = self.check_collection_ready()
+                schema_check = self.check_schema_current()
+            except Exception as e:
+                logger.error(f"Typesense check raised exception: {e}")
+                collection_check = CheckDetail(passed=False, message=f"Error: {str(e)}")
+                schema_check = CheckDetail(passed=False, message=f"Error: {str(e)}")
         else:
             # Services not healthy - skip Typesense checks to avoid connection timeouts
             logger.info("Services not healthy - skipping Typesense checks to avoid timeouts")

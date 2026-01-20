@@ -2,7 +2,6 @@
 Docker Manager Service - Manages docker-compose lifecycle and container monitoring
 """
 
-import asyncio
 import os
 import shutil
 import subprocess
@@ -137,7 +136,7 @@ class DockerManager:
             logger.error(f"Error parsing docker-compose.yml: {e}")
             return []
 
-    async def check_required_images(self) -> Dict[str, any]:
+    def check_required_images(self) -> Dict[str, any]:
         """
         Check if all required images from docker-compose are present locally
 
@@ -162,18 +161,18 @@ class DockerManager:
             else:
                 cmd = ["podman", "images", "--format", "{{.Repository}}:{{.Tag}}"]
 
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
-            stdout, stderr = await process.communicate()
 
-            if process.returncode != 0:
-                logger.error(f"Failed to list images: {stderr.decode()}")
-                return {"success": False, "error": f"Failed to list images: {stderr.decode()}"}
+            if result.returncode != 0:
+                logger.error(f"Failed to list images: {result.stderr}")
+                return {"success": False, "error": f"Failed to list images: {result.stderr}"}
 
-            local_images = set(stdout.decode().strip().split("\n"))
+            local_images = set(result.stdout.strip().split("\n"))
 
             # Also add "latest" tag implicit handling if needed, but safer to match exactly what's in compose
             # Some compose files use short names, docker images might output fulll names.
@@ -210,12 +209,12 @@ class DockerManager:
             logger.error(f"Error checking required images: {e}")
             return {"success": False, "error": str(e)}
 
-    async def pull_images_with_progress(self, progress_callback=None):
+    def pull_images_with_progress(self, progress_callback=None):
         """
         Pull docker images with real progress tracking using Docker SDK
 
         Args:
-            progress_callback: Async callback function(data) where data contains:
+            progress_callback: Callback function(data) where data contains:
                 - image: image being pulled
                 - layer_id: layer being downloaded
                 - status: current status (Pulling, Downloading, Extracting, etc.)
@@ -228,43 +227,41 @@ class DockerManager:
         """
         if not self.docker_cmd:
             if progress_callback:
-                await progress_callback(
-                    {"error": "Docker/Podman not found. Please install Docker or Podman to continue."}
-                )
+                progress_callback({"error": "Docker/Podman not found. Please install Docker or Podman to continue."})
             return {"success": False, "error": "Docker/Podman not found"}
 
         if not self.compose_file.exists():
             if progress_callback:
-                await progress_callback({"error": f"docker-compose.yml not found at {self.compose_file}"})
+                progress_callback({"error": f"docker-compose.yml not found at {self.compose_file}"})
             return {"success": False, "error": "docker-compose.yml not found"}
 
         images = self._get_images_from_compose()
         if not images:
             if progress_callback:
-                await progress_callback({"error": "No images found in docker-compose.yml"})
+                progress_callback({"error": "No images found in docker-compose.yml"})
             return {"success": False, "error": "No images found"}
 
         try:
             # Use appropriate SDK based on detected command
             if self.docker_cmd == "docker":
-                return await self._pull_images_docker_sdk(images, progress_callback)
+                return self._pull_images_docker_sdk(images, progress_callback)
             else:
-                return await self._pull_images_podman_sdk(images, progress_callback)
+                return self._pull_images_podman_sdk(images, progress_callback)
 
         except ImportError as e:
             logger.warning(f"SDK not available ({e}), falling back to CLI")
-            return await self._pull_images_cli(images, progress_callback)
+            return self._pull_images_cli(images, progress_callback)
 
         except Exception as e:
             logger.error(f"Error pulling images: {e}")
             if progress_callback:
-                await progress_callback({"error": str(e)})
+                progress_callback({"error": str(e)})
             return {"success": False, "error": str(e)}
 
-    async def _pull_images_docker_sdk(self, images: List[str], progress_callback=None):
+    def _pull_images_docker_sdk(self, images: List[str], progress_callback=None):
         """Pull images using Docker SDK with progress streaming (non-blocking)"""
-        import asyncio
         import threading
+        import time
         from queue import Queue as ThreadQueue
 
         import docker
@@ -356,7 +353,7 @@ class DockerManager:
         # Stream progress events from queue to callback
         while True:
             # Check queue in a non-blocking way
-            await asyncio.sleep(0.01)  # Small delay to avoid busy-waiting
+            time.sleep(0.01)  # Small delay to avoid busy-waiting
 
             while not progress_queue.empty():
                 try:
@@ -370,13 +367,13 @@ class DockerManager:
                         return {"success": False, "error": data["error"]}
 
                     if progress_callback:
-                        await progress_callback(data)
+                        progress_callback(data)
 
                 except Exception as e:
                     logger.error(f"Error processing progress event: {e}")
                     continue
 
-    async def _pull_images_podman_sdk(self, images: List[str], progress_callback=None):
+    def _pull_images_podman_sdk(self, images: List[str], progress_callback=None):
         """Pull images using podman-py SDK with progress streaming"""
         from podman import PodmanClient
 
@@ -388,7 +385,7 @@ class DockerManager:
         for image in images:
             logger.info(f"Pulling image (Podman SDK): {image}")
             if progress_callback:
-                await progress_callback({"status": "Starting", "image": image, "message": f"Pulling {image}..."})
+                progress_callback({"status": "Starting", "image": image, "message": f"Pulling {image}..."})
 
             layer_progress = {}
 
@@ -414,7 +411,7 @@ class DockerManager:
                         overall_percent = ((completed_images + layer_percent / 100) / total_images) * 100
 
                         if progress_callback:
-                            await progress_callback(
+                            progress_callback(
                                 {
                                     "image": image,
                                     "layer_id": layer_id,
@@ -430,7 +427,7 @@ class DockerManager:
                     else:
                         # String event (older format or status message)
                         if progress_callback:
-                            await progress_callback(
+                            progress_callback(
                                 {
                                     "image": image,
                                     "status": str(event).strip(),
@@ -441,12 +438,12 @@ class DockerManager:
             except Exception as e:
                 logger.error(f"Error pulling {image} with Podman: {e}")
                 if progress_callback:
-                    await progress_callback({"error": f"Failed to pull {image}: {str(e)}"})
+                    progress_callback({"error": f"Failed to pull {image}: {str(e)}"})
                 return {"success": False, "error": str(e)}
 
             completed_images += 1
             if progress_callback:
-                await progress_callback(
+                progress_callback(
                     {
                         "status": "Complete",
                         "image": image,
@@ -458,7 +455,7 @@ class DockerManager:
         client.close()
 
         if progress_callback:
-            await progress_callback(
+            progress_callback(
                 {
                     "complete": True,
                     "message": "All images pulled successfully",
@@ -468,7 +465,7 @@ class DockerManager:
 
         return {"success": True, "message": "All images pulled successfully"}
 
-    async def _pull_images_cli(self, images: List[str], progress_callback=None) -> Dict[str, any]:
+    def _pull_images_cli(self, images: List[str], progress_callback=None) -> Dict[str, any]:
         """
         Fallback: Pull images using compose CLI (no detailed progress)
         """
@@ -480,31 +477,32 @@ class DockerManager:
             else:
                 cmd = ["podman-compose", "-f", str(self.compose_file), "pull"]
 
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 cwd=self.compose_file.parent,
+                text=True,
             )
 
-            while True:
-                line = await process.stdout.readline()
+            # Read output line by line
+            for line in iter(process.stdout.readline, ""):
                 if not line:
                     break
-                log_line = line.decode().rstrip()
+                log_line = line.rstrip()
                 if log_line and progress_callback:
-                    await progress_callback(
+                    progress_callback(
                         {
                             "status": "Pulling",
                             "message": log_line,
                         }
                     )
 
-            await process.wait()
+            process.wait()
 
             if process.returncode == 0:
                 if progress_callback:
-                    await progress_callback(
+                    progress_callback(
                         {
                             "complete": True,
                             "message": "All images pulled successfully",
@@ -519,7 +517,7 @@ class DockerManager:
             logger.error(f"Error pulling docker images (CLI): {e}")
             return {"success": False, "error": str(e)}
 
-    async def start_services(self) -> Dict[str, any]:
+    def start_services(self) -> Dict[str, any]:
         """
         Start docker-compose services
 
@@ -557,32 +555,31 @@ class DockerManager:
             # Inject dynamic API key
             env["TYPESENSE_API_KEY"] = settings.typesense_api_key
 
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
                 cwd=self.compose_file.parent,
                 env=env,
+                timeout=60,
             )
 
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
+            if result.returncode == 0:
                 logger.info("Docker services started successfully")
                 return {
                     "success": True,
                     "message": "Docker services started successfully",
-                    "stdout": stdout.decode(),
-                    "stderr": stderr.decode(),
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
                 }
             else:
-                error_msg = stderr.decode() or stdout.decode()
+                error_msg = result.stderr or result.stdout
                 logger.error(f"Failed to start docker services: {error_msg}")
                 return {
                     "success": False,
                     "error": f"Failed to start docker services: {error_msg}",
-                    "stdout": stdout.decode(),
-                    "stderr": stderr.decode(),
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
                 }
 
         except Exception as e:
@@ -592,7 +589,7 @@ class DockerManager:
                 "error": f"Error starting docker services: {str(e)}",
             }
 
-    async def stop_services(self) -> Dict[str, any]:
+    def stop_services(self) -> Dict[str, any]:
         """
         Stop docker-compose services
 
@@ -618,24 +615,23 @@ class DockerManager:
             # Inject dynamic API key for consistency (though less critical for stop)
             env["TYPESENSE_API_KEY"] = settings.typesense_api_key
 
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
                 cwd=self.compose_file.parent,
                 env=env,
+                timeout=60,
             )
 
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
+            if result.returncode == 0:
                 logger.info("Docker services stopped successfully")
                 return {
                     "success": True,
                     "message": "Docker services stopped successfully",
                 }
             else:
-                error_msg = stderr.decode() or stdout.decode()
+                error_msg = result.stderr or result.stdout
                 logger.warning(f"Error stopping docker services: {error_msg}")
                 return {
                     "success": False,
@@ -649,7 +645,7 @@ class DockerManager:
                 "error": f"Error stopping docker services: {str(e)}",
             }
 
-    async def get_services_status(self) -> Dict[str, any]:
+    def get_services_status(self) -> Dict[str, any]:
         """
         Get status of docker-compose services
 
@@ -672,21 +668,20 @@ class DockerManager:
             env.update(app_paths.get_env_vars())
             env["TYPESENSE_API_KEY"] = settings.typesense_api_key
 
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
                 cwd=self.compose_file.parent,
                 env=env,
+                timeout=10,
             )
 
-            stdout, stderr = await process.communicate()
-
-            if process.returncode == 0:
+            if result.returncode == 0:
                 # Parse output
                 import json
 
-                output = stdout.decode()
+                output = result.stdout
                 services = []
 
                 # Docker compose v2 returns JSON
@@ -715,9 +710,11 @@ class DockerManager:
 
                 # Only perform application-level health checks via HTTP if containers are running
                 if any_running:
-                    import aiohttp
+                    import time
 
-                    async def check_service_health(
+                    import httpx
+
+                    def check_service_health(
                         name: str,
                         url: str,
                         headers: dict = None,
@@ -739,19 +736,15 @@ class DockerManager:
                         """
                         for attempt in range(max_retries):
                             try:
-                                async with aiohttp.ClientSession() as session:
-                                    async with session.get(
-                                        url,
-                                        headers=headers or {},
-                                        timeout=aiohttp.ClientTimeout(total=timeout),
-                                    ) as resp:
-                                        healthy = resp.status < 400
-                                        if healthy:
-                                            logger.info(
-                                                f"Health check {name}: {url} -> status {resp.status}, healthy=True"
-                                            )
-                                            return True
-                                        logger.debug(f"Health check {name}: {url} -> status {resp.status}, unhealthy")
+                                with httpx.Client(timeout=timeout) as client:
+                                    resp = client.get(url, headers=headers or {})
+                                    healthy = resp.status_code < 400
+                                    if healthy:
+                                        logger.info(
+                                            f"Health check {name}: {url} -> status {resp.status_code}, healthy=True"
+                                        )
+                                        return True
+                                    logger.debug(f"Health check {name}: {url} -> status {resp.status_code}, unhealthy")
                             except Exception as e:
                                 logger.debug(
                                     f"Health check {name}: {url} -> attempt {attempt + 1}/{max_retries} failed: {e}"
@@ -759,16 +752,16 @@ class DockerManager:
 
                             # Wait before retry (except on last attempt)
                             if attempt < max_retries - 1:
-                                await asyncio.sleep(retry_delay)
+                                time.sleep(retry_delay)
 
                         logger.info(f"Health check {name}: {url} -> failed after {max_retries} attempts")
                         return False
 
                     # Check Tika
-                    tika_healthy = await check_service_health("tika", f"{settings.tika_url}/version")
+                    tika_healthy = check_service_health("tika", f"{settings.tika_url}/version")
 
                     # Check Typesense
-                    typesense_healthy = await check_service_health(
+                    typesense_healthy = check_service_health(
                         "typesense",
                         f"{settings.typesense_url}/debug",
                         headers={"X-TYPESENSE-API-KEY": settings.typesense_api_key},
@@ -799,7 +792,7 @@ class DockerManager:
             else:
                 return {
                     "success": False,
-                    "error": stderr.decode(),
+                    "error": f"Failed to get services status: {result.stderr}",
                     "services": [],
                     "running": False,
                     "healthy": False,
@@ -815,12 +808,12 @@ class DockerManager:
                 "healthy": False,
             }
 
-    async def get_container_logs(
+    def get_container_logs(
         self,
         service_name: str,
         tail: int = 100,
         follow: bool = False,
-    ) -> asyncio.subprocess.Process:
+    ) -> subprocess.Popen:
         """
         Get logs from a specific container
 
@@ -850,21 +843,22 @@ class DockerManager:
 
         cmd.append(service_name)
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=self.compose_file.parent,
+            text=True,
         )
 
         return process
 
-    async def stream_all_logs(self, callback):
+    def stream_all_logs(self, callback):
         """
         Stream logs from all containers
 
         Args:
-            callback: Async function to call with log lines
+            callback: Function to call with log lines
         """
         if not self.docker_cmd:
             raise RuntimeError("Docker/Podman not found")
@@ -880,28 +874,27 @@ class DockerManager:
             "50",
         ]
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=self.compose_file.parent,
+            text=True,
         )
 
         try:
-            while True:
-                line = await process.stdout.readline()
+            for line in iter(process.stdout.readline, ""):
                 if not line:
                     break
-
-                log_line = line.decode().rstrip()
-                await callback(log_line)
+                log_line = line.rstrip()
+                callback(log_line)
 
         except Exception as e:
             logger.error(f"Error streaming logs: {e}")
         finally:
-            if process.returncode is None:
+            if process.poll() is None:
                 process.terminate()
-                await process.wait()
+                process.wait()
 
 
 # Global docker manager instance

@@ -2,9 +2,9 @@
 File Indexer component
 """
 
-import asyncio
 import hashlib
 import os
+import threading
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
@@ -22,7 +22,7 @@ class FileIndexer:
     def __init__(self):
         self.typesense = get_typesense_client()
         self.extractor = get_extractor()
-        self._stop_event = asyncio.Event()
+        self._stop_event = threading.Event()
 
     def stop(self):
         """Signal the indexing process to stop."""
@@ -32,7 +32,7 @@ class FileIndexer:
         """Reset the indexer state for a new crawl."""
         self._stop_event.clear()
 
-    async def index_file(
+    def index_file(
         self, operation: CrawlOperation, progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> bool:
         """
@@ -42,11 +42,11 @@ class FileIndexer:
             return False
 
         if operation.operation == OperationType.DELETE:
-            return await self._handle_delete_operation(operation)
+            return self._handle_delete_operation(operation)
         else:
-            return await self._handle_create_edit_operation(operation, progress_callback)
+            return self._handle_create_edit_operation(operation, progress_callback)
 
-    async def _handle_create_edit_operation(
+    def _handle_create_edit_operation(
         self, operation: CrawlOperation, progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> bool:
         file_path = operation.file_path
@@ -61,11 +61,11 @@ class FileIndexer:
             logger.warning(f"File too large: {file_path}")
             return False
 
-        file_hash = await self._calculate_file_hash(file_path)
+        file_hash = self._calculate_file_hash(file_path)
         if not file_hash:
             return False
 
-        existing_doc = await self.typesense.get_doc_by_path(file_path)
+        existing_doc = self.typesense.get_doc_by_path(file_path)
         if existing_doc and existing_doc.get("file_hash") == file_hash:
             logger.debug(f"Skipping unchanged file: {file_path}")
             return True
@@ -93,7 +93,7 @@ class FileIndexer:
             chunk_hash = generate_chunk_hash(file_path, chunk_index, chunk_content)
 
             # All chunks get complete metadata
-            await self.typesense.index_file(
+            self.typesense.index_file(
                 file_path=file_path,
                 content=chunk_content,
                 chunk_index=chunk_index,
@@ -110,9 +110,9 @@ class FileIndexer:
 
         return True
 
-    async def _handle_delete_operation(self, operation: CrawlOperation) -> bool:
+    def _handle_delete_operation(self, operation: CrawlOperation) -> bool:
         try:
-            await self.typesense.remove_from_index(operation.file_path)
+            self.typesense.remove_from_index(operation.file_path)
             return True
         except Exception as e:
             logger.error(f"Error deleting {operation.file_path} from index: {e}")
@@ -127,18 +127,14 @@ class FileIndexer:
             return False, "File is not readable"
         return True, "File is accessible"
 
-    async def _calculate_file_hash(self, file_path: str) -> str:
-        loop = asyncio.get_running_loop()
-
-        def _hash():
-            try:
-                hash_md5 = hashlib.md5()
-                with open(file_path, "rb") as f:
-                    for chunk in iter(lambda: f.read(4096), b""):
-                        hash_md5.update(chunk)
-                return hash_md5.hexdigest()
-            except Exception as e:
-                logger.error(f"Error calculating file hash for {file_path}: {e}")
-                return ""
-
-        return await loop.run_in_executor(None, _hash)
+    def _calculate_file_hash(self, file_path: str) -> str:
+        """Calculate MD5 hash of file (runs in current thread)."""
+        try:
+            hash_md5 = hashlib.md5()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
+        except Exception as e:
+            logger.error(f"Error calculating file hash for {file_path}: {e}")
+            return ""

@@ -14,7 +14,7 @@ router = APIRouter(prefix="/stats", tags=["statistics"])
 
 
 @router.get("/recent-files")
-async def get_recent_files(limit: int = Query(default=10, ge=1, le=50)):
+def get_recent_files(limit: int = Query(default=10, ge=1, le=50)):
     """
     Get the most recently indexed files.
 
@@ -64,7 +64,7 @@ async def get_recent_files(limit: int = Query(default=10, ge=1, le=50)):
 
 
 @router.get("/indexing-activity")
-async def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default="24h", alias="range")):
+def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default="24h", alias="range")):
     """
     Get indexing activity over time.
 
@@ -195,7 +195,7 @@ async def get_indexing_activity(time_range: Literal["24h", "7d"] = Query(default
 
 
 @router.get("/files-by-type")
-async def get_files_by_type(
+def get_files_by_type(
     ext: str = Query(..., description="File extension including dot, e.g. '.pdf'"),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
@@ -261,7 +261,7 @@ async def get_files_by_type(
 
 
 @router.get("/files-by-age")
-async def get_files_by_age(
+def get_files_by_age(
     age_range: Literal["30d", "90d", "1y", "older"] = Query(...),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
@@ -340,7 +340,7 @@ async def get_files_by_age(
 
 
 @router.get("/file-age-distribution")
-async def get_file_age_distribution():
+def get_file_age_distribution():
     """
     Get distribution of files by modification age.
 
@@ -389,7 +389,7 @@ async def get_file_age_distribution():
 
 
 @router.get("/storage-by-type")
-async def get_storage_by_type():
+def get_storage_by_type():
     """
     Get total storage size per file type.
 
@@ -451,7 +451,7 @@ async def get_storage_by_type():
 
 
 @router.get("/index-storage")
-async def get_index_storage():
+def get_index_storage():
     """
     Get storage statistics for the search index (Typesense).
 

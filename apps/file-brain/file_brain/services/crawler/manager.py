@@ -2,7 +2,8 @@
 Crawl Job Manager - coordinates discovery and indexing
 """
 
-import asyncio
+import threading
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -32,11 +33,11 @@ class CrawlJobManager:
         self.verifier = IndexVerifier()
         self.queue = DedupQueue[CrawlOperation]()  # Shared queue
         self.monitor = FileMonitorService(self.queue)  # Pass queue to monitor
-        self._stop_event = asyncio.Event()
+        self._stop_event = threading.Event()
         self._running = False
 
-        # Lazy initialization - task created when needed in async context
-        self._indexing_task: Optional[asyncio.Task] = None
+        # Background indexing thread
+        self._indexing_thread: threading.Thread | None = None
 
         # Progress tracking
         self.tracker = CrawlProgressTracker()
@@ -167,19 +168,20 @@ class CrawlJobManager:
             "orphan_count": self.verification_progress.orphaned_count,
         }
 
-    async def _ensure_indexing_task(self):
-        """Ensure indexing task is running in the current event loop."""
-        if self._indexing_task is None or self._indexing_task.done():
-            logger.info("Starting indexing worker task")
-            self._indexing_task = asyncio.create_task(self._process_queue())
+    def _ensure_indexing_thread(self):
+        """Ensure indexing thread is running."""
+        if self._indexing_thread is None or not self._indexing_thread.is_alive():
+            logger.info("Starting indexing worker thread")
+            self._indexing_thread = threading.Thread(target=self._process_queue, daemon=True, name="indexing_worker")
+            self._indexing_thread.start()
 
-    async def start_crawl(self) -> bool:
+    def start_crawl(self) -> bool:
         if self._running:
             logger.warning("Crawl job already running.")
             return False
 
-        # Ensure indexing task is running
-        await self._ensure_indexing_task()
+        # Ensure indexing thread is running
+        self._ensure_indexing_thread()
 
         self._running = True
         self._stop_event.clear()
@@ -213,18 +215,19 @@ class CrawlJobManager:
                 files_indexed=0,
             )
 
-        # Run in background
-        asyncio.create_task(self._run_crawl())
+        # Run in background thread
+        crawl_thread = threading.Thread(target=self._run_crawl, daemon=True, name="crawl_worker")
+        crawl_thread.start()
         return True
 
-    async def _process_queue(self):
+    def _process_queue(self):
         """
         Persistent worker that processes operations from the shared queue.
         """
         logger.info("Indexing worker started")
         while True:
             try:
-                operation = await self.queue.get()
+                operation = self.queue.get()
 
                 # Check for stop signal (None) if we ever use one,
                 # but currently we run forever until app stop.
@@ -237,7 +240,7 @@ class CrawlJobManager:
                     self.indexing_progress.current_chunk_total = chunk_total
 
                 # Process the operation
-                success = await self.indexer.index_file(operation, progress_callback=progress_cb)
+                success = self.indexer.index_file(operation, progress_callback=progress_cb)
 
                 if success:
                     self.indexing_progress.files_indexed += 1
@@ -252,20 +255,17 @@ class CrawlJobManager:
                 if self.indexing_progress.files_indexed % 20 == 0:
                     self._update_db_progress()
 
-            except asyncio.CancelledError:
-                logger.info("Indexing worker cancelled")
-                break
             except Exception as e:
                 logger.error(f"Error in indexing worker: {e}")
-                await asyncio.sleep(1)  # Prevent tight loop on error
+                time.sleep(1)  # Prevent tight loop on error
 
-    async def _run_crawl(self):
+    def _run_crawl(self):
         """Run discovery and fill the shared queue"""
 
         # Phase 1: Verify Index
         try:
             logger.info("Starting index verification phase...")
-            await self.verifier.verify_index()
+            self.verifier.verify_index()
             logger.info("Index verification phase completed.")
         except Exception as e:
             logger.error(f"Index verification failed: {e}")
@@ -279,14 +279,14 @@ class CrawlJobManager:
         # We push directly to the shared queue
 
         try:
-            async for operation in self.discoverer.discover():
+            for operation in self.discoverer.discover():
                 if self._stop_event.is_set():
                     break
                 self.discovery_progress.files_found += 1
                 # Track file discovered (batched)
                 telemetry.track_batched_event("file_discovered")
                 # Use file path as key for deduplication
-                await self.queue.put(operation.file_path, operation)
+                self.queue.put(operation.file_path, operation)
 
             self.discovery_progress.processed_paths = self.discovery_progress.total_paths
 
@@ -305,7 +305,7 @@ class CrawlJobManager:
                     logger.info("Crawl job completed (queue empty and all files processed)")
                     break
 
-                await asyncio.sleep(1)
+                time.sleep(1)
 
         except Exception as e:
             logger.error(f"Crawl job failed: {e}")
@@ -351,7 +351,7 @@ class CrawlJobManager:
                 files_indexed=status["files_indexed"],
             )
 
-    async def stop_crawl(self):
+    def stop_crawl(self):
         if not self._running:
             return
         logger.info("Stopping crawl job...")
@@ -363,14 +363,14 @@ class CrawlJobManager:
         # Note: We don't cancel the indexing task here as it's persistent
         # and continues to process any remaining queue items
 
-    async def clear_indexes(self) -> bool:
+    def clear_indexes(self) -> bool:
         """Reset the collection (drop and recreate with latest schema) and reset statistics"""
         logger.info("Resetting collection and statistics...")
         try:
             # 1. Reset search collection (drop and recreate with latest schema)
             typesense = get_typesense_client()
             logger.info("Dropping and recreating Typesense collection with latest schema...")
-            await typesense.reset_collection()
+            typesense.reset_collection()
 
             with db_session() as db:
                 # 2. Reset crawler statistics and state
@@ -383,12 +383,12 @@ class CrawlJobManager:
             logger.error(f"Error resetting collection: {e}")
             return False
 
-    async def start_monitoring(self) -> bool:
+    def start_monitoring(self) -> bool:
         """Start file monitoring"""
         logger.info("Starting file monitoring...")
 
-        # Ensure indexing task is running to process monitored file events
-        await self._ensure_indexing_task()
+        # Ensure indexing thread is running to process monitored file events
+        self._ensure_indexing_thread()
 
         # Get enabled paths
         if not self.watch_paths:
@@ -420,7 +420,7 @@ class CrawlJobManager:
             logger.error(f"Failed to start monitoring: {e}")
             return False
 
-    async def stop_monitoring(self):
+    def stop_monitoring(self):
         """Stop file monitoring"""
         logger.info("Stopping file monitoring...")
         try:

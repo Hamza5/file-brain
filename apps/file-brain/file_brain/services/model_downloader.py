@@ -2,7 +2,6 @@
 Model Downloader Service - Downloads embedding models from HuggingFace for Typesense
 """
 
-import asyncio
 import shutil
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -84,7 +83,7 @@ class ModelDownloader:
             "missing_files": missing_files,
         }
 
-    async def download_model_with_progress(
+    def download_model_with_progress(
         self,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
@@ -94,7 +93,7 @@ class ModelDownloader:
         Uses tqdm monkey-patching to capture download progress from huggingface_hub.
 
         Args:
-            progress_callback: Async callback function for progress updates.
+            progress_callback: Callback function for progress updates.
 
         Returns:
             Dictionary with success status and details
@@ -233,7 +232,7 @@ class ModelDownloader:
             thread.start()
 
             if progress_callback:
-                await progress_callback(
+                progress_callback(
                     {
                         "status": "starting",
                         "message": f"Downloading {len(MODEL_FILES)} files ({TOTAL_MODEL_SIZE / (1024**3):.2f} GB)...",
@@ -248,12 +247,12 @@ class ModelDownloader:
                     # Non-blocking get with short timeout
                     data = progress_queue.get(timeout=0.1)
                     if progress_callback:
-                        await progress_callback(data)
+                        progress_callback(data)
                     if data.get("complete") or data.get("error"):
                         break
                 except queue.Empty:
-                    # Yield to event loop
-                    await asyncio.sleep(0.05)
+                    # Small delay to avoid busy-waiting
+                    time.sleep(0.05)
                     continue
 
             # Wait for thread to finish
@@ -284,14 +283,14 @@ class ModelDownloader:
             error_msg = f"huggingface_hub not installed: {e}"
             logger.error(error_msg)
             if progress_callback:
-                await progress_callback({"status": "error", "error": error_msg})
+                progress_callback({"status": "error", "error": error_msg})
             return {"success": False, "error": error_msg}
 
         except Exception as e:
             error_msg = f"Failed to download model: {e}"
             logger.error(error_msg, exc_info=True)
             if progress_callback:
-                await progress_callback({"status": "error", "error": error_msg})
+                progress_callback({"status": "error", "error": error_msg})
             return {"success": False, "error": error_msg}
 
 

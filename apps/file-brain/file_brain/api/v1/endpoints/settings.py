@@ -26,7 +26,7 @@ class SettingResponse(BaseModel):
 
 
 @router.get("/")
-async def get_all_settings(db: Session = Depends(get_db)):
+def get_all_settings(db: Session = Depends(get_db)):
     """Get all settings"""
     settings_repo = SettingsRepository(db)
     settings = settings_repo.get_all_as_dict()
@@ -34,7 +34,7 @@ async def get_all_settings(db: Session = Depends(get_db)):
 
 
 @router.get("/{key}")
-async def get_setting(key: str, db: Session = Depends(get_db)):
+def get_setting(key: str, db: Session = Depends(get_db)):
     """Get a specific setting"""
     settings_repo = SettingsRepository(db)
     value = settings_repo.get_value(key)
@@ -46,7 +46,7 @@ async def get_setting(key: str, db: Session = Depends(get_db)):
 
 
 @router.put("/{key}")
-async def update_setting(key: str, value: str, description: str | None = None, db: Session = Depends(get_db)):
+def update_setting(key: str, value: str, description: str | None = None, db: Session = Depends(get_db)):
     """Update a setting"""
     settings_repo = SettingsRepository(db)
     setting = settings_repo.set(key, value, description)
