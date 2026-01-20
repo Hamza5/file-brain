@@ -6,6 +6,7 @@ import shutil
 import signal
 import socketserver
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -19,7 +20,10 @@ import psutil
 
 logger = logging.getLogger("flaskwebgui")
 if not logger.handlers:
-    log_level_str = os.environ.get("FLASKWEBGUI_LOG_LEVEL", "DEBUG").upper()
+    is_frozen = getattr(sys, "frozen", False)
+    is_debug = os.environ.get("DEBUG", "true").lower() == "true"
+    default_level = "INFO" if (is_frozen or not is_debug) else "DEBUG"
+    log_level_str = os.environ.get("FLASKWEBGUI_LOG_LEVEL", default_level).upper()
     log_level = getattr(logging, log_level_str, logging.WARNING)
     logging.basicConfig(level=log_level, format="[FLASKWEBGUI] %(levelname)s - %(asctime)s - %(message)s")
 
@@ -234,6 +238,31 @@ class FlaskUI:
         self.browser_path = self.browser_path or browser_path_dispacher.get(OPERATING_SYSTEM)()
         self.browser_command = self.browser_command or self.get_browser_command()
 
+    def wait_for_server(self, url: str, timeout: float = 30.0):
+        """Wait for the server to be responsive before launching browser"""
+        import urllib.error
+        import urllib.request
+
+        logger.info(f"Waiting for server at {url}...")
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                with urllib.request.urlopen(url):
+                    logger.info("Server is ready!")
+                    return
+            except urllib.error.HTTPError:
+                # Server responded with 4xx/5xx, which means it's running
+                logger.info("Server is ready (responded with HTTP error)!")
+                return
+            except (urllib.error.URLError, ConnectionError):
+                pass
+            except Exception as e:
+                logger.debug(f"Server check failed: {e}")
+
+            time.sleep(0.2)
+
+        logger.warning(f"Timeout waiting for server at {url} after {timeout}s")
+
     def get_browser_command(self):
         # https://peter.sh/experiments/chromium-command-line-switches/
 
@@ -264,6 +293,10 @@ class FlaskUI:
 
     def start_browser(self, server_process: Union[Thread, Process]):
         logger.info(f"Command: {' '.join(self.browser_command)}")
+
+        # Wait for server to be ready before opening browser
+        self.wait_for_server(self.url)
+
         global FLASKWEBGUI_BROWSER_PROCESS
 
         FLASKWEBGUI_BROWSER_PROCESS = subprocess.Popen(self.browser_command)

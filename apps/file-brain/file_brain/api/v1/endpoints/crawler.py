@@ -82,7 +82,7 @@ def start_crawler(db: Session = Depends(get_db)):
         if not valid_paths:
             raise HTTPException(status_code=400, detail="No valid watch paths configured")
 
-        logger.info(f"Starting crawl job for {len(valid_paths)} paths: {[p.path for p in valid_paths]}")
+        logger.info(f"Starting indexing job for {len(valid_paths)} paths: {[p.path for p in valid_paths]}")
 
         # Start the crawl job
         crawl_manager = get_crawl_job_manager(watch_paths=valid_paths)
@@ -91,7 +91,7 @@ def start_crawler(db: Session = Depends(get_db)):
         if not success:
             raise HTTPException(status_code=500, detail="Failed to start crawl job")
 
-        logger.info("Enhanced crawl job started successfully")
+        logger.info("Indexing job started successfully")
 
         # Track crawl start
         telemetry.capture_event(
@@ -235,11 +235,11 @@ def stop_crawler(db: Session = Depends(get_db)):
                 timestamp=int(time.time() * 1000),
             )
 
-        logger.info("Stopping crawl job via API...")
+        logger.debug("Stopping indexing job via API...")
 
         crawl_manager.stop_crawl()
 
-        logger.info("Enhanced crawl job stopped successfully")
+        logger.info("Indexing job stopped successfully")
 
         # Track crawl stop
         telemetry.capture_event(

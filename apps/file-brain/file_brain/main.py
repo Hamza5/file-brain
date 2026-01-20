@@ -117,9 +117,9 @@ def perform_shutdown(vite_process=None):
             logger.info("✅ Crawl manager stopped")
 
         # Shutdown telemetry (flushes batched events and captures shutdown event)
-        logger.info("📊 Shutting down telemetry...")
+        logger.debug("📊 Shutting down telemetry...")
         telemetry.shutdown()
-        logger.info("✅ Telemetry shutdown complete")
+        logger.debug("✅ Telemetry shutdown complete")
 
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
@@ -156,7 +156,7 @@ frontend_dist_path = None
 # 1. Try source (dev mode)
 if os.path.exists(source_frontend_path):
     frontend_dist_path = source_frontend_path
-    logger.info(f"Using frontend from source: {frontend_dist_path}")
+    logger.debug(f"Using frontend from source: {frontend_dist_path}")
 
 # 2. Try installed package (production mode)
 if not frontend_dist_path:
@@ -167,7 +167,7 @@ if not frontend_dist_path:
         frontend_pkg_path = files("file_brain.frontend") / "dist"
         if frontend_pkg_path.is_dir():
             frontend_dist_path = str(frontend_pkg_path)
-            logger.info(f"Using frontend from installed package: {frontend_dist_path}")
+            logger.debug(f"Using frontend from installed package: {frontend_dist_path}")
     except Exception as e:
         logger.debug(f"Could not locate frontend via importlib.resources: {e}")
 

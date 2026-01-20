@@ -302,7 +302,7 @@ class CrawlJobManager:
 
                 # Note: files_found might be > processed if queue is not empty
                 if self.queue.qsize() == 0 and total_processed >= self.discovery_progress.files_found:
-                    logger.info("Crawl job completed (queue empty and all files processed)")
+                    logger.info("Indexing job completed (queue empty and all files processed)")
                     break
 
                 time.sleep(1)
@@ -354,7 +354,7 @@ class CrawlJobManager:
     def stop_crawl(self):
         if not self._running:
             return
-        logger.info("Stopping crawl job...")
+        logger.debug("Stopping indexing job...")
         self._stop_event.set()
         self.verifier.stop()
         self.discoverer.stop()

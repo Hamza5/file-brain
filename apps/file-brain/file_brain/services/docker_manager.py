@@ -537,7 +537,7 @@ class DockerManager:
             }
 
         try:
-            logger.info(f"Starting docker-compose services from {self.compose_file}")
+            logger.debug(f"Starting docker-compose services from {self.compose_file}")
 
             # Use docker compose (v2) or docker-compose (v1)
             if self.docker_cmd == "docker":
@@ -565,7 +565,7 @@ class DockerManager:
             )
 
             if result.returncode == 0:
-                logger.info("Docker services started successfully")
+                logger.debug("Docker services started successfully")
                 return {
                     "success": True,
                     "message": "Docker services started successfully",
@@ -600,7 +600,7 @@ class DockerManager:
             return {"success": False, "error": "Docker/Podman not found"}
 
         try:
-            logger.info("Stopping docker-compose services")
+            logger.debug("Stopping docker-compose services")
 
             if self.docker_cmd == "docker":
                 cmd = [self.docker_cmd, "compose", "-f", str(self.compose_file), "down"]
@@ -625,7 +625,7 @@ class DockerManager:
             )
 
             if result.returncode == 0:
-                logger.info("Docker services stopped successfully")
+                logger.debug("Docker services stopped successfully")
                 return {
                     "success": True,
                     "message": "Docker services stopped successfully",

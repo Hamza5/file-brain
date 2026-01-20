@@ -228,7 +228,7 @@ class TelemetryManager:
         try:
             # Send a single aggregate event with all counters
             events_copy = self.event_counters.copy()
-            logger.info(f"Flushing batched events: {events_copy}")
+            logger.debug(f"Flushing batched events: {events_copy}")
             self.capture_event("batched_events", {"events": events_copy})
 
             # Clear counters and update last flush time
@@ -326,21 +326,21 @@ class TelemetryManager:
         try:
             # Flush any remaining batched events before shutdown
             if self.event_counters:
-                logger.info(f"Flushing {len(self.event_counters)} batched event types before shutdown...")
+                logger.debug(f"Flushing {len(self.event_counters)} batched event types before shutdown...")
                 self.flush_batched_events()
             else:
-                logger.info("No batched events to flush on shutdown")
+                logger.debug("No batched events to flush on shutdown")
 
             # Capture shutdown event
-            logger.info("Capturing application_shutdown event...")
+            logger.debug("Capturing application_shutdown event...")
             self.capture_event("application_shutdown")
 
             if self.posthog:
-                logger.info("Shutting down PostHog client (this may take a few seconds)...")
+                logger.debug("Shutting down PostHog client (this may take a few seconds)...")
                 # PostHog.shutdown() blocks until all queued events are sent
                 # This is expected and ensures data isn't lost
                 self.posthog.shutdown()
-                logger.info("PostHog client shutdown complete")
+                logger.debug("PostHog client shutdown complete")
         except Exception as e:
             logger.error(f"Error shutting down telemetry: {e}", exc_info=True)
 
