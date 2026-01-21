@@ -25,6 +25,7 @@ File Brain is a desktop application that helps you find files instantly using na
 - **🚀 Fast Matching**: Search results are shown within milliseconds, not minutes.
 - **👁️ OCR Support**: Automatically extracts text from screenshots, and scanned documents.
 - **⚡ Auto-Indexing**: Detects changes in real-time and updates the index instantly.
+- **🛡️ Read-Only & Safe**: File Brain only reads your files to index them. It never modifies, deletes, or alters your data in any way.
 - **🔒 Privacy First**: All indexing and AI processing happens 100% locally on your machine. Your data never leaves your computer.
 
 ## Prerequisites
