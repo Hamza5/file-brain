@@ -27,11 +27,6 @@ const features = [
         description: 'Find text inside screenshots, scanned documents, and images effortlessly.'
     },
     {
-        icon: 'fa-solid fa-lock',
-        title: 'Read-Only & Safe',
-        description: 'File Brain only reads your files to index them. It never modifies, deletes, or alters your data in any way.'
-    },
-    {
         icon: 'fa-solid fa-shield-halved',
         title: 'Privacy First',
         description: 'Your data never leaves your machine. All indexing and processing stays local and secure.'
