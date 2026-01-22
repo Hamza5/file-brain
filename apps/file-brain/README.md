@@ -28,6 +28,10 @@ File Brain is a desktop application that helps you find files instantly using na
 - **🛡️ Read-Only & Safe**: File Brain only reads your files to index them. It never modifies, deletes, or alters your data in any way.
 - **🔒 Privacy First**: All indexing and AI processing happens 100% locally on your machine. Your data never leaves your computer.
 
+## Why File Brain?
+
+Most search tools look for *exact matches* of filenames or content. File Brain goes further by understanding *meaning*, tolerating typos, and extracting text from images. See how it compares to other popular tools:
+
 | App Name | Price | OS | Indexing | Search Speed | File Content Search | Fuzzy Search | Semantic Search | OCR |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Everything | Free | Windows | No | Instant | No | Wildcards/Regexp | No | No |
