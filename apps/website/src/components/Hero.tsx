@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
 import posthog from 'posthog-js';
+import { GithubStars } from './GithubStars';
 
 export const Hero: React.FC = () => {
     return (
@@ -12,12 +13,15 @@ export const Hero: React.FC = () => {
                     <div className="mb-4">
                         <Tag value="UNLOCK YOUR PRODUCTIVITY POTENTIAL" rounded severity="info" className="text-xs font-semibold tracking-wider px-3 py-2" style={{ backgroundColor: 'var(--surface-ground)', color: 'var(--primary-color)', border: '1px solid var(--surface-border)' }}></Tag>
                     </div>
+                    
                     <h1 className="text-5xl md:text-6xl font-bold mb-4 tracking-tight" style={{ color: 'var(--text-color)', lineHeight: 1.1 }}>
                         Master Your Data with <span style={{ color: 'var(--primary-color)' }}>File Brain</span>
                     </h1>
+                    
                     <p className="text-xl mb-6 max-w-30rem mx-auto" style={{ color: 'var(--text-color-secondary)' }}>
                         Empower your file search with AI-backed semantic intelligence. Find anything, anywhere, instantly.
                     </p>
+                    
                     <div className="flex gap-3 justify-content-center mb-6">
                         <Button
                             label="Get Started"
@@ -57,6 +61,10 @@ export const Hero: React.FC = () => {
                                 document.getElementById('use-cases')?.scrollIntoView({ behavior: 'smooth' });
                             }}
                         />
+                    </div>
+
+                    <div className="mt-2 animate-fade-in transition-all transition-duration-500">
+                        <GithubStars />
                     </div>
                 </div>
             </div>

@@ -41,6 +41,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Fetch GitHub stars
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node apps/website/scripts/fetch-github-stars.mjs
+        working-directory: .
+
       - name: Build website
         env:
           NEXT_PUBLIC_CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}

@@ -49,7 +49,7 @@ When working on this project, strictly adhere to the following technologies and 
 ### Frontend (`apps/website`, `apps/file-brain/frontend`)
 
 - **Framework**: Next.js (Website), React (App)
-- **UI Library**: PrimeReact
+- **UI Library**: PrimeReact (Always use PrimeReact components when possible instead of drawing custom ones. For example, use `Avatar` and `AvatarGroup` for profile pictures).
 - **Styling**:
   - **PrimeFlex**: Use PrimeFlex utility classes for layout (e.g., `flex`, `grid`, `col-12`, `mb-4`).
   - **CSS Variables**: Use the global CSS variables defined in `globals.css` (e.g., `var(--primary-color)`, `var(--surface-ground)`) to maintain consistency.
