@@ -5,6 +5,9 @@
 
 [![CI](https://github.com/hamza5/file-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/ci.yml)
 [![Release](https://github.com/hamza5/file-brain/actions/workflows/release.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/release.yml)
+[![PyPI version](https://badge.fury.io/py/file-brain.svg)](https://badge.fury.io/py/file-brain)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/file-brain.svg)](https://pypi.org/project/file-brain/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/hamza5/file-brain/blob/main/LICENSE)
 
 </div>
 
