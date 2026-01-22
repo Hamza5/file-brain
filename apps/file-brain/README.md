@@ -71,7 +71,7 @@ pip install -U file-brain
     1.  **System Check**: Verifies Docker is running.
     2.  **Download Components**: Downloads the necessary search services.
     3.  **Initialize Engine**: Starts the background search components.
-    4.  **Download AI Model**: Fetches the AI model for intelligent search.
+    4.  **Download Embedding (AI) Model**: Fetches the embedding (AI) model for intelligent search.
     5.  **Finalize Setup**: Initializes the search engine database.
 
     ![Initialization Wizard](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/wizard.png)

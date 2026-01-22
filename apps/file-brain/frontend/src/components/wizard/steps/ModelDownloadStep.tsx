@@ -78,9 +78,9 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
 
   return (
     <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Downloading AI Search Model</h3>
+      <h3 className="mt-0">Downloading Embedding (AI) Search Model</h3>
       <p className="text-600 mt-0">
-        Downloading the AI model that enables intelligent natural-language search. This model processes your files locally to understand their meaning.
+        Downloading the embedding (AI) model that enables intelligent natural-language search. This model processes your files locally to understand their meaning.
         (Approx. 1.1 GB)
       </p>
 
@@ -91,7 +91,7 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
       />
 
       {modelDownloadComplete ? (
-        <Message severity="success" text="AI Search model downloaded successfully!" />
+        <Message severity="success" text="Embedding (AI) Search model downloaded successfully!" />
       ) : (
         <>
           {loading && modelDownloadProgress && (
@@ -148,7 +148,7 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
           )}
           {!loading && !modelDownloadComplete && modelStatus?.exists && (
             <>
-              <Message severity="success" text="AI model already downloaded!" />
+              <Message severity="success" text="Embedding (AI) model already downloaded!" />
               <Button
                 label="Continue"
                 icon="fas fa-arrow-right"
@@ -159,7 +159,7 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
           )}
           {!loading && !modelDownloadComplete && !modelStatus?.exists && (
             <Button
-              label="Download AI Model"
+              label="Download Embedding (AI) Model"
               icon="fas fa-download"
               onClick={handleDownloadModel}
               size="large"

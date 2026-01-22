@@ -27,7 +27,7 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
     { label: 'System Check' },
     { label: 'Download Components' },
     { label: 'Initialize Engine' },
-    { label: 'Download AI Model' },
+    { label: 'Download Embedding (AI) Model' },
     { label: 'Finalize Setup' },
     { label: 'Complete' },
   ];

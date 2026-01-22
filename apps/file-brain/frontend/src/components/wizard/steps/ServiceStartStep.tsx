@@ -122,7 +122,7 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
             ))}
           </div>
           <Button
-            label="Continue to AI Model"
+            label="Continue to Embedding (AI) Model"
             icon="fas fa-arrow-right"
             onClick={onComplete}
             size="large"
