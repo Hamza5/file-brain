@@ -33,22 +33,22 @@ File Brain is a desktop application that helps you find files instantly using na
 
 ## Why File Brain?
 
-Most search tools look for *exact matches* of filenames or content. File Brain goes further by understanding *meaning*, tolerating typos, and extracting text from images. See how it compares to other popular tools:
+Most search tools look for _exact matches_ of filenames or content. File Brain goes further by understanding _meaning_, tolerating typos, and extracting text from images. See how it compares to other popular tools:
 
-| App Name | Price | OS | Indexing | Search Speed | File Content Search | Fuzzy Search | Semantic Search | OCR |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| Everything | Free | Windows | No | Instant | No | Wildcards/Regexp | No | No |
-| Listary | Free | Windows | No | Instant | No | Yes | No | No |
-| Alfred | Free | MacOS | No | Very fast | No | Yes | No | Yes |
-| Copernic | 25$/yr | Windows | Yes | Fast | 170+ formats | Partial | No | Yes |
-| DocFetcher | Free | Cross-platform | Yes | Fast | 32 formats | No | No | No |
-| Agent Ransack | Free | Windows | No | Slow | PDF and Office | Wildcards/Regexp | No | No |
-| **File Brain** | **Free** | **Cross-platform** | **Yes** | **Very fast** | **1000+ formats** | **Yes** | **Yes** | **Yes** |
+| App Name       | Price    | OS                 | Indexing | Search Speed  | File Content Search | Fuzzy Search     | Semantic Search | OCR     |
+| :------------- | :------- | :----------------- | :------- | :------------ | :------------------ | :--------------- | :-------------- | :------ |
+| Everything     | Free     | Windows            | No       | Instant       | No                  | Wildcards/Regexp | No              | No      |
+| Listary        | Free     | Windows            | No       | Instant       | No                  | Yes              | No              | No      |
+| Alfred         | Free     | MacOS              | No       | Very fast     | No                  | Yes              | No              | Yes     |
+| Copernic       | 25$/yr   | Windows            | Yes      | Fast          | 170+ formats        | Partial          | No              | Yes     |
+| DocFetcher     | Free     | Cross-platform     | Yes      | Fast          | 32 formats          | No               | No              | No      |
+| Agent Ransack  | Free     | Windows            | No       | Slow          | PDF and Office      | Wildcards/Regexp | No              | No      |
+| **File Brain** | **Free** | **Cross-platform** | **Yes**  | **Very fast** | **1000+ formats**   | **Yes**          | **Yes**         | **Yes** |
 
 ## Prerequisites
 
 - **Python 3.11** or higher
-- **Docker** or **Podman** (Must be installed and ready to run)
+- **Docker** or **Podman** (Must be installed and running)
 
 ## Installation
 
@@ -76,6 +76,9 @@ pip install -U file-brain
 
     ![Initialization Wizard](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/wizard.png)
     _The easy-to-use setup wizard that guides you through downloading models and initializing the search database._
+
+    > [!TIP]
+    > **Manual Setup (Fallback)**: If the automatic wizard fails to start the services or download the models, see the [Manual Setup](#manual-setup) section below.
 
 3.  **Select Folders**:
     Choose the folders you want to index via the dashboard settings.
@@ -110,3 +113,42 @@ Want more power? The **PRO** version is on the way with advanced capabilities:
 - **Cloud & Network Drives**: Connect Google Drive, Dropbox, Box, and network drives.
 
 [Check out the website](https://file-brain.com/) to learn more.
+
+## Manual Setup
+
+If the initialization wizard fails, you can manually set up the background services:
+
+### 1. Prepare Embedding (AI) Model Directory
+
+File Brain expects the embedding model to be in a specific system directory. Create it manually:
+
+**Linux / macOS:**
+
+```bash
+mkdir -p ~/.local/share/file-brain/typesense-data/models/ts_paraphrase-multilingual-mpnet-base-v2
+```
+
+**Windows (PowerShell):**
+
+```powershell
+New-Item -Path "$env:LOCALAPPDATA\file-brain\typesense-data\models\ts_paraphrase-multilingual-mpnet-base-v2" -ItemType Directory -Force
+```
+
+### 2. Download the Model Files
+
+You can browse the files in the [Hugging Face repository](https://huggingface.co/typesense/models-moved/tree/main/paraphrase-multilingual-mpnet-base-v2). Download these three files into the directory created above:
+
+- [config.json](https://huggingface.co/typesense/models-moved/resolve/main/paraphrase-multilingual-mpnet-base-v2/config.json)
+- [model.onnx](https://huggingface.co/typesense/models-moved/resolve/main/paraphrase-multilingual-mpnet-base-v2/model.onnx)
+- [sentencepiece.bpe.model](https://huggingface.co/typesense/models-moved/resolve/main/paraphrase-multilingual-mpnet-base-v2/sentencepiece.bpe.model)
+
+### 3. Pull Docker Images
+
+Run the following commands to manually pull the required services:
+
+```bash
+docker pull hamza5/tika:latest-full
+docker pull hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
+```
+
+_Note: Once the images are pulled and the model files are in place, File Brain will handle starting the services automatically on the next run._
