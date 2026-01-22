@@ -28,6 +28,16 @@ File Brain is a desktop application that helps you find files instantly using na
 - **🛡️ Read-Only & Safe**: File Brain only reads your files to index them. It never modifies, deletes, or alters your data in any way.
 - **🔒 Privacy First**: All indexing and AI processing happens 100% locally on your machine. Your data never leaves your computer.
 
+| App Name | Price | OS | Indexing | Search Speed | File Content Search | Fuzzy Search | Semantic Search | OCR |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Everything | Free | Windows | No | Instant | No | Wildcards/Regexp | No | No |
+| Listary | Free | Windows | No | Instant | No | Yes | No | No |
+| Alfred | Free | MacOS | No | Very fast | No | Yes | No | Yes |
+| Copernic | 25$/yr | Windows | Yes | Fast | 170+ formats | Partial | No | Yes |
+| DocFetcher | Free | Cross-platform | Yes | Fast | 32 formats | No | No | No |
+| Agent Ransack | Free | Windows | No | Slow | PDF and Office | Wildcards/Regexp | No | No |
+| **File Brain** | **Free** | **Cross-platform** | **Yes** | **Very fast** | **1000+ formats** | **Yes** | **Yes** | **Yes** |
+
 ## Prerequisites
 
 - **Python 3.11** or higher
