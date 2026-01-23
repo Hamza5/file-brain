@@ -77,8 +77,8 @@ pip install -U file-brain
     ![Initialization Wizard](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/wizard.png)
     _The easy-to-use setup wizard that guides you through downloading models and initializing the search database._
 
-    > [!TIP]
-    > If the automatic wizard fails to start the services or download the models, see the [Manual Setup](#manual-setup) section below.
+> [!TIP]
+> If the automatic wizard fails to start the services or download the models, see the [Manual Setup](#manual-setup) section below.
 
 3.  **Select Folders**:
     Choose the folders you want to index via the dashboard settings.
@@ -87,8 +87,8 @@ pip install -U file-brain
     - **Manual Indexing**: Performs a deep scan of all files. Great for initial setup.
     - **Auto-Indexing**: Watches for new or changed files and processes them instantly.
 
-    > [!NOTE]
-    > File Brain must be running for the background indexing to process your files.
+> [!NOTE]
+> File Brain must be running for the background indexing to process your files.
 
 ## Visualizing the Interaction
 
