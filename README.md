@@ -87,7 +87,8 @@ pip install -U file-brain
     - **Manual Indexing**: Performs a deep scan of all files. Great for initial setup.
     - **Auto-Indexing**: Watches for new or changed files and processes them instantly.
 
-    > **Note**: File Brain must be running for the background indexing to process your files.
+    > [!NOTE]
+    > File Brain must be running for the background indexing to process your files.
 
 ## Visualizing the Interaction
 
