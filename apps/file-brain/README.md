@@ -78,7 +78,7 @@ pip install -U file-brain
     _The easy-to-use setup wizard that guides you through downloading models and initializing the search database._
 
     > [!TIP]
-    > **Manual Setup (Fallback)**: If the automatic wizard fails to start the services or download the models, see the [Manual Setup](#manual-setup) section below.
+    > If the automatic wizard fails to start the services or download the models, see the [Manual Setup](#manual-setup) section below.
 
 3.  **Select Folders**:
     Choose the folders you want to index via the dashboard settings.
