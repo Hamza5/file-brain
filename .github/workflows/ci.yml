@@ -7,12 +7,14 @@ on:
     paths:
       - "apps/file-brain/**"
       - ".github/workflows/ci.yml"
+      - "!apps/file-brain/**/*.md"
   pull_request:
     branches:
       - main
     paths:
       - "apps/file-brain/**"
       - ".github/workflows/ci.yml"
+      - "!apps/file-brain/**/*.md"
 
 defaults:
   run:
