@@ -107,7 +107,7 @@ jobs:
         if: steps.version_check.outputs.changed == 'true'
         id: generate_changelog
         env:
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           # Get the previous tag
           previous_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
