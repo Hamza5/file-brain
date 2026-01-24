@@ -132,6 +132,8 @@ function AppContent({ searchClient }: { searchClient: any }) {
   );
 }
 
+import { usePostHog } from "./context/PostHogProvider";
+
 export default function App() {
   const [wizardNeeded, setWizardNeeded] = useState<boolean | null>(null);
   const [wizardStartStep, setWizardStartStep] = useState<number>(0);
@@ -143,7 +145,14 @@ export default function App() {
     null,
   );
   const [retryCount, setRetryCount] = useState<number>(0);
+  const posthog = usePostHog();
 
+  // Track when main UI is finally viewed (containers ready + search client loaded)
+  useEffect(() => {
+    if (containersReady && searchClient && posthog) {
+      posthog.capture('app_main_ui_viewed');
+    }
+  }, [containersReady, searchClient, posthog]);
   // Check startup requirements on mount with timeout and retry logic
   useEffect(() => {
     const MAX_RETRIES = 3;

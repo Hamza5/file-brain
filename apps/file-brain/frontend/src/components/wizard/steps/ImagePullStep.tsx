@@ -3,6 +3,7 @@ import { Message } from 'primereact/message';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { connectDockerPullStream, type DockerPullProgress } from '../../../api/client';
+import { usePostHog } from '../../../context/PostHogProvider';
 
 interface ImagePullStepProps {
   onComplete: () => void;
@@ -22,6 +23,7 @@ export const ImagePullStep: React.FC<ImagePullStepProps> = ({ onComplete }) => {
   const [pullState, setPullState] = useState<PullState | null>(null);
   const [pullLogs, setPullLogs] = useState<string[]>([]);
   const [pullComplete, setPullComplete] = useState(false);
+  const posthog = usePostHog();
 
   const checkImages = useCallback(async () => {
     if (pullComplete) return;
@@ -87,6 +89,12 @@ export const ImagePullStep: React.FC<ImagePullStepProps> = ({ onComplete }) => {
       (errorMsg: string) => {
         setError(errorMsg);
         setLoading(false);
+        if (posthog) {
+          posthog.capture('wizard_error', {
+            step_name: 'Image Pull',
+            error_message: errorMsg
+          });
+        }
       },
       () => {
         setPullComplete(true);

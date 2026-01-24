@@ -5,6 +5,7 @@ File operations API for cross-platform file opening functionality
 import os
 import platform
 import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List
@@ -191,6 +192,7 @@ def forget_file_from_index(file_path: str, typesense_client: TypesenseClient) ->
 @router.post("/open")
 def open_file_operation(request: FileOperationRequest):
     """Open a single file or containing folder"""
+    start_time = time.time()
     try:
         from file_brain.core.telemetry import telemetry
 
@@ -201,9 +203,12 @@ def open_file_operation(request: FileOperationRequest):
         else:
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'file' or 'folder'")
 
+        duration_ms = int((time.time() - start_time) * 1000)
         if success:
-            # Track file open
-            telemetry.capture_event("file_opened", {"operation": request.operation})
+            # Track file operation success
+            telemetry.capture_event(
+                "file_operation_success", {"operation": request.operation, "duration_ms": duration_ms}
+            )
 
             return {
                 "success": True,
@@ -212,6 +217,9 @@ def open_file_operation(request: FileOperationRequest):
                 "file_path": request.file_path,
             }
         else:
+            # Track file operation failure
+            telemetry.capture_event("file_operation_failure", {"operation": request.operation, "error": message})
+
             # Return 404 for file not found, 500 for other errors
             if "not found" in message.lower():
                 raise HTTPException(status_code=404, detail=message)
@@ -221,6 +229,10 @@ def open_file_operation(request: FileOperationRequest):
     except HTTPException:
         raise
     except Exception as e:
+        # Track unexpected failure
+        from file_brain.core.telemetry import telemetry
+
+        telemetry.capture_event("file_operation_failure", {"operation": request.operation, "error": str(e)})
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
@@ -331,6 +343,7 @@ def get_file_operation_info():
 @router.post("/delete")
 def delete_file_operation(request: FileOperationRequest):
     """Delete a single file from the filesystem and remove from search index"""
+    start_time = time.time()
     try:
         from file_brain.core.telemetry import telemetry
 
@@ -339,6 +352,7 @@ def delete_file_operation(request: FileOperationRequest):
 
         success, message = delete_file_cross_platform(request.file_path)
 
+        duration_ms = int((time.time() - start_time) * 1000)
         if success:
             # Immediately remove from search index to avoid slow watcher processing
             try:
@@ -347,10 +361,9 @@ def delete_file_operation(request: FileOperationRequest):
                 logger.info(f"Removed deleted file from search index: {request.file_path}")
             except Exception as e:
                 logger.warning(f"Failed to remove deleted file from index {request.file_path}: {e}")
-                # Don't fail the operation if index removal fails
 
-            # Track file deletion
-            telemetry.capture_event("file_deleted")
+            # Track file deletion success
+            telemetry.capture_event("file_operation_success", {"operation": "delete", "duration_ms": duration_ms})
 
             return {
                 "success": True,
@@ -359,18 +372,26 @@ def delete_file_operation(request: FileOperationRequest):
                 "file_path": request.file_path,
             }
         else:
+            # Track file deletion failure
+            telemetry.capture_event("file_operation_failure", {"operation": "delete", "error": message})
             raise HTTPException(status_code=500, detail=message)
 
     except HTTPException:
         raise
     except Exception as e:
+        from file_brain.core.telemetry import telemetry
+
+        telemetry.capture_event("file_operation_failure", {"operation": "delete", "error": str(e)})
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/forget")
 def forget_file_operation(request: FileOperationRequest):
     """Remove a single file from the search index"""
+    start_time = time.time()
     try:
+        from file_brain.core.telemetry import telemetry
+
         if request.operation != "forget":
             raise HTTPException(status_code=400, detail="Invalid operation. Must be 'forget'")
 
@@ -378,7 +399,11 @@ def forget_file_operation(request: FileOperationRequest):
         typesense_client = TypesenseClient()
         success, message = forget_file_from_index(request.file_path, typesense_client)
 
+        duration_ms = int((time.time() - start_time) * 1000)
         if success:
+            # Track index removal success
+            telemetry.capture_event("file_operation_success", {"operation": "forget", "duration_ms": duration_ms})
+
             return {
                 "success": True,
                 "message": message,
@@ -386,11 +411,16 @@ def forget_file_operation(request: FileOperationRequest):
                 "file_path": request.file_path,
             }
         else:
+            # Track index removal failure
+            telemetry.capture_event("file_operation_failure", {"operation": "forget", "error": message})
             raise HTTPException(status_code=500, detail=message)
 
     except HTTPException:
         raise
     except Exception as e:
+        from file_brain.core.telemetry import telemetry
+
+        telemetry.capture_event("file_operation_failure", {"operation": "forget", "error": str(e)})
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 

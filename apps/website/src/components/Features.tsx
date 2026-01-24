@@ -1,4 +1,6 @@
+'use client';
 import React from 'react';
+import { useSectionTracking } from '@/hooks/useSectionTracking';
 
 const features = [
     {
@@ -34,8 +36,10 @@ const features = [
 ];
 
 export const Features: React.FC = () => {
+    const sectionRef = useSectionTracking('features');
+
     return (
-        <section id="features" className="features-section py-8" style={{ backgroundColor: 'var(--surface-ground)' }}>
+        <section id="features" ref={sectionRef} className="features-section py-8" style={{ backgroundColor: 'var(--surface-ground)' }}>
             <div className="landing-container">
                 <div className="text-center mb-8">
                     <span className="font-bold uppercase tracking-widest text-sm" style={{ color: 'var(--primary-color)' }}>Powerful Capabilities</span>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Steps } from 'primereact/steps';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
@@ -12,6 +12,8 @@ import { ServiceStartStep } from './steps/ServiceStartStep';
 import { ModelDownloadStep } from './steps/ModelDownloadStep';
 import { CollectionCreateStep } from './steps/CollectionCreateStep';
 
+import { usePostHog } from '../../context/PostHogProvider';
+
 interface InitializationWizardProps {
   onComplete: () => void;
   startStep?: number;
@@ -22,15 +24,27 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
   const [activeStep, setActiveStep] = useState(startStep);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const posthog = usePostHog();
 
-  const steps = [
+  const steps = useMemo(() => [
     { label: 'System Check' },
     { label: 'Download Components' },
     { label: 'Initialize Engine' },
     { label: 'Download Embedding (AI) Model' },
     { label: 'Finalize Setup' },
     { label: 'Complete' },
-  ];
+  ], []);
+
+  // Track when a step is reached
+  useEffect(() => {
+    if (posthog) {
+      posthog.capture('wizard_step_reached', {
+        step_index: activeStep,
+        step_name: steps[activeStep].label,
+        is_upgrade: isUpgrade
+      });
+    }
+  }, [activeStep, posthog, isUpgrade, steps]);
 
   const handleStepComplete = (nextStep: number) => {
     setActiveStep(nextStep);
@@ -43,7 +57,14 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
       await completeWizard();
       onComplete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to complete wizard');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to complete wizard';
+      setError(errorMsg);
+      if (posthog) {
+        posthog.capture('wizard_error', {
+          step_name: 'Completion',
+          error_message: errorMsg
+        });
+      }
     } finally {
       setLoading(false);
     }

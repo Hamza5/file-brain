@@ -1,4 +1,6 @@
+'use client';
 import React from 'react';
+import { useSectionTracking } from '@/hooks/useSectionTracking';
 
 const useCases = [
     {
@@ -24,8 +26,10 @@ const useCases = [
 ];
 
 export const UseCases: React.FC = () => {
+    const sectionRef = useSectionTracking('use-cases');
+
     return (
-        <section id="use-cases" className="use-cases-section py-8" style={{ backgroundColor: 'var(--surface-section)' }}>
+        <section id="use-cases" ref={sectionRef} className="use-cases-section py-8" style={{ backgroundColor: 'var(--surface-section)' }}>
             <div className="landing-container">
                 <div className="text-center mb-8">
                     <span className="font-bold uppercase tracking-widest text-sm" style={{ color: 'var(--primary-color)' }}>Real World Scenarios</span>

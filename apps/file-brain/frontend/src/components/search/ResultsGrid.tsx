@@ -31,15 +31,32 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         file: null
     });
 
+    const searchStartTimeRef = React.useRef<number | null>(null);
+
+    // Track when a search starts to measure latency
+    useEffect(() => {
+        if (isSearching && !searchStartTimeRef.current) {
+            searchStartTimeRef.current = performance.now();
+        }
+    }, [isSearching]);
+
     // Track search events when results change
     useEffect(() => {
         if (results && query && posthog && !isSearching) {
+            const latency = searchStartTimeRef.current 
+                ? performance.now() - searchStartTimeRef.current 
+                : null;
+
             posthog.capture('search_performed', {
                 query_length: query.length,
                 result_count: results.hits.length,
                 has_results: results.hits.length > 0,
                 page: results.page,
+                search_latency_ms: latency ? Math.round(latency) : undefined
             });
+
+            // Reset start time for next search
+            searchStartTimeRef.current = null;
         }
     }, [results, query, posthog, isSearching]);
 

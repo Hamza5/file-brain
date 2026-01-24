@@ -4,8 +4,10 @@ import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
 import { ButtonProps } from "primereact/button";
 import posthog from "posthog-js";
+import { useSectionTracking } from "@/hooks/useSectionTracking";
 
 export const ProVersion = () => {
+  const sectionRef = useSectionTracking("pro-version");
   const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
   // Tier color CSS variable names (using PrimeReact color palette)
   const tierColors: Record<string, string> = {
@@ -142,6 +144,8 @@ export const ProVersion = () => {
 
   return (
     <section
+      id="pro-version"
+      ref={sectionRef}
       className="py-8"
       style={{ backgroundColor: "var(--surface-ground)" }}
     >

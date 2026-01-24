@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Message } from 'primereact/message';
 import { Button } from 'primereact/button';
 import { checkDockerInstallation, type DockerCheckResult } from '../../../api/client';
+import { usePostHog } from '../../../context/PostHogProvider';
 
 interface DockerCheckStepProps {
   onComplete: () => void;
@@ -20,6 +21,7 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({ onComplete }) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const platform = detectPlatform();
+  const posthog = usePostHog();
 
   const checkDocker = useCallback(async () => {
     setLoading(true);
@@ -32,11 +34,18 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({ onComplete }) 
         setTimeout(() => onComplete(), 1000);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to check Docker installation');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to check Docker installation';
+      setError(errorMsg);
+      if (posthog) {
+        posthog.capture('wizard_error', {
+          step_name: 'Docker Check',
+          error_message: errorMsg
+        });
+      }
     } finally {
       setLoading(false);
     }
-  }, [onComplete]);
+  }, [onComplete, posthog]);
 
   useEffect(() => {
     checkDocker();
