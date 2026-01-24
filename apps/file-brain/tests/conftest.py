@@ -4,16 +4,26 @@ Pytest configuration and shared fixtures for File Brain tests.
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
+from file_brain.core.config import settings
+
 # Import models BEFORE creating Base to ensure they're registered
 from file_brain.core.factory import create_app
 from file_brain.database.models import CrawlerState, Setting, WatchPath, WizardState  # noqa: F401
 from file_brain.database.models.base import Base, get_db
+
+
+@pytest.fixture(autouse=True)
+def disable_posthog():
+    """Globally disable PostHog for all tests."""
+    with patch.object(settings, "posthog_enabled", False):
+        yield
 
 
 @pytest.fixture(scope="function")
