@@ -103,11 +103,37 @@ jobs:
           git tag -a "v${{ steps.version_check.outputs.version }}" -m "Release v${{ steps.version_check.outputs.version }}"
           git push origin "v${{ steps.version_check.outputs.version }}"
 
+      - name: Generate Changelog
+        if: steps.version_check.outputs.changed == 'true'
+        id: generate_changelog
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Get the previous tag
+          previous_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$previous_tag" ]; then
+            # If no previous tag, get all commits
+            commit_messages=$(git log --pretty=format:"- %s")
+          else
+            commit_messages=$(git log ${previous_tag}..HEAD --pretty=format:"- %s")
+          fi
+
+          # Summarize using Gemini CLI
+          echo "Summarizing commits..."
+          changelog=$(echo "$commit_messages" | npx @google/gemini-cli "Summarize these commit messages into a concise, professional changelog with sections for Features, Bug Fixes, and Improvements. Do not include duplicate or trivial commits. Format the output as Markdown.")
+
+          # Store changelog for use in release step
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$changelog" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         if: steps.version_check.outputs.changed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ steps.version_check.outputs.version }}"
+          body: ${{ steps.generate_changelog.outputs.changelog }}
           files: |
             apps/file-brain/dist/*.whl
             apps/file-brain/dist/*.tar.gz
