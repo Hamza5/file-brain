@@ -40,6 +40,8 @@ jobs:
         run: poetry install
 
       - name: Run Tests
+        env:
+          FILEBRAIN_POSTHOG_ENABLED: "false"
         run: poetry run pytest
 
   build:
