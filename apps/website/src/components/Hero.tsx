@@ -49,16 +49,16 @@ export const Hero: React.FC = () => {
                             }}
                         />
                         <Button
-                            label="See Use Cases"
-                            icon="fa-solid fa-lightbulb"
+                            label="See File Brain in Action"
+                            icon="fa-solid fa-play"
                             className="p-button-rounded p-button-outlined p-button-lg"
                             style={{ color: 'var(--primary-color)' }}
                             onClick={() => {
-                                posthog.capture('cta_see_use_cases_clicked', {
+                                posthog.capture('cta_see_action_clicked', {
                                     location: 'hero_section',
-                                    target_section: 'use-cases',
+                                    target_section: 'demo',
                                 });
-                                document.getElementById('use-cases')?.scrollIntoView({ behavior: 'smooth' });
+                                document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                             }}
                         />
                     </div>
