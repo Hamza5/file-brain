@@ -4,6 +4,8 @@
 
 Empower your file search with AI-backed semantic intelligence. Find anything, anywhere, instantly.
 
+![File Brain Demo](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/FileBrain_demo_annotated.GIF)
+
 [Get Started](https://github.com/Hamza5/file-brain) | [Explore Features](#powerful-capabilities) | [See Use Cases](#real-world-scenarios)
 
 ---

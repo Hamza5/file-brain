@@ -15,6 +15,8 @@
   Find what you mean, not just what you say. File Brain runs locally on your machine to index and understand your files.
 </p>
 
+![File Brain Demo](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/FileBrain_demo_annotated.GIF)
+
 ## What is File Brain?
 
 File Brain is a desktop application that helps you find files instantly using natural language. Instead of remembering exact filenames, you can ask questions like "flight ticket invoice", and File Brain uses AI to understand the meaning and show the relevant files.
