@@ -153,3 +153,32 @@ docker pull hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
 ```
 
 _Note: Once the images are pulled and the model files are in place, File Brain will handle starting the services automatically on the next run._
+
+## Optional: PDF OCR Text Layer
+
+File Brain can optionally add searchable text layers to scanned PDFs using [OCRmyPDF](https://ocrmypdf.readthedocs.io/). This makes your scanned PDFs searchable in other applications as well, not just within File Brain.
+
+### Installation
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install ocrmypdf tesseract-ocr tesseract-ocr-eng
+```
+
+**macOS:**
+```bash
+brew install ocrmypdf
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S ocrmypdf tesseract tesseract-data-eng
+```
+
+### Enabling OCR
+
+1. Open File Brain
+2. Click the settings icon to open **Index Management**
+3. Toggle **Enable OCR Processing** in the PDF OCR card
+
+When enabled, PDFs will be processed with OCRmyPDF after indexing, adding a searchable text layer. PDFs that already have text are automatically skipped.

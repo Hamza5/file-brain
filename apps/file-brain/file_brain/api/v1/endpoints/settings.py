@@ -25,12 +25,49 @@ class SettingResponse(BaseModel):
     description: str | None = None
 
 
+class OcrStatusResponse(BaseModel):
+    """Response model for OCRmyPDF status endpoint."""
+
+    available: bool
+    version: str | None = None
+    error: str | None = None
+    enabled: bool
+    setting_key: str
+
+
 @router.get("/")
 def get_all_settings(db: Session = Depends(get_db)):
     """Get all settings"""
     settings_repo = SettingsRepository(db)
     settings = settings_repo.get_all_as_dict()
     return settings
+
+
+# NOTE: This endpoint MUST be defined before /{key} to avoid route conflicts
+@router.get("/ocrmypdf-status", response_model=OcrStatusResponse)
+def get_ocrmypdf_status(db: Session = Depends(get_db)):
+    """
+    Get OCRmyPDF availability and enabled status.
+
+    Returns whether ocrmypdf is installed, its version (if available),
+    and whether OCR processing is currently enabled in settings.
+    """
+    from file_brain.services.ocrmypdf_service import (
+        OCRMYPDF_ENABLED_KEY,
+        is_ocrmypdf_available,
+    )
+
+    available, version_or_error = is_ocrmypdf_available()
+    settings_repo = SettingsRepository(db)
+    enabled = settings_repo.get_bool(OCRMYPDF_ENABLED_KEY, default=False)
+
+    return OcrStatusResponse(
+        available=available,
+        version=version_or_error if available else None,
+        error=version_or_error if not available else None,
+        enabled=enabled,
+        setting_key=OCRMYPDF_ENABLED_KEY,
+    )
 
 
 @router.get("/{key}")

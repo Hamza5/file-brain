@@ -917,3 +917,26 @@ export interface IndexStorageResponse {
 export async function getIndexStorage(): Promise<IndexStorageResponse> {
   return requestJSON("/api/v1/stats/index-storage");
 }
+
+// OCRmyPDF Settings API
+export interface OcrStatus {
+  available: boolean;
+  version: string | null;
+  error: string | null;
+  enabled: boolean;
+  setting_key: string;
+}
+
+export async function getOcrStatus(): Promise<OcrStatus> {
+  return requestJSON("/api/v1/config/settings/ocrmypdf-status");
+}
+
+export async function updateSetting(
+  key: string,
+  value: string
+): Promise<{ key: string; value: string; description: string | null }> {
+  return requestJSON(
+    `/api/v1/config/settings/${encodeURIComponent(key)}?value=${encodeURIComponent(value)}`,
+    { method: "PUT" }
+  );
+}

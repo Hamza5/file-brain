@@ -108,6 +108,18 @@ class FileIndexer:
                 metadata=document_content.metadata,
             )
 
+        # OCR PDF if enabled (adds searchable text layer to scanned PDFs)
+        if Path(file_path).suffix.lower() == ".pdf":
+            from file_brain.services.ocrmypdf_service import (
+                is_ocrmypdf_enabled,
+                process_pdf_with_ocr,
+            )
+
+            if is_ocrmypdf_enabled():
+                success, error = process_pdf_with_ocr(file_path)
+                if not success and error:
+                    logger.warning(f"OCR processing failed for {file_path}: {error}")
+
         return True
 
     def _handle_delete_operation(self, operation: CrawlOperation) -> bool:

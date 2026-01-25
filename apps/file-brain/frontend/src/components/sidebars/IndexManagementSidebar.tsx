@@ -1,9 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
 import { confirmDialog } from 'primereact/confirmdialog';
-import { clearIndexes, resetWizard } from '../../api/client';
+import { InputSwitch } from 'primereact/inputswitch';
+import { Tag } from 'primereact/tag';
+import { clearIndexes, resetWizard, getOcrStatus, updateSetting } from '../../api/client';
+import type { OcrStatus } from '../../api/client';
 
 interface IndexManagementSidebarProps {
     visible: boolean;
@@ -13,7 +16,50 @@ interface IndexManagementSidebarProps {
 export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ visible, onHide }) => {
     const [clearingIndexes, setClearingIndexes] = useState(false);
     const [resettingWizard, setResettingWizard] = useState(false);
+    const [ocrStatus, setOcrStatus] = useState<OcrStatus | null>(null);
+    const [ocrLoading, setOcrLoading] = useState(false);
     const toast = useRef<Toast>(null);
+
+    // Load OCR status when sidebar opens
+    useEffect(() => {
+        if (visible) {
+            loadOcrStatus();
+        }
+    }, [visible]);
+
+    const loadOcrStatus = async () => {
+        try {
+            const status = await getOcrStatus();
+            setOcrStatus(status);
+        } catch {
+            // OCR status endpoint might not exist on older versions
+            setOcrStatus(null);
+        }
+    };
+
+    const handleOcrToggle = async (enabled: boolean) => {
+        if (!ocrStatus) return;
+        setOcrLoading(true);
+        try {
+            await updateSetting(ocrStatus.setting_key, enabled ? 'true' : 'false');
+            setOcrStatus({ ...ocrStatus, enabled });
+            toast.current?.show({
+                severity: 'success',
+                summary: 'Success',
+                detail: `PDF OCR processing ${enabled ? 'enabled' : 'disabled'}`,
+                life: 3000
+            });
+        } catch {
+            toast.current?.show({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Failed to update OCR setting',
+                life: 5000
+            });
+        } finally {
+            setOcrLoading(false);
+        }
+    };
 
     const handleClearIndexes = () => {
         confirmDialog({
@@ -104,7 +150,44 @@ export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ 
         >
             <Toast ref={toast} />
             <div className="grid">
-                <div className="col-12 md:col-6">
+                {/* PDF OCR Card */}
+                <div className="col-12 md:col-4">
+                    <div className="surface-card p-4 border-round-xl border-1 surface-border hover:shadow-2 transition-duration-200 h-full flex flex-column justify-content-between">
+                        <div>
+                            <div className="flex align-items-center gap-2 mb-2">
+                                <div className="bg-blue-50 text-blue-500 border-round w-2rem h-2rem flex align-items-center justify-content-center">
+                                    <i className="fa-solid fa-file-pdf" />
+                                </div>
+                                <span className="text-lg font-semibold text-900">PDF OCR</span>
+                                {ocrStatus?.available ? (
+                                    <Tag severity="success" value={ocrStatus.version || 'Available'} className="text-xs" />
+                                ) : ocrStatus ? (
+                                    <Tag severity="danger" value="Not Installed" className="text-xs" />
+                                ) : null}
+                            </div>
+                            <p className="text-secondary m-0 mb-3 line-height-3">
+                                Add searchable text layers to scanned PDFs using OCRmyPDF. Requires ocrmypdf to be installed on the system.
+                            </p>
+                            {ocrStatus && !ocrStatus.available && ocrStatus.error && (
+                                <p className="text-orange-500 text-sm m-0 mb-3">
+                                    <i className="fa-solid fa-circle-info mr-1" />
+                                    {ocrStatus.error}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex align-items-center justify-content-between pt-2 border-top-1 surface-border">
+                            <span className="text-sm font-medium">Enable OCR Processing</span>
+                            <InputSwitch
+                                checked={ocrStatus?.enabled ?? false}
+                                onChange={(e) => handleOcrToggle(e.value)}
+                                disabled={!ocrStatus?.available || ocrLoading}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Reset Search Data Card */}
+                <div className="col-12 md:col-4">
                     <div className="surface-card p-4 border-round-xl border-1 surface-border hover:shadow-2 transition-duration-200 h-full flex flex-column justify-content-between">
                         <div>
                             <div className="flex align-items-center gap-2 mb-2">
@@ -128,7 +211,8 @@ export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ 
                     </div>
                 </div>
 
-                <div className="col-12 md:col-6">
+                {/* Reconfigure System Card */}
+                <div className="col-12 md:col-4">
                     <div className="surface-card p-4 border-round-xl border-1 surface-border hover:shadow-2 transition-duration-200 h-full flex flex-column justify-content-between">
                         <div>
                             <div className="flex align-items-center gap-2 mb-2">
