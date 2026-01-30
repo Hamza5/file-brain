@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check if version changed
         id: version_check
@@ -109,8 +109,26 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # Get the previous tag
-          previous_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ "${{ steps.version_check.outputs.prerelease }}" == "false" ]; then
+            echo "Stable release detected. Searching for last stable tag..."
+            all_tags=$(git tag --merged HEAD --sort=-v:refname)
+            previous_tag=""
+            current_tag="v${{ steps.version_check.outputs.version }}"
+            for t in $all_tags; do
+              if [ "$t" == "$current_tag" ]; then continue; fi
+              # Check if t is a prerelease (matches patterns like a1, b2, rc1, alpha, etc. or contains a hyphen)
+              if [[ "$t" =~ (a|b|rc|alpha|beta|dev|pre) ]] || [[ "$t" == *-* ]]; then
+                continue
+              fi
+              previous_tag=$t
+              break
+            done
+            echo "Found previous stable tag: $previous_tag"
+          else
+            echo "Prerelease detected. Using last tag for changelog."
+            previous_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            echo "Previous tag: $previous_tag"
+          fi
 
           if [ -z "$previous_tag" ]; then
             # If no previous tag, get all commits
@@ -121,7 +139,7 @@ jobs:
 
           # Summarize using Gemini CLI
           echo "Summarizing commits..."
-          changelog=$(echo "$commit_messages" | npx @google/gemini-cli "Summarize these commit messages into a concise, professional changelog with sections for Features, Bug Fixes, and Improvements. Do not include duplicate or trivial commits. Format the output as Markdown.")
+          changelog=$(echo "$commit_messages" | npx @google/gemini-cli "Summarize these commit messages into a concise, professional changelog with sections for Features, Bug Fixes, and Improvements. Do not include duplicate or trivial commits. Format the output as Markdown. Do not wrap it in a code block.")
 
           # Store changelog for use in release step
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
