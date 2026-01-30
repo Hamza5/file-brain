@@ -74,40 +74,85 @@ class DockerManager:
         """Check if Docker or Podman is installed"""
         return self.docker_cmd is not None
 
-    def get_docker_info(self) -> Dict[str, str]:
+    def get_docker_info(self) -> Dict[str, any]:
         """
-        Get information about the docker installation
+        Get information about the docker installation and check if daemon is running.
 
         Returns:
-            Dictionary with docker info
+            Dictionary with docker info, including status of the daemon.
         """
         if not self.docker_cmd:
-            return {"available": False, "command": None, "error": "Docker/Podman not found"}
+            return {
+                "available": False,
+                "running": False,
+                "command": None,
+                "error": (
+                    "Docker/Podman not found. Please install Docker Desktop (Windows/Mac) or Docker Engine (Linux)."
+                ),
+            }
 
         try:
-            # Get docker version
-            result = subprocess.run(
+            # 1. Get version info (fast, usually doesn't need daemon)
+            version_result = subprocess.run(
                 [self.docker_cmd, "--version"],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
+            version = version_result.stdout.strip() if version_result.returncode == 0 else "Unknown"
 
-            version = result.stdout.strip() if result.returncode == 0 else "Unknown"
+            # 2. Check if daemon is actually running
+            # 'docker info' or 'docker version' (without --version) requires daemon connection
+            daemon_check = subprocess.run(
+                [self.docker_cmd, "version", "--format", "{{.Server.Version}}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            is_running = daemon_check.returncode == 0
+            error_msg = None
+
+            if not is_running:
+                stderr = daemon_check.stderr.lower()
+                if "createfile" in stderr or "system cannot find the file specified" in stderr:
+                    error_msg = (
+                        f"{self.docker_cmd.capitalize()} is installed but the background service (daemon) "
+                        "is not running. Please start Docker Desktop."
+                    )
+                elif "permission denied" in stderr or "connect: permission denied" in stderr:
+                    error_msg = (
+                        f"Permission denied while connecting to {self.docker_cmd}. "
+                        "Please add your user to the 'docker' group."
+                    )
+                else:
+                    error_msg = (
+                        f"{self.docker_cmd.capitalize()} daemon is not responding. Ensure it is started and accessible."
+                    )
 
             return {
                 "available": True,
+                "running": is_running,
                 "command": self.docker_cmd,
                 "version": version,
+                "error": error_msg,
                 "compose_file": str(self.compose_file),
                 "compose_exists": self.compose_file.exists(),
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                "available": True,
+                "running": False,
+                "command": self.docker_cmd,
+                "error": f"Connection to {self.docker_cmd} timed out. The service might be frozen or starting up.",
             }
         except Exception as e:
             logger.error(f"Error getting docker info: {e}")
             return {
-                "available": False,
+                "available": True,
+                "running": False,
                 "command": self.docker_cmd,
-                "error": str(e),
+                "error": f"Unexpected error checking {self.docker_cmd}: {str(e)}",
             }
 
     def _get_images_from_compose(self) -> List[str]:
@@ -530,7 +575,17 @@ class DockerManager:
                 "error": "Docker/Podman not found. Please install Docker or Podman to continue.",
             }
 
-        if not self.compose_file.exists():
+        # 1. Check if daemon is running
+        info = self.get_docker_info()
+        if not info.get("running"):
+            return {
+                "success": False,
+                "error": info.get("error")
+                or f"{self.docker_cmd.capitalize()} daemon is not running. Please start it first.",
+            }
+
+        # 2. Check if compose file exists
+        if not info.get("compose_exists"):
             return {
                 "success": False,
                 "error": f"docker-compose.yml not found at {self.compose_file}",
@@ -652,8 +707,16 @@ class DockerManager:
         Returns:
             Dictionary with service statuses
         """
-        if not self.docker_cmd:
-            return {"success": False, "error": "Docker/Podman not found"}
+        # Check if daemon is running
+        info = self.get_docker_info()
+        if not info.get("running"):
+            return {
+                "success": False,
+                "running": False,
+                "healthy": False,
+                "services": [],
+                "error": info.get("error") or f"{self.docker_cmd.capitalize()} daemon is not running.",
+            }
 
         try:
             if self.docker_cmd == "docker":

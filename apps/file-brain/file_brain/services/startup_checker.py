@@ -148,19 +148,24 @@ class StartupChecker:
         self.typesense_client = get_typesense_client()
 
     def check_docker_available(self) -> CheckDetail:
-        """Check if Docker/Podman is installed and accessible"""
+        """Check if Docker/Podman is installed AND the daemon is running"""
         try:
             info = self.docker_manager.get_docker_info()
-            if info.get("available"):
-                version = info.get("version", "unknown")
-                command = info.get("command", "docker")
-                return CheckDetail(passed=True, message=f"{command} {version}")
-            else:
+            if not info.get("available"):
                 error = info.get("error", "Not found")
-                return CheckDetail(passed=False, message=f"Docker/Podman not available: {error}")
+                return CheckDetail(passed=False, message=f"Docker/Podman not installed: {error}")
+
+            if not info.get("running"):
+                error = info.get("error", "Daemon not running")
+                return CheckDetail(passed=False, message=f"Docker service not running: {error}")
+
+            version = info.get("version", "unknown")
+            command = info.get("command", "docker")
+            return CheckDetail(passed=True, message=f"{command.capitalize()} is running ({version})")
+
         except Exception as e:
-            logger.error(f"Error checking Docker availability: {e}")
-            return CheckDetail(passed=False, message=f"Error: {str(e)}")
+            logger.error(f"Error checking Docker status: {e}")
+            return CheckDetail(passed=False, message=f"Error checking Docker: {str(e)}")
 
     def check_docker_images(self) -> CheckDetail:
         """Check if required Docker images are present locally"""

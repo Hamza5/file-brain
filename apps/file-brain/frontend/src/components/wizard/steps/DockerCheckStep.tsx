@@ -29,8 +29,8 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({ onComplete }) 
     try {
       const result = await checkDockerInstallation();
       setDockerCheck(result);
-      if (result.available) {
-        // Auto-proceed to next step if docker is available
+      if (result.available && result.running) {
+        // Auto-proceed to next step if docker is available and running
         setTimeout(() => onComplete(), 1000);
       }
     } catch (err) {
@@ -77,15 +77,75 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({ onComplete }) 
         <div className="flex flex-column gap-2">
           {dockerCheck.available ? (
             <>
-              <Message severity="success" text="Docker/Podman is installed and ready!" />
-              <div className="flex flex-column gap-1 text-sm">
-                <div>
-                  <strong>Command:</strong> {dockerCheck.command}
-                </div>
-                <div>
-                  <strong>Version:</strong> {dockerCheck.version}
-                </div>
-              </div>
+              {dockerCheck.running ? (
+                <>
+                  <Message severity="success" text="Docker/Podman is installed and ready!" />
+                  <div className="flex flex-column gap-1 text-sm">
+                    <div>
+                      <strong>Command:</strong> {dockerCheck.command}
+                    </div>
+                    <div>
+                      <strong>Version:</strong> {dockerCheck.version}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Message
+                    severity="warn"
+                    className="text-lg w-full"
+                    text={
+                      <div className="flex flex-column gap-2">
+                        <div className="text-xl font-bold">
+                          <i className="fas fa-play mr-2" />
+                          {dockerCheck.command?.toUpperCase()} Service Not Running
+                        </div>
+                        <div>
+                          {dockerCheck.error || `The ${dockerCheck.command} desktop application or background service needs to be started.`}
+                        </div>
+                      </div>
+                    }
+                  />
+                  
+                  <div className="p-4 surface-100 border-round mt-2">
+                    <h4 className="mt-0 mb-3">
+                      <i className="fas fa-magic mr-2" />
+                      How to start {dockerCheck.command}
+                    </h4>
+                    
+                    <ul className="text-sm pl-4 mb-4 line-height-3">
+                      {platform === 'Windows' && (
+                        <>
+                          <li>Open the <strong>Start Menu</strong> and type &quot;Docker Desktop&quot;</li>
+                          <li>Launch the application and wait for the status to show &quot;Running&quot;</li>
+                          <li>Once the Docker whale icon in your taskbar is steady, click Retry below</li>
+                        </>
+                      )}
+                      {platform === 'macOS' && (
+                        <>
+                          <li>Open <strong>Applications</strong> and launch &quot;Docker&quot;</li>
+                          <li>Wait for the Docker icon in the menu bar to stop animating</li>
+                          <li>Once it shows &quot;Docker Desktop is running&quot;, click Retry below</li>
+                        </>
+                      )}
+                      {platform === 'Linux' && (
+                        <>
+                          <li>Run <code>sudo systemctl start docker</code> in your terminal</li>
+                          <li>Check status with <code>systemctl status docker</code></li>
+                          <li>Once the service is active, click Retry below</li>
+                        </>
+                      )}
+                    </ul>
+
+                    <Button 
+                      label="Retry Check" 
+                      icon="fas fa-sync" 
+                      onClick={checkDocker} 
+                      className="w-full"
+                    />
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <>

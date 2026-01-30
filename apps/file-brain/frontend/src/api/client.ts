@@ -449,6 +449,7 @@ export interface WizardStatus {
 
 export interface DockerCheckResult {
   available: boolean;
+  running: boolean;
   command?: string;
   version?: string;
   error?: string;
