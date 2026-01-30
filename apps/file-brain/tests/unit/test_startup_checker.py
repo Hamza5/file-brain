@@ -81,6 +81,7 @@ def test_check_docker_available_success(startup_checker, mock_docker_manager):
     """Docker check passes when Docker is available."""
     mock_docker_manager.get_docker_info.return_value = {
         "available": True,
+        "running": True,
         "command": "docker",
         "version": "27.0.1",
     }
@@ -88,20 +89,22 @@ def test_check_docker_available_success(startup_checker, mock_docker_manager):
     result = startup_checker.check_docker_available()
 
     assert result.passed is True
-    assert "docker 27.0.1" in result.message
+    assert "running" in result.message.lower()
+    assert "27.0.1" in result.message
 
 
 def test_check_docker_available_failure(startup_checker, mock_docker_manager):
     """Docker check fails when Docker is not available."""
     mock_docker_manager.get_docker_info.return_value = {
         "available": False,
+        "running": False,
         "error": "Command not found",
     }
 
     result = startup_checker.check_docker_available()
 
     assert result.passed is False
-    assert "not available" in result.message
+    assert "not installed" in result.message.lower()
 
 
 def test_check_docker_images_success(startup_checker, mock_docker_manager):
@@ -248,7 +251,12 @@ def test_perform_all_checks_all_pass(
 ):
     """All checks pass in ideal scenario."""
     # Setup all mocks to return success
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True, "missing": []}
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
@@ -265,7 +273,7 @@ def test_perform_all_checks_all_pass(
 
 def test_perform_all_checks_docker_missing(startup_checker, mock_docker_manager):
     """First check fails when Docker is missing."""
-    mock_docker_manager.get_docker_info.return_value = {"available": False, "error": "Not found"}
+    mock_docker_manager.get_docker_info.return_value = {"available": False, "running": False, "error": "Not found"}
     # Other checks don't matter if Docker is missing
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
@@ -284,7 +292,12 @@ def test_perform_all_checks_images_missing(
 ):
     """Images check fails in upgrade scenario."""
     # Docker available but images missing
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {
         "success": True,
         "all_present": False,
@@ -307,7 +320,12 @@ def test_perform_all_checks_services_not_healthy(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Services check fails when containers are running but unhealthy - wizard should NOT show."""
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": False, "running": True}
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
@@ -326,7 +344,12 @@ def test_perform_all_checks_services_not_running(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Services not running should NOT trigger wizard - app will start them automatically."""
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": False, "running": False}
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
@@ -344,7 +367,12 @@ def test_perform_all_checks_model_missing(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Model check fails when model isn't downloaded."""
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
     mock_model_downloader.check_model_exists.return_value = {"exists": False, "missing_files": ["model.safetensors"]}
@@ -363,7 +391,12 @@ def test_perform_all_checks_collection_missing(
     startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
 ):
     """Collection check fails when collection doesn't exist."""
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
@@ -403,7 +436,12 @@ def test_perform_all_checks_early_exit_wizard_reset(
         mock_repo_class.return_value = mock_repo
 
         # Setup mocks - these should NOT be called because of early exit
-        mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+        mock_docker_manager.get_docker_info.return_value = {
+            "available": True,
+            "running": True,
+            "command": "docker",
+            "version": "27.0.1",
+        }
         mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
 
         result = startup_checker.perform_all_checks()
@@ -424,7 +462,12 @@ def test_perform_all_checks_early_exit_model_missing(
 ):
     """Network checks are skipped when model is missing."""
     mock_model_downloader.check_model_exists.return_value = {"exists": False, "missing_files": ["model.safetensors"]}
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
 
     result = startup_checker.perform_all_checks()
@@ -445,7 +488,12 @@ def test_perform_all_checks_early_exit_images_missing(
 ):
     """Network checks are skipped when Docker images are missing."""
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {
         "success": True,
         "all_present": False,
@@ -469,7 +517,12 @@ def test_perform_all_checks_network_checks_run_when_needed(
 ):
     """Network checks ARE run when all critical checks pass (wizard might not be needed)."""
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
-    mock_docker_manager.get_docker_info.return_value = {"available": True, "command": "docker", "version": "27.0.1"}
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
     mock_typesense_client.check_collection_exists.return_value = True
