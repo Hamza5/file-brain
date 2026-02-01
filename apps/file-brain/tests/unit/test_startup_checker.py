@@ -81,7 +81,6 @@ def test_check_docker_available_success(startup_checker, mock_docker_manager):
     """Docker check passes when Docker is available."""
     mock_docker_manager.get_docker_info.return_value = {
         "available": True,
-        "running": True,
         "command": "docker",
         "version": "27.0.1",
     }
@@ -89,7 +88,7 @@ def test_check_docker_available_success(startup_checker, mock_docker_manager):
     result = startup_checker.check_docker_available()
 
     assert result.passed is True
-    assert "running" in result.message.lower()
+    assert "installed" in result.message.lower()
     assert "27.0.1" in result.message
 
 
@@ -97,7 +96,6 @@ def test_check_docker_available_failure(startup_checker, mock_docker_manager):
     """Docker check fails when Docker is not available."""
     mock_docker_manager.get_docker_info.return_value = {
         "available": False,
-        "running": False,
         "error": "Command not found",
     }
 
@@ -105,22 +103,6 @@ def test_check_docker_available_failure(startup_checker, mock_docker_manager):
 
     assert result.passed is False
     assert "not installed" in result.message.lower()
-
-
-def test_check_docker_daemon_not_running(startup_checker, mock_docker_manager):
-    """Docker check fails when Docker is installed but daemon is not running."""
-    mock_docker_manager.get_docker_info.return_value = {
-        "available": True,
-        "running": False,
-        "command": "docker",
-        "version": "27.0.1",
-        "error": "Docker daemon is not running. Please start Docker Desktop.",
-    }
-
-    result = startup_checker.check_docker_available()
-
-    assert result.passed is False
-    assert "not running" in result.message.lower()
 
 
 def test_check_docker_images_success(startup_checker, mock_docker_manager):
