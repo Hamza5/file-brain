@@ -19,7 +19,7 @@ export const Hero: React.FC = () => {
                     </h1>
                     
                     <p className="text-xl mb-6 max-w-30rem mx-auto" style={{ color: 'var(--text-color-secondary)' }}>
-                        Empower your file search with AI-backed semantic intelligence. Find anything, anywhere, instantly.
+                        Empower your file search with advanced semantic intelligence. Find anything, anywhere, instantly.
                     </p>
                     
                     <div className="flex gap-3 justify-content-center mb-6">

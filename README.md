@@ -1,7 +1,7 @@
 <div align="center">
   <img src="docs/images/logo.svg" alt="File Brain Logo" width="120" />
   <h1>File Brain</h1>
-  <p><strong>Your Local AI Search Engine</strong></p>
+  <p><strong>Your Intelligent Local File Finder</strong></p>
 
 [![CI](https://github.com/hamza5/file-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/ci.yml)
 [![Release](https://github.com/hamza5/file-brain/actions/workflows/release.yml/badge.svg)](https://github.com/hamza5/file-brain/actions/workflows/release.yml)
@@ -19,7 +19,7 @@
 
 ## What is File Brain?
 
-File Brain is a desktop application that helps you find files instantly using natural language. Instead of remembering exact filenames, you can ask questions like "flight ticket invoice", and File Brain uses AI to understand the meaning and show the relevant files.
+File Brain is a desktop application that helps you find files instantly using natural language. Instead of remembering exact filenames, you can ask questions like "flight ticket invoice", and File Brain uses semantic search to understand the meaning and show the relevant files.
 
 ## Key Features
 
@@ -31,7 +31,7 @@ File Brain is a desktop application that helps you find files instantly using na
 - **👁️ OCR Support**: Automatically extracts text from screenshots, and scanned documents.
 - **⚡ Auto-Indexing**: Detects changes in real-time and updates the index instantly.
 - **🛡️ Read-Only & Safe**: File Brain only reads your files to index them. It never modifies, deletes, or alters your data in any way.
-- **🔒 Privacy First**: All indexing and AI processing happens 100% locally on your machine. Your data never leaves your computer.
+- **🔒 Privacy First**: All indexing and processing happens 100% locally on your machine. Your data never leaves your computer.
 
 ## Why File Brain?
 
@@ -73,7 +73,7 @@ pip install -U file-brain
     1.  **System Check**: Verifies Docker is running.
     2.  **Download Components**: Downloads the necessary search services.
     3.  **Initialize Engine**: Starts the background search components.
-    4.  **Download Embedding (AI) Model**: Fetches the embedding (AI) model for intelligent search.
+    4.  **Download Embedding Model**: Fetches the embedding model for intelligent search.
     5.  **Finalize Setup**: Initializes the search engine database.
 
     ![Initialization Wizard](docs/images/wizard.png)
@@ -121,7 +121,7 @@ Want more power? The **PRO** version is on the way with advanced capabilities:
 
 If the initialization wizard fails, you can manually set up the background services:
 
-### 1. Prepare Embedding (AI) Model Directory
+### 1. Prepare Embedding Model Directory
 
 File Brain expects the embedding model to be in a specific system directory. Create it manually:
 

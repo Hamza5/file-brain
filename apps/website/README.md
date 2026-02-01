@@ -2,7 +2,7 @@
 
 > UNLOCK YOUR PRODUCTIVITY POTENTIAL
 
-Empower your file search with AI-backed semantic intelligence. Find anything, anywhere, instantly.
+Empower your file search with advanced semantic intelligence. Find anything, anywhere, instantly.
 
 ![File Brain Demo](https://raw.githubusercontent.com/hamza5/file-brain/main/docs/images/FileBrain_demo_annotated.GIF)
 
@@ -66,6 +66,9 @@ Researching a topic? Find connections between scattered documents and notes to b
 
 One-time payment. Auto-updates and priority support for one year.
 
+> [!TIP]
+> **Preorder Bonus:** Request specific features and we will consider them for the Pro release!
+
 ### 🧠 Knowledge Engine
 
 **$99** (Preorder) / ~~$149~~
@@ -108,13 +111,3 @@ One-time payment. Auto-updates and priority support for one year.
 | Cloud storage                 |   ❌   |        ❌        |      ❌       |      ✅       |
 | Updates                       | Manual |  Auto (1 year)   | Auto (1 year) | Auto (1 year) |
 | Priority support              |   ❌   |      1 year      |    1 year     |    1 year     |
-
----
-
-## Ready to master your data?
-
-Get started with File Brain today and experience the future of local file search.
-
-[Check Installation Instructions](https://github.com/Hamza5/file-brain) | [Contact Us](mailto:hamza.abbad@scrapingbrain.com?subject=File%20Brain%20Inquiry)
-
----

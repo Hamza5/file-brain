@@ -17,9 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "File Brain - Effortless Local File Search",
+  title: "File Brain - Effortless Intelligent Search For Your Files",
   description:
-    "File Brain indexes your local files and makes them searchable with AI-powered semantic search. Privacy-first, lightning-fast, and works completely offline.",
+    "File Brain indexes your local files and makes them searchable with semantic search. Privacy-first, lightning-fast, and works completely offline.",
   keywords: [
     "file search",
     "local search",
@@ -42,23 +42,23 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://file-brain.com",
     siteName: "File Brain",
-    title: "File Brain - Effortless Local File Search",
+    title: "File Brain - Effortless Intelligent Search For Your Files",
     description:
-      "File Brain indexes your local files and makes them searchable with AI-powered semantic search. Privacy-first, lightning-fast, and works completely offline.",
+      "File Brain indexes your local files and makes them searchable with semantic search. Privacy-first, lightning-fast, and works completely offline.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "File Brain - Local AI-Powered File Search Engine",
+        alt: "File Brain - Local Semantic File Search Engine",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "File Brain - Effortless Local File Search",
+    title: "File Brain - Effortless Intelligent Search For Your Files",
     description:
-      "File Brain indexes your local files and makes them searchable with AI-powered semantic search. Privacy-first, lightning-fast, and works completely offline.",
+      "File Brain indexes your local files and makes them searchable with semantic search. Privacy-first, lightning-fast, and works completely offline.",
     images: ["/og-image.png"],
   },
   robots: {
