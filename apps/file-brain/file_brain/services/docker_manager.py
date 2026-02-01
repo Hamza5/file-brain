@@ -115,20 +115,53 @@ class DockerManager:
 
             if not is_running:
                 stderr = daemon_check.stderr.lower()
-                if "createfile" in stderr or "system cannot find the file specified" in stderr:
-                    error_msg = (
-                        f"{self.docker_cmd.capitalize()} is installed but the background service (daemon) "
-                        "is not running. Please start Docker Desktop."
-                    )
-                elif "permission denied" in stderr or "connect: permission denied" in stderr:
-                    error_msg = (
-                        f"Permission denied while connecting to {self.docker_cmd}. "
-                        "Please add your user to the 'docker' group."
-                    )
+
+                # Log the actual error for debugging
+                logger.debug(f"Docker daemon check failed. Return code: {daemon_check.returncode}")
+                logger.debug(f"Stderr: {daemon_check.stderr}")
+                logger.debug(f"Stdout: {daemon_check.stdout}")
+
+                # Try fallback check using 'docker info' which might work better on Windows
+                logger.debug("Attempting fallback check with 'docker info'")
+                info_check = subprocess.run(
+                    [self.docker_cmd, "info", "--format", "{{.ServerVersion}}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+
+                if info_check.returncode == 0:
+                    # Fallback succeeded - daemon is actually running
+                    logger.info("Docker daemon is running (confirmed via 'docker info' fallback)")
+                    is_running = True
                 else:
-                    error_msg = (
-                        f"{self.docker_cmd.capitalize()} daemon is not responding. Ensure it is started and accessible."
-                    )
+                    # Both checks failed - daemon is truly not running
+                    logger.debug(f"Fallback check also failed. Return code: {info_check.returncode}")
+                    logger.debug(f"Fallback stderr: {info_check.stderr}")
+
+                    # Analyze error messages from both attempts
+                    combined_stderr = (stderr + " " + info_check.stderr.lower()).strip()
+
+                    if "createfile" in combined_stderr or "system cannot find the file specified" in combined_stderr:
+                        error_msg = (
+                            f"{self.docker_cmd.capitalize()} is installed but the background service "
+                            "(daemon) is not running. Please start Docker Desktop."
+                        )
+                    elif "permission denied" in combined_stderr or "connect: permission denied" in combined_stderr:
+                        error_msg = (
+                            f"Permission denied while connecting to {self.docker_cmd}. "
+                            "Please add your user to the 'docker' group."
+                        )
+                    elif "error during connect" in combined_stderr or "cannot connect" in combined_stderr:
+                        error_msg = (
+                            f"{self.docker_cmd.capitalize()} daemon is not responding. "
+                            "Please ensure Docker Desktop is running and fully started."
+                        )
+                    else:
+                        error_msg = (
+                            f"{self.docker_cmd.capitalize()} daemon is not responding. "
+                            "Ensure it is started and accessible."
+                        )
 
             return {
                 "available": True,
