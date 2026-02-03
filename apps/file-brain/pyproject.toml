@@ -1,6 +1,6 @@
 [project]
 name = "file-brain"
-version = "0.1.18a3"
+version = "0.1.18a4"
 description = "Advanced file search engine powered by AI"
 authors = [{ name = "Hamza Abbad", email = "contact@file-brain.com" }]
 readme = "README.md"
@@ -76,6 +76,10 @@ build-backend = "poetry.core.masonry.api"
 packages = [{ include = "file_brain" }]
 include = [
     { path = "file_brain/docker-compose.yml", format = [
+        "sdist",
+        "wheel",
+    ] },
+    { path = "file_brain/docker-compose.gpu.yml", format = [
         "sdist",
         "wheel",
     ] },

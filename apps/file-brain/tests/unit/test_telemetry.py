@@ -299,3 +299,123 @@ class TestEnvironmentDetection:
             with patch.dict("sys.modules", {"file_brain": mock_file_brain}):
                 manager = TelemetryManager()
                 assert manager.environment == "development"
+
+
+class TestGPUDetection:
+    """Test GPU detection integration in telemetry"""
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    @patch("file_brain.utils.gpu_detector.should_use_gpu_mode")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_docker_runtime_available")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_gpu_available")
+    def test_gpu_info_all_available(self, mock_gpu, mock_runtime, mock_mode, mock_config_dir, tmp_path):
+        """Test GPU detection when all GPU features are available"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        mock_gpu.return_value = True
+        mock_runtime.return_value = True
+        mock_mode.return_value = True
+
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+
+            manager = TelemetryManager()
+            gpu_info = manager._detect_gpu_info()
+
+            assert gpu_info == {
+                "has_gpu_hardware": True,
+                "has_nvidia_runtime": True,
+                "gpu_mode_enabled": True,
+            }
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    @patch("file_brain.utils.gpu_detector.should_use_gpu_mode")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_docker_runtime_available")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_gpu_available")
+    def test_gpu_info_none_available(self, mock_gpu, mock_runtime, mock_mode, mock_config_dir, tmp_path):
+        """Test GPU detection when no GPU features are available"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        mock_gpu.return_value = False
+        mock_runtime.return_value = False
+        mock_mode.return_value = False
+
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+
+            manager = TelemetryManager()
+            gpu_info = manager._detect_gpu_info()
+
+            assert gpu_info == {
+                "has_gpu_hardware": False,
+                "has_nvidia_runtime": False,
+                "gpu_mode_enabled": False,
+            }
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    @patch("file_brain.utils.gpu_detector.should_use_gpu_mode")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_docker_runtime_available")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_gpu_available")
+    def test_gpu_info_partial_availability(self, mock_gpu, mock_runtime, mock_mode, mock_config_dir, tmp_path):
+        """Test GPU detection when GPU is available but runtime is not"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        mock_gpu.return_value = True
+        mock_runtime.return_value = False
+        mock_mode.return_value = False
+
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+
+            manager = TelemetryManager()
+            gpu_info = manager._detect_gpu_info()
+
+            assert gpu_info == {
+                "has_gpu_hardware": True,
+                "has_nvidia_runtime": False,
+                "gpu_mode_enabled": False,
+            }
+
+    @patch("file_brain.core.telemetry.machineid", None)
+    @patch("platformdirs.user_config_dir")
+    @patch("file_brain.utils.gpu_detector.should_use_gpu_mode")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_docker_runtime_available")
+    @patch("file_brain.utils.gpu_detector.is_nvidia_gpu_available")
+    def test_gpu_detection_error_handling(self, mock_gpu, mock_runtime, mock_mode, mock_config_dir, tmp_path):
+        """Test GPU detection handles errors gracefully"""
+        from file_brain.core.telemetry import TelemetryManager
+
+        mock_config_dir.return_value = str(tmp_path)
+        # Simulate import error or exception
+        mock_gpu.side_effect = Exception("GPU detection failed")
+
+        TelemetryManager._instance = None
+
+        with patch("file_brain.core.telemetry.settings") as mock_settings:
+            mock_settings.posthog_enabled = False
+            mock_settings.app_name = "test-app"
+
+            manager = TelemetryManager()
+            gpu_info = manager._detect_gpu_info()
+
+            # Should return all False on error
+            assert gpu_info == {
+                "has_gpu_hardware": False,
+                "has_nvidia_runtime": False,
+                "gpu_mode_enabled": False,
+            }

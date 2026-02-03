@@ -193,10 +193,10 @@ class TelemetryManager:
             return
 
         try:
-            # Use PostHog standard properties for common metadata
+            # Use custom properties (PostHog's $lib and $lib_version are reserved)
             props = {
-                "$lib": "file-brain-backend",  # PostHog standard
-                "$lib_version": settings.app_version,  # PostHog standard
+                "app_name": settings.app_name,  # Custom property for app identification
+                "app_version": settings.app_version,  # Custom property for version tracking
                 "install_type": self.environment,  # Custom: dev/packaged/production
                 **(properties or {}),
             }
@@ -252,6 +252,33 @@ class TelemetryManager:
         except Exception as e:
             logger.error(f"Failed to flush batched events: {e}")
 
+    def _detect_gpu_info(self) -> Dict[str, bool]:
+        """
+        Detect GPU availability for telemetry.
+
+        Returns:
+            Dictionary with GPU detection properties
+        """
+        try:
+            from file_brain.utils.gpu_detector import (
+                is_nvidia_docker_runtime_available,
+                is_nvidia_gpu_available,
+                should_use_gpu_mode,
+            )
+
+            return {
+                "has_gpu_hardware": is_nvidia_gpu_available(),
+                "has_nvidia_runtime": is_nvidia_docker_runtime_available(),
+                "gpu_mode_enabled": should_use_gpu_mode(),
+            }
+        except Exception as e:
+            logger.debug(f"Failed to detect GPU info: {e}")
+            return {
+                "has_gpu_hardware": False,
+                "has_nvidia_runtime": False,
+                "gpu_mode_enabled": False,
+            }
+
     def set_user_properties(self, properties: Dict):
         """
         Set persistent user properties for analytics segmentation.
@@ -265,14 +292,19 @@ class TelemetryManager:
         import platform
 
         try:
-            # Use PostHog standard properties for system info
+            # Detect GPU info
+            gpu_info = self._detect_gpu_info()
+
+            # Use PostHog standard properties for system info + custom app properties
             self.posthog.identify(
                 distinct_id=self.distinct_id,
                 properties={
                     "$os": platform.system(),  # PostHog standard property
                     "$os_version": platform.release(),  # PostHog standard property
-                    "$app_version": settings.app_version,  # PostHog standard property
+                    "app_name": settings.app_name,  # Custom property for app identification
+                    "app_version": settings.app_version,  # Custom property for version tracking
                     "install_type": self.environment,  # Custom property for dev/packaged/production
+                    **gpu_info,  # GPU detection properties
                     **properties,
                 },
             )

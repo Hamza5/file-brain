@@ -12,7 +12,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Typesense Search Engine (with GPU support)
+  # Typesense Search Engine (GPU image with CPU fallback)
   typesense:
     image: hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
     container_name: file-brain-search-engine
@@ -26,13 +26,6 @@ services:
       TYPESENSE_HEALTHY_WRITE_LAG: 5000
     volumes:
       - ${TYPESENSE_DATA_DIR:-./typesense-data}:/data
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     restart: unless-stopped
     logging:
       driver: "json-file"

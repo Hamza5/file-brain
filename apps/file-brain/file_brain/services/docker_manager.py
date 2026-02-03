@@ -15,12 +15,13 @@ from file_brain.core.logging import logger
 class DockerManager:
     """Manages docker-compose services for File Brain"""
 
-    def __init__(self, compose_file_path: Optional[str] = None):
+    def __init__(self, compose_file_path: Optional[str] = None, use_gpu: Optional[bool] = None):
         """
         Initialize Docker Manager
 
         Args:
             compose_file_path: Path to docker-compose.yml file
+            use_gpu: Force GPU mode on/off. If None, auto-detect.
         """
         if compose_file_path:
             self.compose_file = Path(compose_file_path)
@@ -52,6 +53,29 @@ class DockerManager:
                     # Last ditch effort (though likely to fail if file is gone)
                     self.compose_file = Path("docker-compose.yml")
 
+        # Detect GPU mode
+        if use_gpu is None:
+            from file_brain.utils.gpu_detector import should_use_gpu_mode
+
+            self.use_gpu = should_use_gpu_mode()
+        else:
+            self.use_gpu = use_gpu
+
+        # Build compose file list (base + optional GPU overlay)
+        self.compose_files = [self.compose_file]
+
+        # Add GPU overlay if GPU mode is enabled
+        if self.use_gpu:
+            gpu_overlay = self.compose_file.parent / "docker-compose.gpu.yml"
+            if gpu_overlay.exists():
+                self.compose_files.append(gpu_overlay)
+                logger.info(f"🎮 GPU mode enabled - using GPU overlay: {gpu_overlay}")
+            else:
+                logger.warning("GPU detected but docker-compose.gpu.yml not found, falling back to CPU")
+                self.use_gpu = False
+        else:
+            logger.info("💻 CPU mode - GPU not available or disabled")
+
         self.docker_cmd = self._detect_docker_command()
         self._log_buffers: Dict[str, List[str]] = {}
 
@@ -79,7 +103,7 @@ class DockerManager:
         Get information about the docker installation
 
         Returns:
-            Dictionary with docker info
+            Dictionary with docker info (available, command, version, error)
         """
         if not self.docker_cmd:
             return {"available": False, "command": None, "error": "Docker/Podman not found"}
@@ -109,6 +133,29 @@ class DockerManager:
                 "command": self.docker_cmd,
                 "error": str(e),
             }
+
+    def _build_compose_command(self, *args) -> List[str]:
+        """
+        Build docker-compose command with multiple -f flags for overlay support.
+
+        Args:
+            *args: Additional command arguments (e.g., 'up', '-d')
+
+        Returns:
+            Complete command list ready for subprocess
+        """
+        if self.docker_cmd == "docker":
+            cmd = [self.docker_cmd, "compose"]
+        else:
+            cmd = ["podman-compose"]
+
+        # Add all compose files with -f flags
+        for compose_file in self.compose_files:
+            cmd.extend(["-f", str(compose_file)])
+
+        # Add remaining arguments
+        cmd.extend(args)
+        return cmd
 
     def _get_images_from_compose(self) -> List[str]:
         """
@@ -472,10 +519,8 @@ class DockerManager:
         try:
             logger.info(f"Pulling docker images from {self.compose_file} (CLI mode)")
 
-            if self.docker_cmd == "docker":
-                cmd = [self.docker_cmd, "compose", "-f", str(self.compose_file), "pull"]
-            else:
-                cmd = ["podman-compose", "-f", str(self.compose_file), "pull"]
+            # Build compose command with all files
+            cmd = self._build_compose_command("pull")
 
             process = subprocess.Popen(
                 cmd,
@@ -539,13 +584,8 @@ class DockerManager:
         try:
             logger.debug(f"Starting docker-compose services from {self.compose_file}")
 
-            # Use docker compose (v2) or docker-compose (v1)
-            if self.docker_cmd == "docker":
-                # Try docker compose (v2) first
-                cmd = [self.docker_cmd, "compose", "-f", str(self.compose_file), "up", "-d"]
-            else:
-                # Podman uses podman-compose
-                cmd = ["podman-compose", "-f", str(self.compose_file), "up", "-d"]
+            # Build compose command with all files
+            cmd = self._build_compose_command("up", "-d")
 
             # Inject environment variables from app_paths
             from file_brain.core.paths import app_paths
@@ -602,10 +642,7 @@ class DockerManager:
         try:
             logger.debug("Stopping docker-compose services")
 
-            if self.docker_cmd == "docker":
-                cmd = [self.docker_cmd, "compose", "-f", str(self.compose_file), "down"]
-            else:
-                cmd = ["podman-compose", "-f", str(self.compose_file), "down"]
+            cmd = self._build_compose_command("down")
 
             # Inject environment variables from app_paths
             from file_brain.core.paths import app_paths
@@ -657,9 +694,9 @@ class DockerManager:
 
         try:
             if self.docker_cmd == "docker":
-                cmd = [self.docker_cmd, "compose", "-f", str(self.compose_file), "ps", "--format", "json"]
+                cmd = self._build_compose_command("ps", "--format", "json")
             else:
-                cmd = ["podman-compose", "-f", str(self.compose_file), "ps"]
+                cmd = self._build_compose_command("ps")
 
             # Inject environment variables from app_paths
             from file_brain.core.paths import app_paths

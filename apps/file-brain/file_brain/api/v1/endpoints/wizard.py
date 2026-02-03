@@ -36,6 +36,9 @@ class DockerCheckResponse(BaseModel):
     available: bool
     command: Optional[str] = None
     version: Optional[str] = None
+    has_gpu_hardware: bool = False
+    has_nvidia_runtime: bool = False
+    gpu_mode_enabled: bool = False
     error: Optional[str] = None
 
 
@@ -207,9 +210,19 @@ def check_docker():
     """Check if Docker/Podman is installed"""
     try:
         from file_brain.core.telemetry import telemetry
+        from file_brain.utils.gpu_detector import (
+            is_nvidia_docker_runtime_available,
+            is_nvidia_gpu_available,
+            should_use_gpu_mode,
+        )
 
         docker_manager = get_docker_manager()
         info = docker_manager.get_docker_info()
+
+        # Detect GPU availability
+        has_gpu_hardware = is_nvidia_gpu_available()
+        has_nvidia_runtime = is_nvidia_docker_runtime_available()
+        gpu_mode_enabled = should_use_gpu_mode()
 
         # Update wizard state if docker is available
         if info.get("available"):
@@ -224,6 +237,9 @@ def check_docker():
                     "success": True,
                     "docker_command": info.get("command"),
                     "docker_version": info.get("version"),
+                    "has_gpu_hardware": has_gpu_hardware,
+                    "has_nvidia_runtime": has_nvidia_runtime,
+                    "gpu_mode_enabled": gpu_mode_enabled,
                 },
             )
 
@@ -231,6 +247,9 @@ def check_docker():
             available=info.get("available", False),
             command=info.get("command"),
             version=info.get("version"),
+            has_gpu_hardware=has_gpu_hardware,
+            has_nvidia_runtime=has_nvidia_runtime,
+            gpu_mode_enabled=gpu_mode_enabled,
             error=info.get("error"),
         )
     except Exception as e:
