@@ -44,8 +44,8 @@ jobs:
       - name: Fetch GitHub stars
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node apps/website/scripts/fetch-github-stars.mjs
-        working-directory: .
+        run: node scripts/fetch-github-stars.mjs
+        working-directory: apps/website
 
       - name: Build website
         env:
