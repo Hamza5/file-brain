@@ -1,6 +1,28 @@
 import fs from 'fs';
 import path from 'path';
 
+function updateEnvFile(envValues) {
+    const envPath = path.join(process.cwd(), '.env.production');
+    let content = '';
+    if (fs.existsSync(envPath)) {
+        content = fs.readFileSync(envPath, 'utf8');
+    }
+
+    for (const [key, value] of Object.entries(envValues)) {
+        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`^${escapedKey}=.*$`, 'm');
+        const newLine = `${key}=${value}`;
+        
+        if (regex.test(content)) {
+            content = content.replace(regex, newLine);
+        } else {
+            content += (content.endsWith('\n') || content === '' ? '' : '\n') + newLine + '\n';
+        }
+    }
+    
+    fs.writeFileSync(envPath, content);
+}
+
 async function fetchGitHubStars() {
     console.log('Fetching GitHub star count and stargazers...');
     const [owner, name] = 'Hamza5/file-brain'.split('/');
@@ -9,10 +31,10 @@ async function fetchGitHubStars() {
 
     if (!token) {
         console.warn('GITHUB_TOKEN not found, skipping GraphQL fetch');
-        // Minimal fallback for local dev without token
-        const envPath = path.join(process.cwd(), '.env.production');
-        fs.appendFileSync(envPath, 'NEXT_PUBLIC_GITHUB_STARS="20+"\n');
-        fs.appendFileSync(envPath, 'NEXT_PUBLIC_GITHUB_STARGAZERS="[]"\n');
+        updateEnvFile({
+            'NEXT_PUBLIC_GITHUB_STARS': '"20+"',
+            'NEXT_PUBLIC_GITHUB_STARGAZERS': '"[]"'
+        });
         return;
     }
 
@@ -26,7 +48,7 @@ async function fetchGitHubStars() {
                 node {
                   login
                   avatarUrl
-                  isDefaultAvatar
+                  databaseId
                 }
               }
             }
@@ -52,43 +74,54 @@ async function fetchGitHubStars() {
         }
 
         const result = await response.json();
+        if (result.errors) {
+            console.error('GraphQL Errors:', JSON.stringify(result.errors, null, 2));
+            throw new Error('GitHub GraphQL error');
+        }
+
+        if (!result.data || !result.data.repository) {
+            console.error('Unexpected response structure:', JSON.stringify(result, null, 2));
+            throw new Error('Unexpected GitHub API response structure');
+        }
+
         const repo = result.data.repository;
         const stars = repo.stargazerCount;
         
-        let formattedStars = stars.toString();
+        let approxStars = '';
         if (stars >= 1000) {
-            formattedStars = (stars / 1000).toFixed(1) + 'K';
+            approxStars = (stars / 1000).toFixed(1) + 'K+';
+        } else {
+            // Round down to the nearest 10 (e.g. 85 becomes 80+)
+            const roundedStars = Math.floor(stars / 10) * 10;
+            approxStars = `${roundedStars}+`;
         }
-        const approxStars = `${formattedStars}+`;
 
-        // Filter stargazers: latest first, and skip default avatars
+        // Filter stargazers: latest first
         const latestStargazers = repo.stargazers.edges
             .map(edge => ({
+                id: edge.node.databaseId,
                 login: edge.node.login,
                 avatar_url: edge.node.avatarUrl,
-                starred_at: edge.starredAt,
-                is_default: edge.node.isDefaultAvatar
+                starred_at: edge.starredAt
             }))
-            .filter(user => !user.is_default)
             .sort((a, b) => new Date(b.starred_at).getTime() - new Date(a.starred_at).getTime())
             .slice(0, 5)
-            .map(({ login, avatar_url }) => ({ login, avatar_url }));
+            .map(({ id, login, avatar_url }) => ({ id, login, avatar_url }));
 
         console.log(`Found ${stars} stars and ${latestStargazers.length} valid stargazers.`);
 
-        const envPath = path.join(process.cwd(), '.env.production');
-        const envContent = [
-            `NEXT_PUBLIC_GITHUB_STARS="${approxStars}"`,
-            `NEXT_PUBLIC_GITHUB_STARGAZERS='${JSON.stringify(latestStargazers)}'`
-        ].join('\n') + '\n';
-        
-        fs.appendFileSync(envPath, envContent);
-        console.log(`Successfully wrote to ${envPath}`);
+        updateEnvFile({
+            'NEXT_PUBLIC_GITHUB_STARS': `"${approxStars}"`,
+            'NEXT_PUBLIC_GITHUB_STARGAZERS': `'${JSON.stringify(latestStargazers)}'`
+        });
+        console.log(`Successfully updated .env.production`);
 
     } catch (error) {
         console.error('Failed to fetch GitHub data:', error);
-        const envPath = path.join(process.cwd(), '.env.production');
-        fs.appendFileSync(envPath, 'NEXT_PUBLIC_GITHUB_STARS="10+"\nNEXT_PUBLIC_GITHUB_STARGAZERS="[]"\n');
+        updateEnvFile({
+            'NEXT_PUBLIC_GITHUB_STARS': '"many"',
+            'NEXT_PUBLIC_GITHUB_STARGAZERS': '"[]"'
+        });
     }
 }
 
