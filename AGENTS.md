@@ -42,6 +42,49 @@ This document provides guidelines for AI agents working on this project.
   ```
 - **Verify All Tests Pass**: Ensure all tests pass before considering your work complete. The project maintains 100% test pass rate.
 
+### Frontend/Backend API Consistency
+
+**CRITICAL**: The frontend and backend must always be kept in sync when making API changes. Mismatches between TypeScript interfaces and Python response models cause runtime bugs that are hard to detect.
+
+#### When Modifying API Endpoints
+
+1. **Backend Changes First**: When modifying an API endpoint response:
+   - Update the Pydantic `BaseModel` in the backend endpoint file (e.g., `file_brain/api/v1/endpoints/*.py`)
+   - Run backend tests to ensure the change works
+2. **Frontend Changes Second**: Immediately update the corresponding TypeScript interface:
+   - Update the interface in `frontend/src/api/client.ts`
+   - Update any components that use this interface
+   - Build the frontend to catch TypeScript errors: `npm run build`
+
+3. **Common Pitfall - Incomplete Reverts**: When reverting backend changes:
+   - **ALWAYS check if frontend code references the removed fields**
+   - Search for the field name across the frontend codebase
+   - Remove or update all references to maintain consistency
+
+   **Example Bug**: In v0.1.18a3, the backend removed the `running` field from `DockerCheckResponse`, but the frontend still checked `result.running`, causing the wizard to hang because the field was `undefined`.
+
+#### Verification Checklist
+
+When making API changes, verify:
+
+- [ ] Backend Pydantic model updated
+- [ ] Backend tests pass
+- [ ] Frontend TypeScript interface updated in `client.ts`
+- [ ] All frontend components using this interface updated
+- [ ] Frontend builds without TypeScript errors (`npm run build`)
+- [ ] No references to removed fields remain in frontend code
+
+#### Search for Frontend References
+
+Before removing a field from a backend response, search the frontend:
+
+```bash
+cd apps/file-brain/frontend
+grep -r "fieldName" src/
+```
+
+Replace `fieldName` with the actual field you're removing. Update or remove all occurrences.
+
 ## Technology Stack
 
 When working on this project, strictly adhere to the following technologies and patterns. Do not introduce new libraries or frameworks without explicit permission.

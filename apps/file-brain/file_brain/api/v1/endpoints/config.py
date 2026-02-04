@@ -9,6 +9,7 @@ router = APIRouter()
 class AppConfig(BaseModel):
     """Configuration exposed to the frontend"""
 
+    app_version: str
     typesense: dict
     posthog: dict
 
@@ -22,6 +23,7 @@ def get_config():
     from file_brain.core.telemetry import telemetry
 
     return {
+        "app_version": settings.app_version,
         "typesense": {
             "api_key": settings.typesense_api_key,
             "host": settings.typesense_host,

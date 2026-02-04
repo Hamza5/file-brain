@@ -78,6 +78,7 @@ export async function requestJSON<T>(
 }
 
 export interface AppConfig {
+  app_version: string;
   typesense: {
     api_key: string;
     host: string;
@@ -449,9 +450,11 @@ export interface WizardStatus {
 
 export interface DockerCheckResult {
   available: boolean;
-  running: boolean;
   command?: string;
   version?: string;
+  has_gpu_hardware?: boolean;
+  has_nvidia_runtime?: boolean;
+  gpu_mode_enabled?: boolean;
   error?: string;
 }
 

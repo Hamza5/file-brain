@@ -4,7 +4,7 @@ import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { Message } from 'primereact/message';
 import { ConfirmDialog } from 'primereact/confirmdialog';
-import { completeWizard } from '../../api/client';
+import { completeWizard, getAppConfig, type AppConfig } from '../../api/client';
 import { ThemeSwitcher } from '../layout/ThemeSwitcher';
 import { DockerCheckStep } from './steps/DockerCheckStep';
 import { ImagePullStep } from './steps/ImagePullStep';
@@ -24,7 +24,13 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
   const [activeStep, setActiveStep] = useState(startStep);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const posthog = usePostHog();
+
+  // Load app config for version display
+  useEffect(() => {
+    getAppConfig().then(setConfig).catch(console.error);
+  }, []);
 
   const steps = useMemo(() => [
     { label: 'System Check' },
@@ -125,6 +131,11 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
         <h1 className="text-4xl font-bold text-primary mb-2">
           <i className="fas fa-screwdriver-wrench mr-2" />
           {isUpgrade ? 'File Brain Update' : 'File Brain Setup'}
+          {config?.app_version && (
+            <span className="text-sm font-normal ml-2 px-2 py-1 border-round surface-100 text-600">
+              v{config.app_version}
+            </span>
+          )}
         </h1>
         <p className="text-600 text-center max-w-30rem">
           {isUpgrade 

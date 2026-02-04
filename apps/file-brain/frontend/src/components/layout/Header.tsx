@@ -6,6 +6,7 @@ import { InputSwitch } from 'primereact/inputswitch';
 import { Tooltip } from 'primereact/tooltip';
 import { useSearchBox } from 'react-instantsearch';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { getAppConfig, type AppConfig } from '../../api/client';
 
 interface HeaderProps {
     isCrawlerActive: boolean;
@@ -52,6 +53,12 @@ export const Header: React.FC<HeaderProps> = ({
     const [searchValue, setSearchValue] = useState('');
     const [isTogglingCrawler, setIsTogglingCrawler] = useState(false);
     const [isTogglingMonitor, setIsTogglingMonitor] = useState(false);
+    const [config, setConfig] = useState<AppConfig | null>(null);
+
+    // Load app config for version display
+    React.useEffect(() => {
+        getAppConfig().then(setConfig).catch(console.error);
+    }, []);
 
     React.useEffect(() => {
         if (query === '' && searchValue !== '') {
@@ -92,6 +99,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="flex align-items-center gap-2 flex-shrink-0">
                     <img src="/icon.svg" alt="File Brain" className="w-2rem h-2rem" />
                     <span className="text-xl font-bold text-color hidden md:block">File Brain</span>
+                    {config?.app_version && (
+                        <span className="text-xs px-2 py-1 border-round surface-100 text-600 hidden lg:inline">
+                            v{config.app_version}
+                        </span>
+                    )}
                 </div>
 
                 {/* Search */}
