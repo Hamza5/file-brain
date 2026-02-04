@@ -88,6 +88,12 @@ class Settings(BaseSettings):
         default=900, description="Interval in seconds to flush batched telemetry events (default: 15 minutes)"
     )
 
+    # GPU Configuration
+    gpu_mode: str = Field(
+        default="auto",
+        description="GPU mode: 'auto' (auto-detect), 'force-gpu' (always GPU), or 'force-cpu' (always CPU)",
+    )
+
     @property
     def typesense_url(self) -> str:
         """Get full Typesense URL"""

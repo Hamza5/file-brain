@@ -1,6 +1,6 @@
 [project]
 name = "file-brain"
-version = "0.1.18a5"
+version = "0.1.18a6"
 description = "Smart local file search engine that understands your files"
 authors = [{ name = "Hamza Abbad", email = "contact@file-brain.com" }]
 readme = "README.md"

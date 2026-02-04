@@ -1,5 +1,31 @@
 services:
+  # Apache Tika Server (Docker-based content extraction)
+  tika:
+    image: hamza5/tika:latest-full
+    container_name: file-brain-data-extractor
+    ports:
+      - "9998:9998"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Typesense Search Engine (GPU-enabled image with CUDA support)
   typesense:
+    image: hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
+    container_name: file-brain-search-engine
+    ports:
+      - "8108:8108"
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_SNAPSHOT_INTERVAL_SECONDS: 900
+      TYPESENSE_HEALTHY_READ_LAG: 5000
+      TYPESENSE_HEALTHY_WRITE_LAG: 5000
+    volumes:
+      - ${TYPESENSE_DATA_DIR:-./typesense-data}:/data
     deploy:
       resources:
         reservations:
@@ -7,3 +33,9 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

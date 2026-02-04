@@ -12,9 +12,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Typesense Search Engine (GPU image with CPU fallback)
+  # Typesense Search Engine (CPU-only, official image)
   typesense:
-    image: hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
+    image: typesense/typesense:29.0
     container_name: file-brain-search-engine
     ports:
       - "8108:8108"

@@ -100,29 +100,52 @@ def should_use_gpu_mode() -> bool:
     """
     Determine if GPU mode should be enabled for Typesense.
 
-    GPU mode requires both:
+    Respects FILEBRAIN_GPU_MODE environment variable:
+    - 'auto' (default): Auto-detect GPU availability
+    - 'force-gpu': Always return True (fails if GPU not available)
+    - 'force-cpu': Always return False
+
+    GPU mode requires both (when auto-detecting):
     1. NVIDIA GPU hardware (nvidia-smi available)
     2. NVIDIA Docker runtime (docker runtime supports nvidia)
 
     Returns:
-        bool: True if both GPU and runtime are available, False otherwise
+        bool: True if GPU mode should be used, False otherwise
     """
-    has_gpu = is_nvidia_gpu_available()
-    has_runtime = is_nvidia_docker_runtime_available()
+    from file_brain.core.config import settings
 
-    if has_gpu and has_runtime:
-        logger.info("✅ GPU mode enabled - NVIDIA GPU and Docker runtime detected")
+    gpu_mode = settings.gpu_mode.lower()
+
+    if gpu_mode == "force-gpu":
+        logger.info("🎮 GPU mode forced via FILEBRAIN_GPU_MODE=force-gpu")
         return True
-    elif has_gpu and not has_runtime:
-        logger.info("⚠️  GPU mode disabled - NVIDIA GPU found but Docker runtime missing")
-        logger.info("   Install NVIDIA Container Toolkit to enable GPU acceleration")
+    elif gpu_mode == "force-cpu":
+        logger.info("💻 CPU mode forced via FILEBRAIN_GPU_MODE=force-cpu")
         return False
-    elif not has_gpu and has_runtime:
-        logger.debug("GPU mode disabled - NVIDIA runtime available but no GPU detected")
-        return False
+    elif gpu_mode == "auto":
+        # Auto-detect GPU availability
+        has_gpu = is_nvidia_gpu_available()
+        has_runtime = is_nvidia_docker_runtime_available()
+
+        if has_gpu and has_runtime:
+            logger.info("✅ GPU mode enabled - NVIDIA GPU and Docker runtime detected")
+            return True
+        elif has_gpu and not has_runtime:
+            logger.info("⚠️  GPU mode disabled - NVIDIA GPU found but Docker runtime missing")
+            logger.info("   Install NVIDIA Container Toolkit to enable GPU acceleration")
+            return False
+        elif not has_gpu and has_runtime:
+            logger.debug("GPU mode disabled - NVIDIA runtime available but no GPU detected")
+            return False
+        else:
+            logger.debug("GPU mode disabled - no NVIDIA GPU or runtime detected")
+            return False
     else:
-        logger.debug("GPU mode disabled - no NVIDIA GPU or runtime detected")
-        return False
+        logger.warning(f"Invalid FILEBRAIN_GPU_MODE='{gpu_mode}', defaulting to auto-detect")
+        # Fall back to auto-detect
+        has_gpu = is_nvidia_gpu_available()
+        has_runtime = is_nvidia_docker_runtime_available()
+        return has_gpu and has_runtime
 
 
 def get_gpu_info() -> Dict[str, bool]:

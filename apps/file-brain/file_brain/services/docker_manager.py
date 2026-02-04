@@ -23,37 +23,7 @@ class DockerManager:
             compose_file_path: Path to docker-compose.yml file
             use_gpu: Force GPU mode on/off. If None, auto-detect.
         """
-        if compose_file_path:
-            self.compose_file = Path(compose_file_path)
-        else:
-            # Locating docker-compose.yml (now consistently in file_brain/docker-compose.yml)
-            try:
-                from importlib.resources import files
-
-                # Check inside the file_brain package (installed mode or proper package structure)
-                pkg_compose = files("file_brain") / "docker-compose.yml"
-                if pkg_compose.is_file():
-                    self.compose_file = Path(pkg_compose)
-                else:
-                    # Fallback for dev/source mode
-                    # Location: file_brain/services/docker_manager.py -> file_brain/docker-compose.yml
-                    # Go up 2 levels: services -> file_brain
-                    dev_compose = Path(__file__).parent.parent / "docker-compose.yml"
-                    if dev_compose.exists():
-                        self.compose_file = dev_compose
-                    else:
-                        raise FileNotFoundError("docker-compose.yml not found in package resources or source tree")
-            except Exception as e:
-                # Fallback purely on file path relative to this file
-                dev_compose = Path(__file__).parent.parent / "docker-compose.yml"
-                if dev_compose.exists():
-                    self.compose_file = dev_compose
-                else:
-                    logger.error(f"Failed to locate docker-compose.yml: {e}")
-                    # Last ditch effort (though likely to fail if file is gone)
-                    self.compose_file = Path("docker-compose.yml")
-
-        # Detect GPU mode
+        # Detect GPU mode first
         if use_gpu is None:
             from file_brain.utils.gpu_detector import should_use_gpu_mode
 
@@ -61,20 +31,74 @@ class DockerManager:
         else:
             self.use_gpu = use_gpu
 
-        # Build compose file list (base + optional GPU overlay)
+        # Select compose file based on GPU mode
+        if compose_file_path:
+            self.compose_file = Path(compose_file_path)
+        else:
+            # Locating docker-compose.yml (now consistently in file_brain/docker-compose.yml)
+            try:
+                from importlib.resources import files
+
+                # Determine compose filename based on GPU mode
+                compose_filename = "docker-compose.gpu.yml" if self.use_gpu else "docker-compose.yml"
+
+                # Check inside the file_brain package (installed mode or proper package structure)
+                pkg_compose = files("file_brain") / compose_filename
+                if pkg_compose.is_file():
+                    self.compose_file = Path(pkg_compose)
+                else:
+                    # Fallback for dev/source mode
+                    # Location: file_brain/services/docker_manager.py -> file_brain/docker-compose.yml
+                    # Go up 2 levels: services -> file_brain
+                    dev_compose = Path(__file__).parent.parent / compose_filename
+                    if dev_compose.exists():
+                        self.compose_file = dev_compose
+                    else:
+                        # If GPU file not found, fall back to CPU mode
+                        if self.use_gpu:
+                            logger.warning(f"GPU compose file not found: {compose_filename}, falling back to CPU mode")
+                            self.use_gpu = False
+                            compose_filename = "docker-compose.yml"
+                            dev_compose = Path(__file__).parent.parent / compose_filename
+                            if dev_compose.exists():
+                                self.compose_file = dev_compose
+                            else:
+                                raise FileNotFoundError(
+                                    "docker-compose.yml not found in package resources or source tree"
+                                )
+                        else:
+                            raise FileNotFoundError("docker-compose.yml not found in package resources or source tree")
+            except Exception as e:
+                # Fallback purely on file path relative to this file
+                compose_filename = "docker-compose.gpu.yml" if self.use_gpu else "docker-compose.yml"
+                dev_compose = Path(__file__).parent.parent / compose_filename
+                if dev_compose.exists():
+                    self.compose_file = dev_compose
+                else:
+                    # If GPU file not found, fall back to CPU mode
+                    if self.use_gpu:
+                        logger.warning(f"GPU compose file not found, falling back to CPU mode: {e}")
+                        self.use_gpu = False
+                        dev_compose = Path(__file__).parent.parent / "docker-compose.yml"
+                        if dev_compose.exists():
+                            self.compose_file = dev_compose
+                        else:
+                            logger.error(f"Failed to locate docker-compose.yml: {e}")
+                            # Last ditch effort (though likely to fail if file is gone)
+                            self.compose_file = Path("docker-compose.yml")
+                    else:
+                        logger.error(f"Failed to locate docker-compose.yml: {e}")
+                        # Last ditch effort (though likely to fail if file is gone)
+                        self.compose_file = Path("docker-compose.yml")
+
+        # Store as single-item list for compatibility with _build_compose_command
         self.compose_files = [self.compose_file]
 
-        # Add GPU overlay if GPU mode is enabled
+        # Log selected mode
         if self.use_gpu:
-            gpu_overlay = self.compose_file.parent / "docker-compose.gpu.yml"
-            if gpu_overlay.exists():
-                self.compose_files.append(gpu_overlay)
-                logger.info(f"🎮 GPU mode enabled - using GPU overlay: {gpu_overlay}")
-            else:
-                logger.warning("GPU detected but docker-compose.gpu.yml not found, falling back to CPU")
-                self.use_gpu = False
+            logger.info(f"🎮 GPU mode enabled - using GPU compose file: {self.compose_file}")
         else:
-            logger.info("💻 CPU mode - GPU not available or disabled")
+            logger.info(f"💻 CPU mode - using standard compose file: {self.compose_file}")
 
         self.docker_cmd = self._detect_docker_command()
         self._log_buffers: Dict[str, List[str]] = {}
@@ -136,7 +160,7 @@ class DockerManager:
 
     def _build_compose_command(self, *args) -> List[str]:
         """
-        Build docker-compose command with multiple -f flags for overlay support.
+        Build docker-compose command with selected compose file.
 
         Args:
             *args: Additional command arguments (e.g., 'up', '-d')
@@ -149,9 +173,8 @@ class DockerManager:
         else:
             cmd = ["podman-compose"]
 
-        # Add all compose files with -f flags
-        for compose_file in self.compose_files:
-            cmd.extend(["-f", str(compose_file)])
+        # Single compose file (no overlay merging)
+        cmd.extend(["-f", str(self.compose_file)])
 
         # Add remaining arguments
         cmd.extend(args)
