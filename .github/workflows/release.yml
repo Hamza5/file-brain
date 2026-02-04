@@ -95,14 +95,6 @@ jobs:
         if: steps.version_check.outputs.changed == 'true'
         run: python build.py
 
-      - name: Create Git Tag
-        if: steps.version_check.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ steps.version_check.outputs.version }}" -m "Release v${{ steps.version_check.outputs.version }}"
-          git push origin "v${{ steps.version_check.outputs.version }}"
-
       - name: Generate Changelog
         if: steps.version_check.outputs.changed == 'true'
         id: generate_changelog
@@ -139,12 +131,20 @@ jobs:
 
           # Summarize using Gemini CLI
           echo "Summarizing commits..."
-          changelog=$(echo "$commit_messages" | npx @google/gemini-cli "Summarize these commit messages into a concise, professional changelog with sections for Features, Bug Fixes, and Improvements. Do not include duplicate or trivial commits. Format the output as Markdown. Do not wrap it in a code block.")
+          changelog=$(echo "$commit_messages" | npx @google/gemini-cli --model gemini-2.5-flash "Summarize these commit messages into a concise, professional changelog with sections for Features, Bug Fixes, and Improvements. Do not include duplicate or trivial commits. Format the output as Markdown. Do not wrap it in a code block.")
 
           # Store changelog for use in release step
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$changelog" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag
+        if: steps.version_check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version_check.outputs.version }}" -m "Release v${{ steps.version_check.outputs.version }}"
+          git push origin "v${{ steps.version_check.outputs.version }}"
 
       - name: Create GitHub Release
         if: steps.version_check.outputs.changed == 'true'
