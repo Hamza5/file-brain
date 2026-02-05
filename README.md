@@ -147,11 +147,23 @@ You can browse the files in the [Hugging Face repository](https://huggingface.co
 
 ### 3. Pull Docker Images
 
-Run the following commands to manually pull the required services:
+Run the following commands to manually pull the required services. Choose the Typesense image based on your system capabilities:
+
+**For CPU (Default, works on all systems):**
+
+```bash
+docker pull hamza5/tika:latest-full
+docker pull typesense/typesense:29.0
+```
+
+**For NVIDIA GPU (Faster indexing):**
 
 ```bash
 docker pull hamza5/tika:latest-full
 docker pull hamza5/typesense-gpu:29.0-cuda11.8.0-cudnn8-runtime-ubuntu22.04
 ```
+
+> [!NOTE]
+> File Brain automatically detects if you have an NVIDIA GPU and the necessary Docker runtime. You can override this behavior by setting the `FILEBRAIN_GPU_MODE` environment variable to `force-gpu`, `force-cpu`, or `auto` (default).
 
 _Note: Once the images are pulled and the model files are in place, File Brain will handle starting the services automatically on the next run._
