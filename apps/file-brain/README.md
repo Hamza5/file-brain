@@ -50,7 +50,7 @@ Most search tools look for _exact matches_ of filenames or content. File Brain g
 ## Prerequisites
 
 - **Python 3.11** or higher
-- **Docker** or **Podman** (Must be installed and running)
+- **Docker** (Must be installed and running)
 
 ## Installation
 

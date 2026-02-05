@@ -102,7 +102,7 @@ When working on this project, strictly adhere to the following technologies and 
 
 - **Language**: Python 3.11+
 - **Search Engine**: Typesense
-- **Containerization**: Docker / Podman
+- **Containerization**: Docker
 
 ## Maintenance
 

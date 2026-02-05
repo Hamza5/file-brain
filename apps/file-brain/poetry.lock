@@ -1425,27 +1425,6 @@ dev = ["pre-commit", "tox"]
 testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
-name = "podman"
-version = "5.6.0"
-description = "Bindings for Podman RESTful API"
-optional = false
-python-versions = ">=3.9"
-groups = ["main"]
-files = [
-    {file = "podman-5.6.0-py3-none-any.whl", hash = "sha256:967ff8ad8c6b851bc5da1a9410973882d80e235a9410b7d1e931ce0c3324fbe3"},
-    {file = "podman-5.6.0.tar.gz", hash = "sha256:cc5f7aa9562e30f992fc170a48da970a7132be60d8a2e2941e6c17bd0a0b35c9"},
-]
-
-[package.dependencies]
-requests = ">=2.24"
-urllib3 = "*"
-
-[package.extras]
-docs = ["sphinx"]
-progress-bar = ["rich (>=12.5.1)"]
-test = ["coverage", "fixtures", "pytest", "requests-mock", "tox"]
-
-[[package]]
 name = "posthog"
 version = "7.5.1"
 description = "Integrate PostHog into any python application."
@@ -2986,4 +2965,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "47158f8f1f0c201f93f44eba5f3ad6cae417ae3f04f3e8ebae1104ea8a63072a"
+content-hash = "bcdd5346011ac15ff4b2dd50519c5d5a6269106412f694ec4e4f8abb1076fb6d"

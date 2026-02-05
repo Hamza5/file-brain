@@ -105,21 +105,18 @@ class DockerManager:
 
     def _detect_docker_command(self) -> Optional[str]:
         """
-        Detect available docker command (docker or podman)
+        Detect available docker command
 
         Returns:
-            Command name ('docker' or 'podman') or None if not found
+            Command name ('docker') or None if not found
         """
-        # Check for docker first
+        # Check for docker
         if shutil.which("docker"):
             return "docker"
-        # Check for podman as fallback
-        elif shutil.which("podman"):
-            return "podman"
         return None
 
     def is_docker_available(self) -> bool:
-        """Check if Docker or Podman is installed"""
+        """Check if Docker is installed"""
         return self.docker_cmd is not None
 
     def get_docker_info(self) -> Dict[str, str]:
@@ -130,7 +127,7 @@ class DockerManager:
             Dictionary with docker info (available, command, version, error)
         """
         if not self.docker_cmd:
-            return {"available": False, "command": None, "error": "Docker/Podman not found"}
+            return {"available": False, "command": None, "error": "Docker not found"}
 
         try:
             # Get docker version
@@ -168,10 +165,7 @@ class DockerManager:
         Returns:
             Complete command list ready for subprocess
         """
-        if self.docker_cmd == "docker":
-            cmd = [self.docker_cmd, "compose"]
-        else:
-            cmd = ["podman-compose"]
+        cmd = [self.docker_cmd, "compose"]
 
         # Single compose file (no overlay merging)
         cmd.extend(["-f", str(self.compose_file)])
@@ -214,7 +208,7 @@ class DockerManager:
             Dictionary with status of images
         """
         if not self.docker_cmd:
-            return {"success": False, "error": "Docker/Podman not found"}
+            return {"success": False, "error": "Docker not found"}
 
         images = self._get_images_from_compose()
         if not images:
@@ -226,10 +220,7 @@ class DockerManager:
         try:
             # Get list of local images
             # format: repository:tag
-            if self.docker_cmd == "docker":
-                cmd = [self.docker_cmd, "images", "--format", "{{.Repository}}:{{.Tag}}"]
-            else:
-                cmd = ["podman", "images", "--format", "{{.Repository}}:{{.Tag}}"]
+            cmd = [self.docker_cmd, "images", "--format", "{{.Repository}}:{{.Tag}}"]
 
             result = subprocess.run(
                 cmd,
@@ -297,8 +288,8 @@ class DockerManager:
         """
         if not self.docker_cmd:
             if progress_callback:
-                progress_callback({"error": "Docker/Podman not found. Please install Docker or Podman to continue."})
-            return {"success": False, "error": "Docker/Podman not found"}
+                progress_callback({"error": "Docker not found. Please install Docker to continue."})
+            return {"success": False, "error": "Docker not found"}
 
         if not self.compose_file.exists():
             if progress_callback:
@@ -312,14 +303,11 @@ class DockerManager:
             return {"success": False, "error": "No images found"}
 
         try:
-            # Use appropriate SDK based on detected command
-            if self.docker_cmd == "docker":
-                return self._pull_images_docker_sdk(images, progress_callback)
-            else:
-                return self._pull_images_podman_sdk(images, progress_callback)
+            # Use Docker SDK for image pulling
+            return self._pull_images_docker_sdk(images, progress_callback)
 
         except ImportError as e:
-            logger.warning(f"SDK not available ({e}), falling back to CLI")
+            logger.warning(f"Docker SDK not available ({e}), falling back to CLI")
             return self._pull_images_cli(images, progress_callback)
 
         except Exception as e:
@@ -443,98 +431,6 @@ class DockerManager:
                     logger.error(f"Error processing progress event: {e}")
                     continue
 
-    def _pull_images_podman_sdk(self, images: List[str], progress_callback=None):
-        """Pull images using podman-py SDK with progress streaming"""
-        from podman import PodmanClient
-
-        # Connect to Podman socket
-        client = PodmanClient()
-        total_images = len(images)
-        completed_images = 0
-
-        for image in images:
-            logger.info(f"Pulling image (Podman SDK): {image}")
-            if progress_callback:
-                progress_callback({"status": "Starting", "image": image, "message": f"Pulling {image}..."})
-
-            layer_progress = {}
-
-            try:
-                # Use stream=True and decode=True for progress events
-                for event in client.images.pull(image, stream=True, decode=True):
-                    # Podman returns dict events similar to Docker when decode=True
-                    if isinstance(event, dict):
-                        layer_id = event.get("id", "")
-                        status = event.get("status", event.get("stream", ""))
-                        progress_detail = event.get("progressDetail", {})
-
-                        current = progress_detail.get("current", 0)
-                        total = progress_detail.get("total", 0)
-
-                        if layer_id and total > 0:
-                            layer_progress[layer_id] = {"current": current, "total": total}
-
-                        total_bytes = sum(lp.get("total", 0) for lp in layer_progress.values())
-                        current_bytes = sum(lp.get("current", 0) for lp in layer_progress.values())
-                        layer_percent = (current_bytes / total_bytes * 100) if total_bytes > 0 else 0
-                        layer_specific_percent = (current / total * 100) if total > 0 else 0
-                        overall_percent = ((completed_images + layer_percent / 100) / total_images) * 100
-
-                        if progress_callback:
-                            progress_callback(
-                                {
-                                    "image": image,
-                                    "layer_id": layer_id,
-                                    "status": status.strip() if isinstance(status, str) else status,
-                                    "current": current,
-                                    "total": total,
-                                    "progress_percent": round(layer_specific_percent, 1),
-                                    "image_percent": round(layer_percent, 1),
-                                    "overall_percent": round(overall_percent, 1),
-                                    "progress_text": event.get("progress", ""),
-                                }
-                            )
-                    else:
-                        # String event (older format or status message)
-                        if progress_callback:
-                            progress_callback(
-                                {
-                                    "image": image,
-                                    "status": str(event).strip(),
-                                    "overall_percent": ((completed_images) / total_images) * 100,
-                                }
-                            )
-
-            except Exception as e:
-                logger.error(f"Error pulling {image} with Podman: {e}")
-                if progress_callback:
-                    progress_callback({"error": f"Failed to pull {image}: {str(e)}"})
-                return {"success": False, "error": str(e)}
-
-            completed_images += 1
-            if progress_callback:
-                progress_callback(
-                    {
-                        "status": "Complete",
-                        "image": image,
-                        "message": f"Pulled {image} successfully",
-                        "overall_percent": round((completed_images / total_images) * 100, 1),
-                    }
-                )
-
-        client.close()
-
-        if progress_callback:
-            progress_callback(
-                {
-                    "complete": True,
-                    "message": "All images pulled successfully",
-                    "overall_percent": 100,
-                }
-            )
-
-        return {"success": True, "message": "All images pulled successfully"}
-
     def _pull_images_cli(self, images: List[str], progress_callback=None) -> Dict[str, any]:
         """
         Fallback: Pull images using compose CLI (no detailed progress)
@@ -595,7 +491,7 @@ class DockerManager:
         if not self.docker_cmd:
             return {
                 "success": False,
-                "error": "Docker/Podman not found. Please install Docker or Podman to continue.",
+                "error": "Docker not found. Please install Docker to continue.",
             }
 
         if not self.compose_file.exists():
@@ -660,7 +556,7 @@ class DockerManager:
             Dictionary with status and message
         """
         if not self.docker_cmd:
-            return {"success": False, "error": "Docker/Podman not found"}
+            return {"success": False, "error": "Docker not found"}
 
         try:
             logger.debug("Stopping docker-compose services")
@@ -713,7 +609,7 @@ class DockerManager:
             Dictionary with service statuses
         """
         if not self.docker_cmd:
-            return {"success": False, "error": "Docker/Podman not found"}
+            return {"success": False, "error": "Docker not found"}
 
         try:
             if self.docker_cmd == "docker":
@@ -886,7 +782,7 @@ class DockerManager:
             Subprocess for streaming logs
         """
         if not self.docker_cmd:
-            raise RuntimeError("Docker/Podman not found")
+            raise RuntimeError("Docker not found")
 
         cmd = [
             self.docker_cmd,
@@ -921,7 +817,7 @@ class DockerManager:
             callback: Function to call with log lines
         """
         if not self.docker_cmd:
-            raise RuntimeError("Docker/Podman not found")
+            raise RuntimeError("Docker not found")
 
         cmd = [
             self.docker_cmd,

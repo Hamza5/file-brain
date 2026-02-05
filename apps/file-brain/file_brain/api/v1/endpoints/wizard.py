@@ -207,7 +207,7 @@ def check_startup_requirements():
 
 @router.get("/docker-check", response_model=DockerCheckResponse)
 def check_docker():
-    """Check if Docker/Podman is installed"""
+    """Check if Docker is installed"""
     try:
         from file_brain.core.telemetry import telemetry
         from file_brain.utils.gpu_detector import (
@@ -282,7 +282,7 @@ def pull_docker_images():
 
         # Check if docker is available
         if not docker_manager.is_docker_available():
-            yield "data: " + json.dumps({"error": "Docker/Podman not found"}) + "\n\n"
+            yield "data: " + json.dumps({"error": "Docker not found"}) + "\n\n"
             return
 
         # Use a queue to collect progress events
@@ -367,7 +367,7 @@ def start_docker_services():
         if not docker_manager.is_docker_available():
             raise HTTPException(
                 status_code=400,
-                detail="Docker/Podman not found. Please install Docker or Podman first.",
+                detail="Docker not found. Please install Docker first.",
             )
 
         # Start services
@@ -440,7 +440,7 @@ def stream_docker_logs():
         try:
             # Check if docker is available
             if not docker_manager.is_docker_available():
-                yield "data: {'error': 'Docker/Podman not found'}\n\n"
+                yield "data: {'error': 'Docker not found'}\n\n"
                 return
 
             # Use a queue to communicate between threads
@@ -723,7 +723,7 @@ def restart_typesense():
         if not docker_manager.is_docker_available():
             raise HTTPException(
                 status_code=400,
-                detail="Docker/Podman not found",
+                detail="Docker not found",
             )
 
         # Build commands
@@ -805,7 +805,7 @@ def stream_collection_logs():
         try:
             # Check if docker is available
             if not docker_manager.is_docker_available():
-                yield f"data: {json.dumps({'error': 'Docker/Podman not found'})}\n\n"
+                yield f"data: {json.dumps({'error': 'Docker not found'})}\n\n"
                 return
 
             # Build logs command for typesense service
@@ -931,7 +931,7 @@ def start_app_containers():
             docker_manager = get_docker_manager()
 
             if not docker_manager.is_docker_available():
-                logger.error("Docker/Podman not available for app container startup")
+                logger.error("Docker not available for app container startup")
                 return
 
             logger.info("Starting app containers in background...")
@@ -973,7 +973,7 @@ def stream_app_containers_status():
         try:
             # Check if docker is available
             if not docker_manager.is_docker_available():
-                yield f"data: {json.dumps({'error': 'Docker/Podman not found'})}\n\n"
+                yield f"data: {json.dumps({'error': 'Docker not found'})}\n\n"
                 return
 
             # Poll container status indefinitely with exponential backoff
