@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import TypesenseInstantSearchAdapter from "typesense-instantsearch-adapter";
-import { InstantSearch, Configure } from "react-instantsearch";
 import { PrimeReactProvider } from "primereact/api";
 import { StatusProvider, useStatus } from "./context/StatusContext";
 import { NotificationProvider } from "./context/NotificationProvider";
 import { useNotification } from "./context/NotificationContext";
 import { IndexingNotifier } from "./context/IndexingNotifier";
 import { ThemeProvider } from "./context/ThemeContext";
+import { SearchProvider } from "./context/SearchContext";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { Button } from "primereact/button";
 import { Message } from "primereact/message";
@@ -24,11 +23,13 @@ import {
   startFileMonitoring,
   stopFileMonitoring,
   checkStartupRequirements,
-  getAppConfig,
   type CrawlStatus,
 } from "./api/client";
 
-function AppContent({ searchClient }: { searchClient: any }) {
+import { usePostHog } from "./context/PostHogProvider";
+import { SearchClientWrapper } from "./components/search/SearchClientWrapper";
+
+function AppContent() {
   const { status, stats, watchPaths } = useStatus();
   const { showSuccess, showInfo, showError } = useNotification();
   const [isCrawlerActive, setIsCrawlerActive] = useState(false);
@@ -91,13 +92,7 @@ function AppContent({ searchClient }: { searchClient: any }) {
   };
 
   return (
-    <InstantSearch
-      indexName="files"
-      searchClient={searchClient}
-      future={{ preserveSharedStateOnUnmount: true }}
-    >
-      <Configure hitsPerPage={24} />
-
+    <SearchClientWrapper>
       <div
         style={{
           display: "flex",
@@ -128,31 +123,27 @@ function AppContent({ searchClient }: { searchClient: any }) {
           file={selectedFile}
         />
       </div>
-    </InstantSearch>
+    </SearchClientWrapper>
   );
 }
-
-import { usePostHog } from "./context/PostHogProvider";
 
 export default function App() {
   const [wizardNeeded, setWizardNeeded] = useState<boolean | null>(null);
   const [wizardStartStep, setWizardStartStep] = useState<number>(0);
   const [isUpgrade, setIsUpgrade] = useState<boolean>(false);
   const [containersReady, setContainersReady] = useState<boolean>(false);
-  const [searchClient, setSearchClient] = useState<any>(null);
-  const [configError, setConfigError] = useState<string | null>(null);
   const [startupCheckError, setStartupCheckError] = useState<string | null>(
     null,
   );
   const [retryCount, setRetryCount] = useState<number>(0);
   const posthog = usePostHog();
 
-  // Track when main UI is finally viewed (containers ready + search client loaded)
+  // Track when main UI is finally viewed (containers ready)
   useEffect(() => {
-    if (containersReady && searchClient && posthog) {
+    if (containersReady && posthog) {
       posthog.capture('app_main_ui_viewed');
     }
-  }, [containersReady, searchClient, posthog]);
+  }, [containersReady, posthog]);
   // Check startup requirements on mount with timeout and retry logic
   useEffect(() => {
     const MAX_RETRIES = 3;
@@ -206,51 +197,7 @@ export default function App() {
     checkStartup();
   }, []);
 
-  // Fetch config and initialize search client after wizard is not needed
-  useEffect(() => {
-    if (wizardNeeded === false) {
-      const initClient = async () => {
-        setConfigError(null);
-        try {
-          const config = await getAppConfig();
-          const typesenseInstantsearchAdapter =
-            new TypesenseInstantSearchAdapter({
-              server: {
-                apiKey: config.typesense.api_key,
-                nodes: [
-                  {
-                    host: config.typesense.host,
-                    port: config.typesense.port,
-                    path: "",
-                    protocol: config.typesense.protocol,
-                  },
-                ],
-                cacheSearchResultsForSeconds: 0,
-                connectionTimeoutSeconds: 30,
-              },
-              additionalSearchParameters: {
-                query_by:
-                  "file_path,content,title,description,subject,keywords,author,comments,producer,application,embedding",
-                exclude_fields: "embedding",
-                group_by: "file_path",
-                group_limit: 1,
-                per_page: 24,
-              },
-            });
-          setSearchClient(typesenseInstantsearchAdapter.searchClient);
-        } catch (error) {
-          console.error("Failed to load app config:", error);
-          setConfigError(
-            error instanceof Error ? error.message : String(error),
-          );
-
-          // Retry after a delay if it's a network error (backend might be starting)
-          setTimeout(initClient, 3000);
-        }
-      };
-      initClient();
-    }
-  }, [wizardNeeded]);
+  // No longer need to initialize search client here - SearchClientWrapper handles it
 
   // Show loading while checking startup requirements
   if (wizardNeeded === null) {
@@ -317,45 +264,24 @@ export default function App() {
   return (
     <PrimeReactProvider>
       <ThemeProvider>
-        <StatusProvider enabled={wizardNeeded === false}>
-          <NotificationProvider>
-            <IndexingNotifier />
-            {searchClient ? (
-              <AppContent searchClient={searchClient} />
-            ) : (
-              <div style={{ backgroundColor: "var(--surface-ground)" }}>
-                <PremiumLoading
-                  message="Almost there..."
-                  subMessage={
-                    configError
-                      ? `Connection failed: ${configError}. Retrying...`
-                      : "Finalizing configuration..."
-                  }
-                />
-                {configError && (
-                  <div className="fixed bottom-0 left-0 right-0 flex justify-content-center pb-8">
-                    <Button
-                      label="Retry Now"
-                      icon="fas fa-sync"
-                      severity="secondary"
-                      onClick={() => setWizardNeeded((prev) => prev)}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+        <SearchProvider>
+          <StatusProvider enabled={wizardNeeded === false}>
+            <NotificationProvider>
+              <IndexingNotifier />
+              <AppContent />
 
-            {/* Container initialization overlay - blocks interaction until containers ready */}
-            <ContainerInitOverlay
-              isVisible={!containersReady}
-              onReady={() => setContainersReady(true)}
-            />
+              {/* Container initialization overlay - blocks interaction until containers ready */}
+              <ContainerInitOverlay
+                isVisible={!containersReady}
+                onReady={() => setContainersReady(true)}
+              />
 
-            {/* Global Confirm Dialog - Single instance for all delete operations */}
-            <ConfirmDialog />
-            <StatusBar />
-          </NotificationProvider>
-        </StatusProvider>
+              {/* Global Confirm Dialog - Single instance for all delete operations */}
+              <ConfirmDialog />
+              <StatusBar />
+            </NotificationProvider>
+          </StatusProvider>
+        </SearchProvider>
       </ThemeProvider>
     </PrimeReactProvider>
   );

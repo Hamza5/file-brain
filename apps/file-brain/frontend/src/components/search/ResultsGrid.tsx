@@ -7,6 +7,7 @@ import { confirmDialog } from 'primereact/confirmdialog';
 import { Tooltip } from 'primereact/tooltip';
 import { pickIconClass, formatDate, getFileName } from '../../utils/fileUtils';
 import { usePostHog } from '../../context/PostHogProvider';
+import { useSearch } from '../../context/SearchContext';
 
 interface ResultsGridProps {
     onResultClick: (result: SearchHit) => void;
@@ -18,6 +19,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
     const { refresh, status } = useInstantSearch();
     const { query } = useSearchBox();
     const posthog = usePostHog();
+    const { searchMode, fuzzySearchEnabled } = useSearch();
     const isSearching = status === 'loading' || status === 'stalled';
     const [contextMenu, setContextMenu] = useState<{
         isOpen: boolean;
@@ -52,13 +54,15 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                 result_count: results.hits.length,
                 has_results: results.hits.length > 0,
                 page: results.page,
-                search_latency_ms: latency ? Math.round(latency) : undefined
+                search_latency_ms: latency ? Math.round(latency) : undefined,
+                search_mode: searchMode,
+                fuzzy_enabled: fuzzySearchEnabled
             });
 
             // Reset start time for next search
             searchStartTimeRef.current = null;
         }
-    }, [results, query, posthog, isSearching]);
+    }, [results, query, posthog, isSearching, searchMode, fuzzySearchEnabled]);
 
     const handleContextMenu = (e: React.MouseEvent, hit: SearchHit) => {
         e.preventDefault();

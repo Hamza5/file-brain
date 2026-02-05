@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { InputText } from 'primereact/inputtext';
 import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
 import { InputSwitch } from 'primereact/inputswitch';
 import { Tooltip } from 'primereact/tooltip';
+import { OverlayPanel } from 'primereact/overlaypanel';
 import { useSearchBox } from 'react-instantsearch';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { AdvancedSearchOverlay } from '../search/AdvancedSearchOverlay';
+import { usePostHog } from '../../context/PostHogProvider';
 import { getAppConfig, type AppConfig } from '../../api/client';
 
 interface HeaderProps {
@@ -54,6 +57,8 @@ export const Header: React.FC<HeaderProps> = ({
     const [isTogglingCrawler, setIsTogglingCrawler] = useState(false);
     const [isTogglingMonitor, setIsTogglingMonitor] = useState(false);
     const [config, setConfig] = useState<AppConfig | null>(null);
+    const overlayRef = useRef<OverlayPanel>(null);
+    const posthog = usePostHog();
 
     // Load app config for version display
     React.useEffect(() => {
@@ -77,6 +82,13 @@ export const Header: React.FC<HeaderProps> = ({
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') handleSearch();
+    };
+
+    const handleOverlayToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+        overlayRef.current?.toggle(e);
+        if (posthog) {
+            posthog.capture('search_options_opened');
+        }
     };
 
     const getPlaceholder = () => {
@@ -156,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 tooltipOptions={{ position: 'bottom' }}
                                 style={{
                                     position: 'absolute',
-                                    right: searchValue ? '2.5rem' : '0.5rem',
+                                    right: searchValue ? '5rem' : '2.5rem',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     width: '2rem',
@@ -176,7 +188,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 tooltipOptions={{ position: 'bottom' }}
                                 style={{
                                     position: 'absolute',
-                                    right: '0.25rem',
+                                    right: '2.5rem',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     width: '2rem',
@@ -185,6 +197,24 @@ export const Header: React.FC<HeaderProps> = ({
                                 }}
                             />
                         )}
+                        <Button
+                            icon="fa-solid fa-sliders"
+                            rounded
+                            onClick={handleOverlayToggle}
+                            className="p-button-text search-options-btn"
+                            aria-label="Search options"
+                            tooltip="Search Options"
+                            tooltipOptions={{ position: 'bottom' }}
+                            style={{
+                                position: 'absolute',
+                                right: '0.5rem',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                width: '2rem',
+                                height: '2rem',
+                                color: 'var(--text-color-secondary)',
+                            }}
+                        />
                     </span>
                 </div>
 
@@ -255,6 +285,9 @@ export const Header: React.FC<HeaderProps> = ({
 
                 </div>
             </div>
+
+            {/* Advanced Search Overlay */}
+            <AdvancedSearchOverlay overlayRef={overlayRef} />
         </header>
     );
 };
