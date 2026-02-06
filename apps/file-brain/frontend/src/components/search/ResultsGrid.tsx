@@ -8,6 +8,8 @@ import { Tooltip } from 'primereact/tooltip';
 import { pickIconClass, formatDate, getFileName } from '../../utils/fileUtils';
 import { usePostHog } from '../../context/PostHogProvider';
 import { useSearch } from '../../context/SearchContext';
+import { SearchPagination } from './SearchPagination';
+
 
 interface ResultsGridProps {
     onResultClick: (result: SearchHit) => void;
@@ -332,6 +334,10 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                     </div >
                 )
             }
+
+            <div style={{ display: isSearching ? 'none' : 'block' }}>
+                <SearchPagination className="mt-3 mb-7" />
+            </div>
 
             <FileContextMenu
                 isOpen={contextMenu.isOpen}

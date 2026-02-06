@@ -2,6 +2,7 @@ import React from 'react';
 import { HeroStats } from '../dashboard/HeroStats';
 import { type SearchHit } from '../../types/search';
 import { ResultsGrid } from '../search/ResultsGrid';
+import { SearchSidebar } from '../search/SearchSidebar';
 import { useSearchBox } from 'react-instantsearch';
 
 interface MainContentProps {
@@ -16,13 +17,22 @@ export const MainContent: React.FC<MainContentProps> = ({ onResultClick, isCrawl
     return (
         <main style={{
             flex: 1,
-            overflowY: 'auto',
+            overflowY: 'hidden', // Changed from auto to hidden to manage scroll in children
             backgroundColor: 'var(--surface-ground)',
+            display: 'flex',
+            flexDirection: 'column'
         }}>
             {!hasQuery ? (
-                <HeroStats />
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                    <HeroStats />
+                </div>
             ) : (
-                <ResultsGrid onResultClick={onResultClick} isCrawlerActive={isCrawlerActive} />
+                <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+                    <SearchSidebar />
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '0 1rem' }}>
+                        <ResultsGrid onResultClick={onResultClick} isCrawlerActive={isCrawlerActive} />
+                    </div>
+                </div>
             )}
         </main>
     );
