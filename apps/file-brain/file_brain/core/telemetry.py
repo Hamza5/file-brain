@@ -193,10 +193,9 @@ class TelemetryManager:
             return
 
         try:
-            # Use custom properties (PostHog's $lib and $lib_version are reserved)
             props = {
-                "app_name": settings.app_name,  # Custom property for app identification
-                "app_version": settings.app_version,  # Custom property for version tracking
+                "$app_name": settings.app_name,  # Standard PostHog property
+                "$app_version": settings.app_version,  # Standard PostHog property
                 "install_type": self.environment,  # Custom: dev/packaged/production
                 **(properties or {}),
             }
@@ -301,8 +300,8 @@ class TelemetryManager:
                 properties={
                     "$os": platform.system(),  # PostHog standard property
                     "$os_version": platform.release(),  # PostHog standard property
-                    "app_name": settings.app_name,  # Custom property for app identification
-                    "app_version": settings.app_version,  # Custom property for version tracking
+                    "$app_name": settings.app_name,  # Standard PostHog property
+                    "$app_version": settings.app_version,  # Standard PostHog property
                     "install_type": self.environment,  # Custom property for dev/packaged/production
                     **gpu_info,  # GPU detection properties
                     **properties,

@@ -79,6 +79,8 @@ export async function requestJSON<T>(
 
 export interface AppConfig {
   app_version: string;
+  app_name: string;
+  install_type: string;
   typesense: {
     api_key: string;
     host: string;

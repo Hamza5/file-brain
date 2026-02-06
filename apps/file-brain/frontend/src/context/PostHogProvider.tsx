@@ -31,6 +31,14 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
             // This ensures frontend and backend events are grouped in the same session
             posthog.identify(config.posthog.device_id);
             console.log('PostHog initialized with device ID:', config.posthog.device_id.substring(0, 16) + '...');
+            
+            // Register super properties to be sent with every event
+            // These match the backend properties for consistency
+            posthog.register({
+                "$app_version": config.app_version,
+                "$app_name": config.app_name,
+                "install_type": config.install_type,
+            });
           }
         });
         

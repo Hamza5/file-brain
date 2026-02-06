@@ -10,6 +10,8 @@ class AppConfig(BaseModel):
     """Configuration exposed to the frontend"""
 
     app_version: str
+    app_name: str
+    install_type: str
     typesense: dict
     posthog: dict
 
@@ -24,6 +26,8 @@ def get_config():
 
     return {
         "app_version": settings.app_version,
+        "app_name": settings.app_name,
+        "install_type": telemetry.environment,
         "typesense": {
             "api_key": settings.typesense_api_key,
             "host": settings.typesense_host,

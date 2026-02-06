@@ -12,12 +12,13 @@ from typing import List, Optional
 from file_brain.api.models.file_event import DocumentContent
 from file_brain.core.config import settings
 from file_brain.core.logging import logger
+from file_brain.services.extraction.exceptions import ExtractionFallbackNotAllowed
 from file_brain.services.extraction.protocol import ExtractionStrategy
 
 
 class ContentExtractor:
     """
-    Document content extractor using pluggable extraction strategies.
+    Document content extraction using pluggable extraction strategies.
 
     Uses Strategy pattern to select appropriate extraction method:
     1. Tika extraction for documents, images, and archives
@@ -54,6 +55,10 @@ class ContentExtractor:
                 try:
                     result = strategy.extract(file_path)
                     break
+                except ExtractionFallbackNotAllowed as e:
+                    # Strategy explicitly requested no fallback
+                    logger.error(f"Extraction failed and fallback prevented for {file_path}: {e}")
+                    raise e
                 except Exception as e:
                     logger.warning(f"{strategy.__class__.__name__} failed for {file_path}: {e}")
                     last_error = e
