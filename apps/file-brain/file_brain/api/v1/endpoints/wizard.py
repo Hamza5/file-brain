@@ -95,6 +95,14 @@ class StartupCheckResponse(BaseModel):
     checks: dict  # Maps check name to CheckDetailResponse
 
 
+class DatabaseUpgradeResponse(BaseModel):
+    """Response model for database upgrade"""
+
+    success: bool
+    message: str
+    logs: list[str]
+
+
 @router.get("/status", response_model=WizardStatusResponse)
 def get_wizard_status():
     """Get current wizard completion status"""
@@ -706,6 +714,27 @@ def get_collection_status():
             ready=False,
             error=str(e),
         )
+
+
+@router.post("/database-upgrade", response_model=DatabaseUpgradeResponse)
+def upgrade_database():
+    """Run database migrations to upgrade to latest revision"""
+    try:
+        from file_brain.services.database_migrations import get_migration_service
+
+        service = get_migration_service()
+        success, logs = service.run_upgrade()
+
+        message = "Database upgrade completed successfully" if success else "Database upgrade failed"
+
+        return DatabaseUpgradeResponse(
+            success=success,
+            message=message,
+            logs=logs,
+        )
+    except Exception as e:
+        logger.error(f"Error upgrading database: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/restart-typesense")

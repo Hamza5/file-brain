@@ -33,6 +33,15 @@ This document provides guidelines for AI agents working on this project.
   - `poetry run python -m file_brain.main` (NOT `python -m file_brain.main`)
   - This ensures you're using the correct virtual environment with all dependencies installed.
 
+### Project Scripts
+
+- **Use NPM Scripts**: For high-level application tasks, prefer the scripts defined in `package.json` at the root.
+  - `npm run dev:app`: Run the app in development mode
+  - `npm run build:app-frontend`: Build the frontend
+  - `npm run clean:*`: various cleanup commands
+  - `npm run db:*`: Database migration commands
+- **Maintain Scripts**: Keep `package.json` scripts updated. If you introduce new common workflows or change existing ones, update `package.json` accordingly.
+
 ### Testing
 
 - **Run Full Test Suite**: Before submitting changes, run the full test suite:
@@ -103,6 +112,13 @@ When working on this project, strictly adhere to the following technologies and 
 - **Language**: Python 3.11+
 - **Search Engine**: Typesense
 - **Containerization**: Docker
+- **Database Migrations**: Alembic
+  - Use `npm` scripts for migration operations (run from root):
+    - Create migration: `npm run db:revision -- "message"`
+    - Apply migrations: `npm run db:upgrade`
+    - Verify status: `npm run db:current`
+    - View history: `npm run db:history`
+    - Downgrade: `npm run db:downgrade`
 
 ## Maintenance
 

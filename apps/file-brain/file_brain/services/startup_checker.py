@@ -36,6 +36,7 @@ class StartupCheckResult:
     docker_images: CheckDetail
     services_healthy: CheckDetail
     model_downloaded: CheckDetail
+    db_migration_current: CheckDetail
     collection_ready: CheckDetail
     schema_current: CheckDetail
     wizard_reset: CheckDetail
@@ -49,6 +50,7 @@ class StartupCheckResult:
                 self.docker_images.passed,
                 self.services_healthy.passed,
                 self.model_downloaded.passed,
+                self.db_migration_current.passed,
                 self.collection_ready.passed,
                 self.schema_current.passed,
                 self.wizard_reset.passed,
@@ -85,6 +87,10 @@ class StartupCheckResult:
         if self.is_first_run:
             return True
 
+        # Show wizard if database migration is needed
+        if not self.db_migration_current.passed:
+            return True
+
         # If wizard was completed before, never auto-show it again
         # Even if checks fail, let the app handle it with retry UI
         return False
@@ -95,6 +101,9 @@ class StartupCheckResult:
         Check if this is an upgrade scenario (some checks passed, some failed).
         If Docker is available and at least one other check passed, it's likely an upgrade.
         """
+        if not self.db_migration_current.passed:
+            return True
+
         if not self.docker_available.passed:
             return False
 
@@ -112,15 +121,17 @@ class StartupCheckResult:
         Get the wizard step number to start from based on first failed check.
 
         Returns:
-            Step number (0-5) or None if all checks passed
+            Step number (0-6) or None if all checks passed
 
         Wizard steps:
         0: Docker Check
         1: Image Pull
         2: Service Start (only if services are unhealthy, not just stopped)
-        3: Model Download
-        4: Collection Create
-        5: Complete
+        2: Service Start
+        3: Database Migration
+        4: Model Download
+        5: Collection Create
+        6: Complete
         """
         # If wizard was deliberately reset, start from the beginning
         if not self.wizard_reset.passed:
@@ -130,12 +141,17 @@ class StartupCheckResult:
             return 0
         if not self.docker_images.passed:
             return 1
-        # Skip service start step - services not running doesn't require wizard
-        # The app will start them automatically via ContainerInitOverlay
-        if not self.model_downloaded.passed:
+        if not self.services_healthy.passed:
+            return 2
+
+        if not self.db_migration_current.passed:
             return 3
-        if not self.collection_ready.passed or not self.schema_current.passed:
+
+        if not self.model_downloaded.passed:
             return 4
+
+        if not self.collection_ready.passed or not self.schema_current.passed:
+            return 5
         return None
 
 
@@ -146,6 +162,10 @@ class StartupChecker:
         self.docker_manager = get_docker_manager()
         self.model_downloader = get_model_downloader()
         self.typesense_client = get_typesense_client()
+        # Import lazily to avoid circular imports
+        from file_brain.services.database_migrations import get_migration_service
+
+        self.migration_service = get_migration_service()
 
     def check_docker_available(self) -> CheckDetail:
         """Check if Docker is installed"""
@@ -203,6 +223,18 @@ class StartupChecker:
         except Exception as e:
             logger.error(f"Error checking model status: {e}")
             return CheckDetail(passed=False, message=f"Error: {str(e)}")
+
+    def check_db_migration_current(self) -> CheckDetail:
+        """Check if database schema is up to date."""
+        try:
+            needed, current, head = self.migration_service.check_migration_needed()
+            if needed:
+                return CheckDetail(passed=False, message=f"Database migration needed: {current} -> {head}")
+            return CheckDetail(passed=True, message=f"Database schema current ({current})")
+        except Exception as e:
+            logger.error(f"Error checking database migration: {e}")
+            # Fail safely - if check fails, assume we might need migration or let user retry
+            return CheckDetail(passed=False, message=f"Error checking migrations: {str(e)}")
 
     def check_collection_ready(self) -> CheckDetail:
         """
@@ -306,6 +338,9 @@ class StartupChecker:
         wizard_check = self.check_wizard_reset()
         model_check = self.check_model_downloaded()
 
+        # Check database migrations (fast, local)
+        db_migration_check = self.check_db_migration_current()
+
         # EARLY EXIT: If wizard was reset, skip all other checks
         if not wizard_check.passed:
             logger.info("Wizard was reset - skipping remaining checks for fast startup")
@@ -314,6 +349,7 @@ class StartupChecker:
                 docker_images=CheckDetail(passed=True, message="Skipped - wizard reset"),
                 services_healthy=CheckDetail(passed=True, message="Skipped - wizard reset"),
                 model_downloaded=model_check,
+                db_migration_current=db_migration_check,
                 collection_ready=CheckDetail(passed=True, message="Skipped - wizard reset"),
                 schema_current=CheckDetail(passed=True, message="Skipped - wizard reset"),
                 wizard_reset=wizard_check,
@@ -334,6 +370,7 @@ class StartupChecker:
                 docker_images=images_check,
                 services_healthy=CheckDetail(passed=True, message="Skipped - model missing"),
                 model_downloaded=model_check,
+                db_migration_current=db_migration_check,
                 collection_ready=CheckDetail(passed=True, message="Skipped - model missing"),
                 schema_current=CheckDetail(passed=True, message="Skipped - model missing"),
                 wizard_reset=wizard_check,
@@ -350,6 +387,7 @@ class StartupChecker:
                 docker_images=CheckDetail(passed=True, message="Skipped - Docker not available"),
                 services_healthy=CheckDetail(passed=True, message="Skipped - Docker not available"),
                 model_downloaded=model_check,
+                db_migration_current=db_migration_check,
                 collection_ready=CheckDetail(passed=True, message="Skipped - Docker not available"),
                 schema_current=CheckDetail(passed=True, message="Skipped - Docker not available"),
                 wizard_reset=wizard_check,
@@ -372,6 +410,7 @@ class StartupChecker:
                 docker_images=images_check,
                 services_healthy=CheckDetail(passed=True, message="Skipped - images missing"),
                 model_downloaded=model_check,
+                db_migration_current=db_migration_check,
                 collection_ready=CheckDetail(passed=True, message="Skipped - images missing"),
                 schema_current=CheckDetail(passed=True, message="Skipped - images missing"),
                 wizard_reset=wizard_check,
@@ -406,6 +445,7 @@ class StartupChecker:
             docker_images=images_check,
             services_healthy=services_check,
             model_downloaded=model_check,
+            db_migration_current=db_migration_check,
             collection_ready=collection_check,
             schema_current=schema_check,
             wizard_reset=wizard_check,

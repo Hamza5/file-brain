@@ -11,6 +11,8 @@ import { ImagePullStep } from './steps/ImagePullStep';
 import { ServiceStartStep } from './steps/ServiceStartStep';
 import { ModelDownloadStep } from './steps/ModelDownloadStep';
 import { CollectionCreateStep } from './steps/CollectionCreateStep';
+import { DatabaseMigrationStep } from './steps/DatabaseMigrationStep';
+
 
 import { usePostHog } from '../../context/PostHogProvider';
 
@@ -36,9 +38,11 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
     { label: 'System Check' },
     { label: 'Download Components' },
     { label: 'Initialize Engine' },
+    { label: 'Database Migration' },
     { label: 'Download Embedding (AI) Model' },
     { label: 'Finalize Setup' },
     { label: 'Complete' },
+
   ], []);
 
   // Track when a step is reached
@@ -88,12 +92,16 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
         return <ServiceStartStep onComplete={() => handleStepComplete(3)} />;
 
       case 3:
-        return <ModelDownloadStep onComplete={() => handleStepComplete(4)} />;
+        return <DatabaseMigrationStep isActive={activeStep === 3} onComplete={() => handleStepComplete(4)} onError={(err) => setError(err)} />;
 
       case 4:
-        return <CollectionCreateStep onComplete={() => handleStepComplete(5)} />;
+        return <ModelDownloadStep onComplete={() => handleStepComplete(5)} />;
 
       case 5:
+        return <CollectionCreateStep onComplete={() => handleStepComplete(6)} />;
+
+      case 6:
+
         return (
           <div className="flex flex-column gap-3 align-items-center text-center">
             <i className="fas fa-check-circle text-6xl text-green-500" />

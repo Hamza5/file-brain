@@ -24,7 +24,12 @@
     "clean:db": "rm -f ~/.local/share/file-brain/file_brain.db && echo '✅ Database removed'",
     "clean:typesense": "sudo rm -rf ~/.local/share/file-brain/typesense-data && echo '✅ Typesense data removed'",
     "clean:all": "npm run clean:docker && npm run clean:db && npm run clean:typesense && echo '✅ Full cleanup complete - ready for fresh wizard test'",
-    "clean:all-full": "npm run clean:images-full && npm run clean:db && npm run clean:typesense && echo '✅ Complete cleanup with dependencies - realistic wizard test'"
+    "clean:all-full": "npm run clean:images-full && npm run clean:db && npm run clean:typesense && echo '✅ Complete cleanup with dependencies - realistic wizard test'",
+    "db:revision": "cd apps/file-brain && poetry run alembic revision --autogenerate -m",
+    "db:upgrade": "cd apps/file-brain && poetry run alembic upgrade head",
+    "db:downgrade": "cd apps/file-brain && poetry run alembic downgrade -1",
+    "db:history": "cd apps/file-brain && poetry run alembic history",
+    "db:current": "cd apps/file-brain && poetry run alembic current"
   },
   "devDependencies": {
     "typescript": "^5.1.0"

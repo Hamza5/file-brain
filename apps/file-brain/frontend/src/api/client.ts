@@ -739,6 +739,16 @@ export async function restartTypesense(): Promise<{
   return requestJSON("/api/v1/wizard/restart-typesense", { method: "POST" });
 }
 
+export interface DatabaseUpgradeResponse {
+  success: boolean;
+  message: string;
+  logs: string[];
+}
+
+export async function upgradeDatabase(): Promise<DatabaseUpgradeResponse> {
+  return requestJSON("/api/v1/wizard/database-upgrade", { method: "POST" });
+}
+
 export async function completeWizard(): Promise<{
   success: boolean;
   message?: string;
