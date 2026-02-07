@@ -101,11 +101,11 @@ class StartupCheckResult:
         Check if this is an upgrade scenario (some checks passed, some failed).
         If Docker is available and at least one other check passed, it's likely an upgrade.
         """
-        if not self.db_migration_current.passed:
-            return True
-
         if not self.docker_available.passed:
             return False
+
+        if not self.db_migration_current.passed:
+            return True
 
         checks = [
             self.docker_images.passed,

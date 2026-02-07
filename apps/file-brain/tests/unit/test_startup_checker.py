@@ -57,18 +57,28 @@ def mock_wizard_state():
 
 
 @pytest.fixture
-def startup_checker(mock_docker_manager, mock_model_downloader, mock_typesense_client):
+def mock_migration_service():
+    """Mock database migration service."""
+    service = MagicMock()
+    service.check_migration_needed.return_value = (False, "head", "head")
+    return service
+
+
+@pytest.fixture
+def startup_checker(mock_docker_manager, mock_model_downloader, mock_typesense_client, mock_migration_service):
     """Create a StartupChecker with mocked dependencies."""
     with (
         patch("file_brain.services.startup_checker.get_docker_manager", return_value=mock_docker_manager),
         patch("file_brain.services.startup_checker.get_model_downloader", return_value=mock_model_downloader),
         patch("file_brain.services.startup_checker.get_typesense_client", return_value=mock_typesense_client),
+        patch("file_brain.services.database_migrations.get_migration_service", return_value=mock_migration_service),
     ):
         checker = StartupChecker()
         # Replace the dependencies with our mocks
         checker.docker_manager = mock_docker_manager
         checker.model_downloader = mock_model_downloader
         checker.typesense_client = mock_typesense_client
+        checker.migration_service = mock_migration_service
         yield checker
 
 
@@ -239,13 +249,33 @@ def test_check_schema_current_no_collection(startup_checker, mock_typesense_clie
     assert "does not exist" in result.message
 
 
+def test_check_db_migration_current_success(startup_checker, mock_migration_service):
+    """DB migration check passes when no migration is needed."""
+    mock_migration_service.check_migration_needed.return_value = (False, "head", "head")
+
+    result = startup_checker.check_db_migration_current()
+
+    assert result.passed is True
+    assert "schema current" in result.message.lower()
+
+
+def test_check_db_migration_current_failure(startup_checker, mock_migration_service):
+    """DB migration check fails when migration is needed."""
+    mock_migration_service.check_migration_needed.return_value = (True, "base", "head")
+
+    result = startup_checker.check_db_migration_current()
+
+    assert result.passed is False
+    assert "migration needed" in result.message.lower()
+
+
 # ============================================================================
 # Combined Check Tests
 # ============================================================================
 
 
 def test_perform_all_checks_all_pass(
-    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client, mock_migration_service
 ):
     """All checks pass in ideal scenario."""
     # Setup all mocks to return success
@@ -259,6 +289,7 @@ def test_perform_all_checks_all_pass(
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
     mock_typesense_client.check_collection_exists.return_value = True
+    mock_migration_service.check_migration_needed.return_value = (False, "head", "head")
 
     result = startup_checker.perform_all_checks()
 
@@ -334,7 +365,7 @@ def test_perform_all_checks_services_not_healthy(
     assert result.all_checks_passed is False
     # Services running but not healthy should NOT trigger wizard (critical checks passed)
     assert result.needs_wizard is False
-    assert result.get_first_failed_step() is None  # No wizard step needed
+    assert result.get_first_failed_step() == 2  # Service Start step needed
     assert result.is_upgrade is False  # All critical checks passed
 
 
@@ -357,7 +388,7 @@ def test_perform_all_checks_services_not_running(
 
     assert result.all_checks_passed is False  # Services check failed
     assert result.needs_wizard is False  # But wizard not needed - app will start services
-    assert result.get_first_failed_step() is None  # No wizard step needed
+    assert result.get_first_failed_step() == 2  # Service Start step needed
     assert result.is_upgrade is False  # All critical checks passed
 
 
@@ -381,7 +412,7 @@ def test_perform_all_checks_model_missing(
     assert result.all_checks_passed is False
     assert result.needs_wizard is False  # Model missing doesn't trigger wizard on normal runs
     assert result.is_first_run is False  # Wizard was completed before
-    assert result.get_first_failed_step() == 3  # Model download step
+    assert result.get_first_failed_step() == 4  # Model download step
     assert result.is_upgrade is True
 
 
@@ -405,8 +436,34 @@ def test_perform_all_checks_collection_missing(
     assert result.all_checks_passed is False
     assert result.needs_wizard is False  # Collection missing doesn't trigger wizard on normal runs
     assert result.is_first_run is False  # Wizard was completed before
-    assert result.get_first_failed_step() == 4  # Collection create step
+    assert result.get_first_failed_step() == 5  # Collection create step
     assert result.is_upgrade is True
+
+
+def test_perform_all_checks_db_migration_needed(
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client, mock_migration_service
+):
+    """Specific test for DB migration needed."""
+    mock_docker_manager.get_docker_info.return_value = {
+        "available": True,
+        "running": True,
+        "command": "docker",
+        "version": "27.0.1",
+    }
+    # These won't be called because migration check runs before
+    mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
+
+    # Mock migration needed
+    mock_migration_service.check_migration_needed.return_value = (True, "base", "head")
+
+    result = startup_checker.perform_all_checks()
+
+    assert result.all_checks_passed is False
+    assert result.needs_wizard is True
+    assert result.db_migration_current.passed is False
+    assert result.get_first_failed_step() == 3
+    # 0=Docker, 1=Images, 2=Services, 3=DB Migration, 4=Model, 5=Collection
+    assert "migration needed" in result.db_migration_current.message
 
 
 # ============================================================================
@@ -473,7 +530,7 @@ def test_perform_all_checks_early_exit_model_missing(
     # Model missing but wizard was completed - no wizard needed
     assert result.needs_wizard is False
     assert result.is_first_run is False
-    assert result.get_first_failed_step() == 3  # Model download step
+    assert result.get_first_failed_step() == 4  # Model download step updated index
 
     # Docker and images checks are fast, so they run even when model missing
     # But network checks should be skipped
@@ -511,7 +568,7 @@ def test_perform_all_checks_early_exit_images_missing(
 
 
 def test_perform_all_checks_network_checks_run_when_needed(
-    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client
+    startup_checker, mock_docker_manager, mock_model_downloader, mock_typesense_client, mock_migration_service
 ):
     """Network checks ARE run when all critical checks pass (wizard might not be needed)."""
     mock_model_downloader.check_model_exists.return_value = {"exists": True, "missing_files": []}
@@ -524,6 +581,7 @@ def test_perform_all_checks_network_checks_run_when_needed(
     mock_docker_manager.check_required_images.return_value = {"success": True, "all_present": True}
     mock_docker_manager.get_services_status.return_value = {"healthy": True, "running": True}
     mock_typesense_client.check_collection_exists.return_value = True
+    mock_migration_service.check_migration_needed.return_value = (False, "head", "head")
 
     result = startup_checker.perform_all_checks()
 
@@ -558,6 +616,7 @@ def test_startup_check_result_all_checks_passed():
         docker_images=CheckDetail(True, "ok"),
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
@@ -571,6 +630,7 @@ def test_startup_check_result_all_checks_passed():
         docker_images=CheckDetail(False, "missing"),
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
@@ -589,6 +649,7 @@ def test_startup_check_result_is_upgrade():
         docker_images=CheckDetail(False, "missing"),
         services_healthy=CheckDetail(False, "not running"),
         model_downloaded=CheckDetail(False, "missing"),
+        db_migration_current=CheckDetail(False, "missing"),
         collection_ready=CheckDetail(False, "missing"),
         schema_current=CheckDetail(False, "missing"),
         wizard_reset=CheckDetail(True, "ok"),
@@ -601,6 +662,7 @@ def test_startup_check_result_is_upgrade():
         docker_images=CheckDetail(False, "missing"),  # Critical check failed
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
@@ -618,6 +680,7 @@ def test_startup_check_result_get_first_failed_step():
         docker_images=CheckDetail(True, "ok"),
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
@@ -630,6 +693,7 @@ def test_startup_check_result_get_first_failed_step():
         docker_images=CheckDetail(False, "missing"),
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
@@ -642,11 +706,25 @@ def test_startup_check_result_get_first_failed_step():
         docker_images=CheckDetail(True, "ok"),
         services_healthy=CheckDetail(False, "not healthy"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
     )
-    assert result.get_first_failed_step() is None  # No wizard step needed
+    assert result.get_first_failed_step() == 2  # Service Start Step needed
+
+    # DB migration failed
+    result = StartupCheckResult(
+        docker_available=CheckDetail(True, "ok"),
+        docker_images=CheckDetail(True, "ok"),
+        services_healthy=CheckDetail(True, "ok"),
+        model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(False, "update needed"),
+        collection_ready=CheckDetail(True, "ok"),
+        schema_current=CheckDetail(True, "ok"),
+        wizard_reset=CheckDetail(True, "ok"),
+    )
+    assert result.get_first_failed_step() == 3
 
     # Model failed
     result = StartupCheckResult(
@@ -654,11 +732,12 @@ def test_startup_check_result_get_first_failed_step():
         docker_images=CheckDetail(True, "ok"),
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(False, "missing"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
     )
-    assert result.get_first_failed_step() == 3
+    assert result.get_first_failed_step() == 4
 
     # Collection or schema failed
     result = StartupCheckResult(
@@ -666,11 +745,12 @@ def test_startup_check_result_get_first_failed_step():
         docker_images=CheckDetail(True, "ok"),
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(False, "missing"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
     )
-    assert result.get_first_failed_step() == 4
+    assert result.get_first_failed_step() == 5
 
     # All passed
     result = StartupCheckResult(
@@ -678,6 +758,7 @@ def test_startup_check_result_get_first_failed_step():
         docker_images=CheckDetail(True, "ok"),
         services_healthy=CheckDetail(True, "ok"),
         model_downloaded=CheckDetail(True, "ok"),
+        db_migration_current=CheckDetail(True, "ok"),
         collection_ready=CheckDetail(True, "ok"),
         schema_current=CheckDetail(True, "ok"),
         wizard_reset=CheckDetail(True, "ok"),
