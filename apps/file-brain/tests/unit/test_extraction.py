@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import tika.detector  # noqa: F401
+import tika.parser  # noqa: F401
 
 # Ensure tika submodules are loaded so patch can find them
 from file_brain.api.models.file_event import DocumentContent
