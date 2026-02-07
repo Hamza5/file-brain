@@ -113,3 +113,7 @@ When working on this project, strictly adhere to the following technologies and 
   - The root `README.md` may continue to use relative paths.
 - **Website README Sync**: The `apps/website/README.md` must reflect the actual website structure and content.
   - When modifying website sections (Hero, Features, Use Cases, Pro Version, etc.), update the website README accordingly.
+
+## Workflow
+
+- **Git Operations**: Do not auto-commit and push changes unless explicitly requested by the user. Always wait for user confirmation or instructions.
