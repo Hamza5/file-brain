@@ -84,6 +84,39 @@ class WatchPathCreateRequest(BaseModel):
     )
     enabled: bool = Field(default=True, description="Whether path should be enabled")
     is_excluded: bool = Field(default=False, description="Whether path should be excluded from indexing")
+    file_type_filter: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="File type filter configuration (only for included folders)",
+    )
+
+    @classmethod
+    def model_validate(cls, value):
+        """Custom validation for file type filter"""
+        instance = super().model_validate(value)
+
+        # If file_type_filter is provided, validate its structure
+        if instance.file_type_filter is not None:
+            # Only allow filter for included folders
+            if instance.is_excluded:
+                raise ValueError("file_type_filter cannot be used with excluded folders")
+
+            # Validate structure
+            if "mode" not in instance.file_type_filter or "extensions" not in instance.file_type_filter:
+                raise ValueError("file_type_filter must contain 'mode' and 'extensions'")
+
+            # Validate mode
+            if instance.file_type_filter["mode"] not in ["include", "exclude"]:
+                raise ValueError("file_type_filter mode must be 'include' or 'exclude'")
+
+            # Validate extensions
+            if not isinstance(instance.file_type_filter["extensions"], list):
+                raise ValueError("file_type_filter extensions must be a list")
+
+            for ext in instance.file_type_filter["extensions"]:
+                if not isinstance(ext, str) or not ext.startswith("."):
+                    raise ValueError(f"Invalid extension '{ext}': extensions must start with '.'")
+
+        return instance
 
 
 class ClearIndexesResponse(BaseModel):

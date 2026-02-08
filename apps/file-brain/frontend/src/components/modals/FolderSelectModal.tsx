@@ -3,12 +3,19 @@ import { Dialog } from "primereact/dialog";
 import { Button } from "primereact/button";
 import { Checkbox } from "primereact/checkbox";
 import { Message } from "primereact/message";
+import { Dropdown } from "primereact/dropdown";
+import { Chips } from "primereact/chips";
 import { getFsRoots, listFs, type FsRoot, type FsEntry } from "../../api/client";
 
 type FolderSelectModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (path: string, includeSubdirectories: boolean, isExcluded: boolean) => void;
+  onConfirm: (
+    path: string,
+    includeSubdirectories: boolean,
+    isExcluded: boolean,
+    fileTypeFilter?: { mode: "include" | "exclude"; extensions: string[] } | null,
+  ) => void;
   includeSubdirectories: boolean;
   onIncludeSubdirectoriesChange: (checked: boolean) => void;
   isExcludedMode: boolean;
@@ -33,6 +40,10 @@ export function FolderSelectModal({
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // File type filter state (only for included folders)
+  const [filterMode, setFilterMode] = useState<"include" | "exclude">("include");
+  const [filterExtensions, setFilterExtensions] = useState<string[]>([]);
 
   // Filter entries based on the filter text
   const filteredEntries = filter.trim() === ""
@@ -52,6 +63,9 @@ export function FolderSelectModal({
       setLoading(false);
       setInitializing(false);
       setError(null);
+      // Reset file type filter
+      setFilterMode("exclude");
+      setFilterExtensions([]);
     }
   }, [isOpen]);
 
@@ -193,7 +207,13 @@ export function FolderSelectModal({
 
   function handleConfirm() {
     if (!selectedPath) return;
-    onConfirm(selectedPath, includeSubdirectories, isExcludedMode);
+    
+    // Only pass file type filter for included folders
+    const fileTypeFilter = !isExcludedMode && filterExtensions.length > 0
+      ? { mode: filterMode, extensions: filterExtensions }
+      : null;
+    
+    onConfirm(selectedPath, includeSubdirectories, isExcludedMode, fileTypeFilter);
   }
 
   const breadcrumbSegments = getBreadcrumbSegments(currentPath);
@@ -202,10 +222,10 @@ export function FolderSelectModal({
     <Dialog
       header={isExcludedMode ? "Exclude Folder from Indexing" : "Select Folder to Watch"}
       visible={isOpen}
-      style={{ width: "90vw", maxWidth: "800px", height: "80vh" }}
+      style={{ width: "90vw", height: "90vh" }}
       onHide={onClose}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "500px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "100%" }}>
         {/* Breadcrumb */}
         <div
           style={{
@@ -214,7 +234,7 @@ export function FolderSelectModal({
             gap: "0.5rem",
             flexWrap: "wrap",
             fontSize: "0.9rem",
-            padding: "0.75rem",
+            padding: "0.5rem",
             backgroundColor: "var(--surface-50)",
             borderRadius: "6px",
             border: "1px solid var(--surface-border)",
@@ -522,23 +542,22 @@ export function FolderSelectModal({
             {/* Selected path display */}
             <div
               style={{
-                borderTop: "1px solid var(--surface-border)",
-                paddingTop: "0.75rem",
+                display: "flex",
+                flexDirection: "row",
+                gap: "0.5rem",
+                alignItems: "center",
               }}
             >
               <div
                 style={{
-                  fontSize: "0.85rem",
                   color: "var(--text-color-secondary)",
-                  marginBottom: "0.5rem",
                 }}
               >
                 Selected Folder
               </div>
               <div
                 style={{
-                  minHeight: "2.5rem",
-                  padding: "0.75rem",
+                  padding: "0.5rem",
                   borderRadius: "6px",
                   border: "1px solid var(--surface-border)",
                   backgroundColor: "var(--surface-50)",
@@ -546,8 +565,9 @@ export function FolderSelectModal({
                     ? "var(--primary-color)"
                     : "var(--text-color-secondary)",
                   wordBreak: "break-all",
-                  fontSize: "0.9rem",
+                  fontSize: "0.75rem",
                   fontFamily: "monospace",
+                  flex: 1,
                 }}
               >
                 {selectedPath || "None selected"}
@@ -556,42 +576,109 @@ export function FolderSelectModal({
           </div>
         </div>
 
-        {/* Footer buttons */}
+        {/* Footer section */}
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "0.75rem",
-            borderTop: "1px solid var(--surface-border)",
-            paddingTop: "1rem",
+            flexDirection: "column",
+            gap: "1rem"
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Checkbox
-              inputId="modalIncludeSubdirectories"
-              checked={includeSubdirectories}
-              onChange={(e) => onIncludeSubdirectoriesChange(e.checked ?? true)}
-            />
-            <label htmlFor="modalIncludeSubdirectories" style={{ cursor: "pointer", fontSize: "0.85rem" }}>
-              Include Subdirectories
-            </label>
-          </div>
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <Button
-              label="Cancel"
-              severity="danger"
-              onClick={onClose}
-              outlined
-              icon="fa-solid fa-xmark"
-            />
-            <Button
-              label={isExcludedMode ? "Exclude Folder" : "Add Folder"}
-              icon={isExcludedMode ? "fa-solid fa-ban" : "fa-solid fa-check"}
-              onClick={handleConfirm}
-              disabled={!selectedPath}
-              className={isExcludedMode ? "p-button-danger" : ""}
-            />
+          {/* File Type Filter - Only for included folders */}
+          {!isExcludedMode && (
+            <div style={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              gap: "0.5rem",
+              padding: "0.75rem",
+              backgroundColor: "var(--surface-50)",
+              borderRadius: "6px",
+              border: "1px solid var(--surface-border)"
+            }}>
+              <div style={{ 
+                fontSize: "0.75rem", 
+                fontWeight: 600, 
+                color: "var(--text-color-secondary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px"
+              }}>
+                File Type Filter (Optional)
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <Dropdown
+                  value={filterMode}
+                  options={[
+                    { label: "Include", value: "include" },
+                    { label: "Exclude", value: "exclude" },
+                  ]}
+                  onChange={(e) => setFilterMode(e.value)}
+                  style={{ fontSize: "0.85rem" }}
+                  valueTemplate={(option) => (
+                    <div>
+                      {option.value === "exclude" ? (
+                        <i className="fas fa-times" aria-hidden="true" />
+                      ) : (
+                        <i className="fas fa-check" aria-hidden="true" />
+                      )}
+                      <span className="ml-2">{option.label}</span>
+                    </div>
+                  )}
+                />
+                <Chips
+                  value={filterExtensions}
+                  onChange={(e) => {
+                    // Ensure extensions start with a dot
+                    const validated = (e.value || []).map((ext) => 
+                      ext.startsWith(".") ? ext.toLowerCase() : `.${ext.toLowerCase()}`
+                    );
+                    setFilterExtensions(validated);
+                  }}
+                  separator=","
+                  placeholder={`File types to ${filterMode === "include" ? "include" : "exclude"}`}
+                  style={{ flex: 1, fontSize: "0.85rem" }}
+                  pt={ { container: { style: {width: "100%"} } } }
+                  tooltip="Enter file extensions separated by commas (e.g., .pdf, .txt, .log)"
+                  tooltipOptions={{ position: "top" }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Bottom row with checkbox and buttons */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Checkbox
+                inputId="modalIncludeSubdirectories"
+                checked={includeSubdirectories}
+                onChange={(e) => onIncludeSubdirectoriesChange(e.checked ?? true)}
+              />
+              <label htmlFor="modalIncludeSubdirectories" style={{ cursor: "pointer", fontSize: "0.85rem" }}>
+                Include Subdirectories
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <Button
+                label="Cancel"
+                severity="danger"
+                onClick={onClose}
+                outlined
+                icon="fa-solid fa-xmark"
+              />
+              <Button
+                label={isExcludedMode ? "Exclude Folder" : "Add Folder"}
+                icon={isExcludedMode ? "fa-solid fa-ban" : "fa-solid fa-check"}
+                onClick={handleConfirm}
+                disabled={!selectedPath}
+                className={isExcludedMode ? "p-button-danger" : ""}
+              />
+            </div>
           </div>
         </div>
       </div>

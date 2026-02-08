@@ -54,9 +54,10 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({
     path: string,
     includeSubdirectories: boolean,
     isExcluded: boolean,
+    fileTypeFilter?: { mode: "include" | "exclude"; extensions: string[] } | null,
   ) => {
     try {
-      await addWatchPath(path, includeSubdirectories, isExcluded);
+      await addWatchPath(path, includeSubdirectories, isExcluded, fileTypeFilter);
       await loadWatchPaths();
       setFolderPickerVisible(false);
       toast.current?.show({
@@ -191,6 +192,37 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({
                 Recursive
               </span>
             )}
+            {/* File Type Filter Badge */}
+            {item.file_type_filter && (
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  backgroundColor: item.file_type_filter.mode === "include" 
+                    ? "var(--green-100)" 
+                    : "var(--orange-100)",
+                  color: item.file_type_filter.mode === "include" 
+                    ? "var(--green-700)" 
+                    : "var(--orange-700)",
+                  padding: "0.25rem 0.625rem",
+                  borderRadius: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                <i
+                  className={`fa-solid ${
+                    item.file_type_filter.mode === "include" 
+                      ? "fa-check" 
+                      : "fa-times"
+                  }`}
+                  style={{ fontSize: "0.7rem" }}
+                />
+                {item.file_type_filter.mode === "include" ? "Only" : "Exclude"}:
+                {item.file_type_filter.extensions.join(", ")}
+              </span>
+            )}
             <div
               style={{
                 display: "flex",
@@ -294,7 +326,7 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({
             <FolderSelectModal
                 isOpen={folderPickerVisible}
                 onClose={() => setFolderPickerVisible(false)}
-                onConfirm={(path, includeSubdirectories) => handleAddPath(path, includeSubdirectories, isAddingExcluded)}
+                onConfirm={handleAddPath}
                 includeSubdirectories={includeSubdirectories}
                 onIncludeSubdirectoriesChange={setIncludeSubdirectories}
                 isExcludedMode={isAddingExcluded}

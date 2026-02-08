@@ -77,6 +77,27 @@ class FileDiscoverer:
                                 return
 
                             file_path = os.path.join(root, filename)
+
+                            # Apply file type filter if configured
+                            if watch_path_model.file_type_filter:
+                                try:
+                                    import json
+                                    from pathlib import Path
+
+                                    filter_config = json.loads(watch_path_model.file_type_filter)
+                                    file_ext = Path(file_path).suffix.lower()
+                                    mode = filter_config.get("mode")
+                                    extensions = [ext.lower() for ext in filter_config.get("extensions", [])]
+
+                                    # Apply filter based on mode
+                                    if mode == "exclude" and file_ext in extensions:
+                                        continue  # Skip excluded file types
+                                    elif mode == "include" and file_ext not in extensions:
+                                        continue  # Skip non-included file types
+                                except (json.JSONDecodeError, KeyError):
+                                    # If filter is invalid, index the file (fail-safe)
+                                    pass
+
                             try:
                                 stats = os.stat(file_path)
                                 self.files_found += 1

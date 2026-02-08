@@ -33,6 +33,7 @@ class WatchPathRepository(BaseRepository[WatchPath]):
         enabled: bool = True,
         include_subdirectories: bool = True,
         is_excluded: bool = False,
+        file_type_filter: Optional[str] = None,
     ) -> WatchPath:
         """Create a watch path if it doesn't exist"""
         existing = self.get_by_path(path)
@@ -45,6 +46,7 @@ class WatchPathRepository(BaseRepository[WatchPath]):
                 "enabled": enabled,
                 "include_subdirectories": include_subdirectories,
                 "is_excluded": is_excluded,
+                "file_type_filter": file_type_filter,
             }
         )
 

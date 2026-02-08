@@ -29,7 +29,8 @@
     "db:upgrade": "cd apps/file-brain && poetry run alembic upgrade head",
     "db:downgrade": "cd apps/file-brain && poetry run alembic downgrade -1",
     "db:history": "cd apps/file-brain && poetry run alembic history",
-    "db:current": "cd apps/file-brain && poetry run alembic current"
+    "db:current": "cd apps/file-brain && poetry run alembic current",
+    "test:app": "cd apps/file-brain && poetry run pytest"
   },
   "devDependencies": {
     "typescript": "^5.1.0"

@@ -27,6 +27,7 @@ class WatchPathResponse(BaseModel):
     enabled: bool
     include_subdirectories: bool
     is_excluded: bool
+    file_type_filter: dict | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -35,6 +36,7 @@ class WatchPathUpdateRequest(BaseModel):
     enabled: bool | None = None
     include_subdirectories: bool | None = None
     is_excluded: bool | None = None
+    file_type_filter: dict | None = None
 
 
 @router.get("", response_model=List[WatchPathResponse])
@@ -53,6 +55,8 @@ def get_watch_paths(
     else:
         paths = watch_path_repo.get_all()
 
+    import json
+
     return [
         WatchPathResponse(
             id=p.id,
@@ -60,6 +64,7 @@ def get_watch_paths(
             enabled=p.enabled,
             include_subdirectories=p.include_subdirectories,
             is_excluded=p.is_excluded,
+            file_type_filter=json.loads(p.file_type_filter) if p.file_type_filter else None,
             created_at=p.created_at.isoformat() if p.created_at else None,
             updated_at=p.updated_at.isoformat() if p.updated_at else None,
         )
@@ -84,11 +89,17 @@ def create_watch_path(
     if not os.path.isdir(request.path):
         raise HTTPException(status_code=400, detail=f"Path is not a directory: {request.path}")
 
+    import json
+
     try:
+        # Serialize file_type_filter to JSON string if provided
+        file_type_filter_str = json.dumps(request.file_type_filter) if request.file_type_filter else None
+
         watch_path = watch_path_repo.create_if_not_exists(
             request.path,
             include_subdirectories=request.include_subdirectories,
             is_excluded=request.is_excluded,
+            file_type_filter=file_type_filter_str,
         )
 
         # Ensure enabled state matches request (create_if_not_exists might return existing disabled one)
@@ -112,6 +123,7 @@ def create_watch_path(
             enabled=watch_path.enabled,
             include_subdirectories=watch_path.include_subdirectories,
             is_excluded=watch_path.is_excluded,
+            file_type_filter=json.loads(watch_path.file_type_filter) if watch_path.file_type_filter else None,
             created_at=watch_path.created_at.isoformat() if watch_path.created_at else None,
             updated_at=watch_path.updated_at.isoformat() if watch_path.updated_at else None,
         )
@@ -153,11 +165,17 @@ def update_watch_path_by_id(
     """
     Update a single watch path by its ID.
     """
+    import json
+
     watch_path_repo = WatchPathRepository(db)
 
     update_data = request.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided")
+
+    # Serialize file_type_filter if present in update
+    if "file_type_filter" in update_data and update_data["file_type_filter"] is not None:
+        update_data["file_type_filter"] = json.dumps(update_data["file_type_filter"])
 
     watch_path = watch_path_repo.get(path_id)
     if not watch_path:
@@ -173,6 +191,7 @@ def update_watch_path_by_id(
         enabled=updated_path.enabled,
         include_subdirectories=updated_path.include_subdirectories,
         is_excluded=updated_path.is_excluded,
+        file_type_filter=json.loads(updated_path.file_type_filter) if updated_path.file_type_filter else None,
         created_at=updated_path.created_at.isoformat() if updated_path.created_at else None,
         updated_at=updated_path.updated_at.isoformat() if updated_path.updated_at else None,
     )

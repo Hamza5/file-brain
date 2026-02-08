@@ -29,7 +29,13 @@ export interface ServicePhase {
 export interface ServiceInitStatus {
   name: string;
   user_friendly_name: string;
-  state: "not_started" | "initializing" | "ready" | "failed" | "disabled" | "busy";
+  state:
+    | "not_started"
+    | "initializing"
+    | "ready"
+    | "failed"
+    | "disabled"
+    | "busy";
   current_phase?: ServicePhase;
   error?: string;
   logs: string[];
@@ -51,7 +57,7 @@ const API_BASE_URL = "";
  */
 export async function requestJSON<T>(
   input: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<T> {
   const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
   const res = await fetch(url, {
@@ -65,7 +71,7 @@ export async function requestJSON<T>(
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
-      `Request failed (${res.status}): ${text || res.statusText}`
+      `Request failed (${res.status}): ${text || res.statusText}`,
     );
   }
 
@@ -180,7 +186,7 @@ export async function getCrawlerSettings(): Promise<Record<string, unknown>> {
 }
 
 export async function updateCrawlerSettings(
-  settings: Record<string, unknown>
+  settings: Record<string, unknown>,
 ): Promise<{ message: string; success: boolean; timestamp: number }> {
   return requestJSON("/api/v1/crawler/settings", {
     method: "PUT",
@@ -199,6 +205,10 @@ export interface WatchPath {
   enabled: boolean;
   include_subdirectories: boolean;
   is_excluded: boolean;
+  file_type_filter?: {
+    mode: "include" | "exclude";
+    extensions: string[];
+  } | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -229,7 +239,7 @@ export interface BatchWatchPathsResponse {
 }
 
 export async function listWatchPaths(
-  enabledOnly = false
+  enabledOnly = false,
 ): Promise<WatchPath[]> {
   const qs = enabledOnly ? "?enabled_only=true" : "";
   return requestJSON(`/api/v1/config/watch-paths${qs}`);
@@ -238,14 +248,26 @@ export async function listWatchPaths(
 export async function addWatchPath(
   path: string,
   includeSubdirectories: boolean = true,
-  isExcluded: boolean = false
+  isExcluded: boolean = false,
+  fileTypeFilter?: { mode: "include" | "exclude"; extensions: string[] } | null,
 ): Promise<WatchPath> {
-  const body = {
+  const body: {
+    path: string;
+    include_subdirectories: boolean;
+    is_excluded: boolean;
+    enabled: boolean;
+    file_type_filter?: { mode: "include" | "exclude"; extensions: string[] };
+  } = {
     path,
     include_subdirectories: includeSubdirectories,
     is_excluded: isExcluded,
     enabled: true,
   };
+  
+  if (fileTypeFilter) {
+    body.file_type_filter = fileTypeFilter;
+  }
+  
   return requestJSON<WatchPath>("/api/v1/config/watch-paths", {
     method: "POST",
     body: JSON.stringify(body),
@@ -266,7 +288,11 @@ export async function deleteWatchPath(pathId: number): Promise<void> {
 
 export async function updateWatchPath(
   pathId: number,
-  update: { enabled?: boolean; include_subdirectories?: boolean }
+  update: {
+    enabled?: boolean;
+    include_subdirectories?: boolean;
+    file_type_filter?: { mode: "include" | "exclude"; extensions: string[] } | null;
+  },
 ): Promise<WatchPath> {
   return requestJSON(`/api/v1/config/watch-paths/${pathId}`, {
     method: "PUT",
@@ -311,7 +337,7 @@ export type StreamErrorHandler = (error: Event) => void;
 
 export function connectStatusStream(
   onUpdate: StreamUpdateHandler,
-  onError?: StreamErrorHandler
+  onError?: StreamErrorHandler,
 ): () => void {
   const es = new EventSource("/api/v1/crawler/stream");
 
@@ -408,7 +434,7 @@ export async function getServicesStatus(): Promise<ServiceStatus> {
 }
 
 export async function retryService(
-  serviceName: string
+  serviceName: string,
 ): Promise<{ message: string; timestamp: number }> {
   return requestJSON(`/api/v1/system/services/${serviceName}/retry`, {
     method: "POST",
@@ -417,7 +443,7 @@ export async function retryService(
 
 export function connectInitializationStream(
   onUpdate: (status: InitializationStatus) => void,
-  onError?: () => void
+  onError?: () => void,
 ): () => void {
   const eventSource = new EventSource("/api/v1/system/initialization/stream");
 
@@ -488,7 +514,7 @@ export interface CheckDetail {
 export interface StartupCheckResponse {
   all_checks_passed: boolean;
   needs_wizard: boolean;
-  is_first_run: boolean;  // True if wizard was never completed
+  is_first_run: boolean; // True if wizard was never completed
   start_step: number | null;
   is_upgrade: boolean;
   checks: Record<string, CheckDetail>;
@@ -546,7 +572,7 @@ export interface DockerPullProgress {
 export function connectDockerPullStream(
   onProgress: (data: DockerPullProgress) => void,
   onError?: (error: string) => void,
-  onComplete?: () => void
+  onComplete?: () => void,
 ): () => void {
   // Use GET for SSE (EventSource only supports GET)
   const eventSource = new EventSource("/api/v1/wizard/docker-pull");
@@ -580,7 +606,7 @@ export function connectDockerPullStream(
 
 export function connectDockerLogsStream(
   onLog: (log: string, timestamp: number) => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
 ): () => void {
   const eventSource = new EventSource("/api/v1/wizard/docker-logs");
 
@@ -617,7 +643,7 @@ export interface CollectionLogEvent {
 export function connectCollectionLogsStream(
   onLog: (log: string, timestamp: number) => void,
   onComplete?: (status: string) => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
 ): () => void {
   const eventSource = new EventSource("/api/v1/wizard/collection-logs");
 
@@ -683,7 +709,7 @@ export interface ModelDownloadProgress {
 export function connectModelDownloadStream(
   onProgress: (data: ModelDownloadProgress) => void,
   onError?: (error: string) => void,
-  onComplete?: () => void
+  onComplete?: () => void,
 ): () => void {
   const eventSource = new EventSource("/api/v1/wizard/model-download");
 
@@ -779,16 +805,16 @@ export interface AppContainerStatus {
   healthy: boolean;
   services: DockerService[];
   error?: string;
-  retrying?: boolean;  // Indicates error but will retry
+  retrying?: boolean; // Indicates error but will retry
   message?: string;
   timestamp: number;
-  check_count?: number;  // Number of health check attempts
+  check_count?: number; // Number of health check attempts
 }
 
 export function connectAppContainerStatusStream(
   onStatus: (status: AppContainerStatus) => void,
   onError?: (error: string) => void,
-  onComplete?: () => void
+  onComplete?: () => void,
 ): () => void {
   const eventSource = new EventSource("/api/v1/wizard/app-containers-status");
 
@@ -881,13 +907,13 @@ export interface StorageByTypeResponse {
 
 // Extended Stats API functions
 export async function getRecentFiles(
-  limit: number = 10
+  limit: number = 10,
 ): Promise<RecentFilesResponse> {
   return requestJSON(`/api/v1/stats/recent-files?limit=${limit}`);
 }
 
 export async function getIndexingActivity(
-  range: "24h" | "7d" = "24h"
+  range: "24h" | "7d" = "24h",
 ): Promise<IndexingActivityResponse> {
   return requestJSON(`/api/v1/stats/indexing-activity?range=${range}`);
 }
@@ -895,22 +921,22 @@ export async function getIndexingActivity(
 export async function getFilesByType(
   ext: string,
   page: number = 1,
-  perPage: number = 20
+  perPage: number = 20,
 ): Promise<FilesByTypeResponse> {
   return requestJSON(
     `/api/v1/stats/files-by-type?ext=${encodeURIComponent(
-      ext
-    )}&page=${page}&per_page=${perPage}`
+      ext,
+    )}&page=${page}&per_page=${perPage}`,
   );
 }
 
 export async function getFilesByAge(
   ageRange: "30d" | "90d" | "1y" | "older",
   page: number = 1,
-  perPage: number = 20
+  perPage: number = 20,
 ): Promise<FilesByAgeResponse> {
   return requestJSON(
-    `/api/v1/stats/files-by-age?age_range=${ageRange}&page=${page}&per_page=${perPage}`
+    `/api/v1/stats/files-by-age?age_range=${ageRange}&page=${page}&per_page=${perPage}`,
   );
 }
 
