@@ -1,6 +1,6 @@
 [project]
 name = "file-brain"
-version = "0.1.19b6"
+version = "0.1.19b7"
 description = "Smart local file search engine that understands your files"
 authors = [{ name = "Hamza Abbad", email = "contact@file-brain.com" }]
 readme = "README.md"
@@ -91,6 +91,10 @@ include = [
         "wheel",
     ] },
     { path = "alembic.ini", format = [
+        "sdist",
+        "wheel",
+    ] },
+    { path = "migrations", format = [
         "sdist",
         "wheel",
     ] },
