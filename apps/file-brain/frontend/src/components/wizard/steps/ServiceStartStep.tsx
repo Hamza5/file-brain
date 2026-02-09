@@ -4,6 +4,7 @@ import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { Tag } from 'primereact/tag';
 import { startDockerServices, getDockerStatus, connectAppContainerStatusStream, type AppContainerStatus } from '../../../api/client';
+import { WizardStepLayout } from '../shared/WizardStepLayout';
 
 interface ServiceStartStepProps {
   onComplete: () => void;
@@ -85,12 +86,10 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
   };
 
   return (
-    <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Initializing Search Engine</h3>
-      <p className="text-600 mt-0">
-        Starting the search and file extraction engine.
-      </p>
-
+    <WizardStepLayout 
+      title="Initializing Search Engine"
+      description="Starting the search and file extraction engine."
+    >
       {dockerStatus?.running ? (
         <>
           <Message 
@@ -122,7 +121,7 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
             ))}
           </div>
           <Button
-            label="Continue to Embedding (AI) Model"
+            label="Continue"
             icon="fas fa-arrow-right"
             onClick={onComplete}
             size="large"
@@ -173,6 +172,6 @@ export const ServiceStartStep: React.FC<ServiceStartStepProps> = ({ onComplete }
       )}
 
       {error && <Message severity="error" text={error} />}
-    </div>
+    </WizardStepLayout>
   );
 };

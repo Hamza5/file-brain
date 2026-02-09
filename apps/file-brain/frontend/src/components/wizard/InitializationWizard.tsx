@@ -39,7 +39,7 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
     { label: 'Download Components' },
     { label: 'Initialize Engine' },
     { label: 'Database Migration' },
-    { label: 'Download Embedding (AI) Model' },
+    { label: 'Download Embedding' },
     { label: 'Finalize Setup' },
     { label: 'Complete' },
 

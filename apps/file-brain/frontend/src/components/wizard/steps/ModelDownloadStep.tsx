@@ -4,6 +4,7 @@ import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { formatBytes } from '../../../utils/fileUtils';
 import { getModelStatus, connectModelDownloadStream, type ModelStatusResult, type ModelDownloadProgress } from '../../../api/client';
+import { WizardStepLayout } from '../shared/WizardStepLayout';
 
 interface ModelDownloadStepProps {
   onComplete: () => void;
@@ -77,21 +78,18 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
   };
 
   return (
-    <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Downloading Embedding (AI) Search Model</h3>
-      <p className="text-600 mt-0">
-        Downloading the embedding (AI) model that enables intelligent natural-language search. This model processes your files locally to understand their meaning.
-        (Approx. 1.1 GB)
-      </p>
-
+    <WizardStepLayout 
+      title="Downloading Embedding Model"
+      description="Downloading the embedding model that enables intelligent natural-language search. This model processes your files locally to understand their meaning. (Approx. 1.1 GB)"
+    >
       <Message 
         severity="info" 
-        text="The download may appear to pause at times or make quick jumps while the model components are being finalized. Please be patient." 
+        text="The download may appear to pause at times or make quick jumps while the model components are being retrieved. Please be patient." 
         className="w-full justify-content-start"
       />
 
       {modelDownloadComplete ? (
-        <Message severity="success" text="Embedding (AI) Search model downloaded successfully!" />
+        <Message severity="success" text="Embedding model downloaded successfully!" />
       ) : (
         <>
           {loading && modelDownloadProgress && (
@@ -148,7 +146,7 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
           )}
           {!loading && !modelDownloadComplete && modelStatus?.exists && (
             <>
-              <Message severity="success" text="Embedding (AI) model already downloaded!" />
+              <Message severity="success" text="Embedding model already downloaded!" />
               <Button
                 label="Continue"
                 icon="fas fa-arrow-right"
@@ -159,7 +157,7 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
           )}
           {!loading && !modelDownloadComplete && !modelStatus?.exists && (
             <Button
-              label="Download Embedding (AI) Model"
+              label="Download Embedding Model"
               icon="fas fa-download"
               onClick={handleDownloadModel}
               size="large"
@@ -168,6 +166,6 @@ export const ModelDownloadStep: React.FC<ModelDownloadStepProps> = ({ onComplete
         </>
       )}
       {error && <Message severity="error" text={error} />}
-    </div>
+    </WizardStepLayout>
   );
 };

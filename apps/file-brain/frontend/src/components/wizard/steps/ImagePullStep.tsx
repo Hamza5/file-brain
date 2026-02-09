@@ -4,6 +4,8 @@ import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { connectDockerPullStream, type DockerPullProgress } from '../../../api/client';
 import { usePostHog } from '../../../context/PostHogProvider';
+import { WizardStepLayout } from '../shared/WizardStepLayout';
+import { WizardLogViewer } from '../shared/WizardLogViewer';
 
 interface ImagePullStepProps {
   onComplete: () => void;
@@ -108,12 +110,10 @@ export const ImagePullStep: React.FC<ImagePullStepProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Downloading Components</h3>
-      <p className="text-600 mt-0">
-        Downloading essential components for search and file extraction. This may take several minutes on first run.
-      </p>
-
+    <WizardStepLayout 
+      title="Downloading Components"
+      description="Downloading essential components for search and file extraction. This may take several minutes on first run."
+    >
       <Message 
         severity="info" 
         text="Progress is estimated and may occasionally fluctuate as new components are discovered. This is normal behavior." 
@@ -159,18 +159,9 @@ export const ImagePullStep: React.FC<ImagePullStepProps> = ({ onComplete }) => {
                 </div>
               )}
 
-              {/* Logs viewer */}
+              {/* Logs viewer with auto-scroll */}
               {pullLogs.length > 0 && (
-                <div className="p-3 surface-100 border-round" style={{ maxHeight: '200px', overflow: 'auto' }}>
-                  <div className="text-sm font-semibold mb-2 text-600">Download Logs:</div>
-                  <code className="text-xs">
-                    {pullLogs.map((log, idx) => (
-                      <div key={idx} className="text-600">
-                        {log}
-                      </div>
-                    ))}
-                  </code>
-                </div>
+                <WizardLogViewer logs={pullLogs} title="Download Logs" />
               )}
             </>
           )}
@@ -191,6 +182,6 @@ export const ImagePullStep: React.FC<ImagePullStepProps> = ({ onComplete }) => {
         </>
       )}
       {error && <Message severity="error" text={error} />}
-    </div>
+    </WizardStepLayout>
   );
 };

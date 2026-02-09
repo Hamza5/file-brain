@@ -6,6 +6,7 @@ import {
   type DockerCheckResult,
 } from "../../../api/client";
 import { usePostHog } from "../../../context/PostHogProvider";
+import { WizardStepLayout } from "../shared/WizardStepLayout";
 
 interface DockerCheckStepProps {
   onComplete: () => void;
@@ -70,8 +71,7 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({
         : "https://docs.docker.com/desktop/install/linux-install/";
 
   return (
-    <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Checking System Requirements</h3>
+    <WizardStepLayout title="Checking System Requirements">
       {loading && (
         <div className="flex align-items-center gap-2">
           <i className="fas fa-spinner fa-spin" />
@@ -79,7 +79,7 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({
         </div>
       )}
       {dockerCheck && (
-        <div className="flex flex-column gap-2">
+        <>
           {dockerCheck.available ? (
             <>
               <Message
@@ -134,6 +134,7 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({
                       label={`Download Docker for ${platform}`}
                       icon="fas fa-external-link-alt"
                       className="p-button-outlined"
+                      size="large"
                       onClick={() => window.open(dockerDownloadLink, "_blank")}
                     />
                   </div>
@@ -157,13 +158,14 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({
                 icon="fas fa-sync"
                 onClick={checkDocker}
                 className="mt-2"
+                size="large"
                 severity="secondary"
               />
             </>
           )}
-        </div>
+        </>
       )}
       {error && <Message severity="error" text={error} />}
-    </div>
+    </WizardStepLayout>
   );
 };

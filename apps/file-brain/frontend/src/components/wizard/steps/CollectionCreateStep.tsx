@@ -4,6 +4,8 @@ import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { confirmDialog } from 'primereact/confirmdialog';
 import { createTypesenseCollection, getCollectionStatus, restartTypesense, connectCollectionLogsStream } from '../../../api/client';
+import { WizardStepLayout } from '../shared/WizardStepLayout';
+import { WizardLogViewer } from '../shared/WizardLogViewer';
 
 interface CollectionCreateStepProps {
   onComplete: () => void;
@@ -72,7 +74,7 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
             if (pollInterval) clearInterval(pollInterval);
             if (logsEventSource) logsEventSource();
             setLoading(false);
-            setTimeout(() => onComplete(), 1000);
+            // Don't auto-complete - let user review and decide
           }
         }, 1500);
       } else {
@@ -127,34 +129,38 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
   };
 
   return (
-    <div className="flex flex-column gap-3">
-      <h3 className="mt-0">Finalizing Search Engine</h3>
-      <p className="text-600 mt-0">
-        Setting up the search database to store and index your file information.
-      </p>
-
-      {collectionStatus?.ready || collectionStatus?.exists ? (
-        <>
-          <Message severity="success" text="Search database is ready." />
-          {collectionStatus.document_count !== undefined && (
-            <div className="text-sm text-600 mb-2">
-              <strong>Indexed Files:</strong> {collectionStatus.document_count}
-            </div>
-          )}
-          <div className="flex gap-3 justify-content-end">
+    <WizardStepLayout 
+      title="Finalizing Search Engine"
+      description="Setting up the search database to store and index your file information."
+      actions={
+        collectionStatus?.ready || collectionStatus?.exists ? (
+          <>
             <Button
-              label="Reset Database"
+              label="Reset Search Index"
               icon="fas fa-redo"
               onClick={handleResetCollection}
+              size="large"
               severity="warning"
               outlined
             />
             <Button
-              label="Finish Setup"
-              icon="fas fa-arrow-right"
+              label="Complete Setup"
+              icon="fas fa-check"
               onClick={onComplete}
+              size="large"
             />
-          </div>
+          </>
+        ) : undefined
+      }
+    >
+      {collectionStatus?.ready || collectionStatus?.exists ? (
+        <>
+          <Message severity="success" text="Search database is ready." />
+          {collectionStatus.document_count !== undefined && (
+            <div className="text-sm text-600">
+              <strong>Indexed Files:</strong> {collectionStatus.document_count}
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -166,16 +172,7 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
                 <span>Finalizing...</span>
               </div>
               {collectionLogs.length > 0 && (
-                <div className="p-3 surface-100 border-round" style={{ maxHeight: '300px', overflow: 'auto' }}>
-                  <div className="text-sm font-semibold mb-2 text-600">Setup Logs:</div>
-                  <code className="text-xs">
-                    {collectionLogs.map((log, idx) => (
-                      <div key={idx} className="text-600">
-                        {log}
-                      </div>
-                    ))}
-                  </code>
-                </div>
+                <WizardLogViewer logs={collectionLogs} title="Setup Logs" />
               )}
             </>
           )}
@@ -191,6 +188,6 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
       )}
 
       {error && <Message severity="error" text={error} />}
-    </div>
+    </WizardStepLayout>
   );
 };
