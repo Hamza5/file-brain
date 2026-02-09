@@ -24,10 +24,24 @@ class DatabaseMigrationService:
 
         self.package_root = Path(file_brain.__file__).parent
         self.project_root = self.package_root.parent
-        self.alembic_ini_path = self.project_root / "alembic.ini"
 
-        if not self.alembic_ini_path.exists():
-            logger.warning(f"alembic.ini not found at {self.alembic_ini_path}")
+        # Try finding alembic.ini in project root (dev) or package root (prod)
+        possible_paths = [
+            self.project_root / "alembic.ini",
+            self.package_root.parent / "alembic.ini",  # In case we are in site-packages/file_brain
+            self.package_root / "alembic.ini",  # In case it's packaged inside
+        ]
+
+        self.alembic_ini_path = None
+        for path in possible_paths:
+            if path.exists():
+                self.alembic_ini_path = path
+                break
+
+        if not self.alembic_ini_path:
+            # Fallback to project root but log warning
+            self.alembic_ini_path = self.project_root / "alembic.ini"
+            logger.warning(f"alembic.ini not found in expected locations. Defaulting to {self.alembic_ini_path}")
 
         self.alembic_cfg = Config(str(self.alembic_ini_path))
         # Prevent Alembic from configuring logging, we want to keep our app's logging setup
@@ -47,13 +61,14 @@ class DatabaseMigrationService:
         """Get the head revision from the script directory."""
         try:
             script = ScriptDirectory.from_config(self.alembic_cfg)
-            return script.get_current_head()
+            head = script.get_current_head()
+            if head is None:
+                # Should not happen if alembic is configured correctly
+                raise ValueError("Could not determine head revision")
+            return head
         except Exception as e:
             logger.error(f"Error getting head revision: {e}")
-            # If we fail to get head (e.g. valid config but no scripts?),
-            # we should probably re-raise or return something that indicates failure.
-            # Returning empty string for now.
-            return ""
+            raise
 
     def check_migration_needed(self) -> Tuple[bool, Optional[str], str]:
         """
@@ -62,10 +77,6 @@ class DatabaseMigrationService:
         """
         current = self.get_current_revision()
         head = self.get_head_revision()
-
-        # If head is empty, something is wrong with setup, assume no migration needed to prevent blocking
-        if not head:
-            return False, current, head
 
         # If current is same as head, no migration needed
         needed = current != head
