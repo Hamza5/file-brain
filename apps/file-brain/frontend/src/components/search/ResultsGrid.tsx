@@ -9,6 +9,7 @@ import { pickIconClass, formatDate, getFileName } from '../../utils/fileUtils';
 import { usePostHog } from '../../context/PostHogProvider';
 import { useSearch } from '../../context/SearchContext';
 import { SearchPagination } from './SearchPagination';
+import { FileThumbnail } from '../common/FileThumbnail';
 
 
 interface ResultsGridProps {
@@ -267,9 +268,22 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                                                 justifyContent: 'center',
                                                 backgroundColor: 'var(--surface-50)',
                                                 borderRadius: '8px',
-                                                height: '140px'
+                                                height: '140px',
+                                                overflow: 'hidden'
                                             }}>
-                                                <i className={iconClass} style={{ fontSize: '3rem', color: 'var(--primary-color)' }} />
+                                                <FileThumbnail
+                                                    filePath={searchHit.file_path}
+                                                    maxSize={256}
+                                                    iconClass={iconClass}
+                                                    alt={getFileName(searchHit.file_path)}
+                                                    style={{
+                                                        fontSize: '3rem',
+                                                        color: 'var(--primary-color)',
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover'
+                                                    }}
+                                                />
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                                 <div style={{

@@ -506,6 +506,23 @@ export async function getWizardStatus(): Promise<WizardStatus> {
   return requestJSON("/api/v1/wizard/status");
 }
 
+/**
+ * Get the URL for a file preview/thumbnail.
+ * Returns a URL that fetches the OS-native thumbnail for the file.
+ *
+ * @param filePath - Absolute path to the file
+ * @param maxSize - Maximum dimension in pixels (default 300, max 800)
+ * @returns URL to the preview endpoint
+ */
+export function getPreviewUrl(filePath: string, maxSize: number = 300): string {
+  const params = new URLSearchParams({
+    file_path: filePath,
+    max_size: maxSize.toString(),
+  });
+  return `${API_BASE_URL}/api/v1/files/preview?${params.toString()}`;
+}
+
+
 export interface CheckDetail {
   passed: boolean;
   message: string;

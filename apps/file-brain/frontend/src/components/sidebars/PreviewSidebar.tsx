@@ -9,6 +9,7 @@ import { Tooltip } from 'primereact/tooltip';
 import { formatSize, formatDate } from '../../utils/fileUtils';
 import { Snippet, useInstantSearch } from 'react-instantsearch';
 
+
 interface PreviewSidebarProps {
     visible: boolean;
     onHide: () => void;
@@ -102,6 +103,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                     </h2>
                 </div>
 
+                {/* Content section - full width for matched text */}
                 <div style={{
                     flex: 1,
                     overflowY: 'auto',
