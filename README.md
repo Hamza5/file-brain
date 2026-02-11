@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/images/logo.svg" alt="File Brain Logo" width="120" />
+  <img src="apps/file-brain/frontend/public/icon.svg" alt="File Brain Logo" width="120" />
   <h1>File Brain</h1>
   <p><strong>Your Intelligent Local File Finder</strong></p>
 

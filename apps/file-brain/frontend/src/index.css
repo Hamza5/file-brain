@@ -169,11 +169,6 @@ html:has(link[id="theme-link"][href*="dark"]) header {
   box-shadow: 0 2px 12px rgba(66, 165, 245, 0.15) !important;
 }
 
-/* Logo color inversion for dark mode */
-html:has(link[id="theme-link"][href*="dark"]) header img[src="/icon.svg"] {
-  filter: invert(1) brightness(1.2);
-}
-
 /* Premium Spinner Animations */
 @keyframes premium-spin {
   0% {
