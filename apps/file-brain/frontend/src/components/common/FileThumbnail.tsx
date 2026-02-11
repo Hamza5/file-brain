@@ -53,6 +53,7 @@ export function FileThumbnail({
       <img
         src={previewUrl}
         alt={alt}
+        className="ph-no-capture"
         loading="lazy"
         style={{
           width: '100%',
