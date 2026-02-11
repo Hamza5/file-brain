@@ -150,12 +150,14 @@ def test_macos_thumbnail_returns_none_when_qlmanage_times_out(mock_run, tmp_path
     assert result is None
 
 
+@patch.dict("sys.modules", {"file_brain.utils.windows_thumbnail": None})
 def test_windows_thumbnail_handles_import_error_gracefully(tmp_path):
-    """Windows thumbnail method returns None when dependencies are unavailable (e.g., on Linux)."""
+    """Windows thumbnail method returns None when dependencies are unavailable."""
     test_file = tmp_path / "test.txt"
     test_file.write_text("test content")
 
-    # On Linux, windll won't be available, so this should return None
-    result = SystemThumbnailService._get_windows_thumbnail(str(test_file), 300)
+    # Force reload or ensure the import fails
+    with patch("builtins.__import__", side_effect=ImportError("Mocked ImportError")):
+         result = SystemThumbnailService._get_windows_thumbnail(str(test_file), 300)
 
     assert result is None
