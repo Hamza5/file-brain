@@ -12,7 +12,7 @@
     "start:website": "npm run start --workspace=@file-brain/website",
     "dev:app": "cd apps/file-brain && poetry run python -m file_brain.main --mode dev",
     "start:app": "cd apps/file-brain && poetry run python -m file_brain.main --mode prod",
-    "install:app": "npm install && cd apps/file-brain && poetry install",
+    "install:app": "npm install --workspace=@file-brain/app && cd apps/file-brain && poetry install",
     "package:app": "npm run build:app-frontend && rm -rf apps/file-brain/file_brain/frontend/dist && cp -r apps/file-brain/frontend/dist apps/file-brain/file_brain/frontend/ && cd apps/file-brain && poetry build",
     "build:app-frontend": "npm run build --workspace=@file-brain/app",
     "docker:up": "cd apps/file-brain/file_brain && TYPESENSE_DATA_DIR=$HOME/.local/share/file-brain/typesense-data docker compose up -d",
