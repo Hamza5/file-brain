@@ -10,6 +10,7 @@
     "dev:website": "npm run dev --workspace=@file-brain/website",
     "build:website": "npm run build --workspace=@file-brain/website",
     "start:website": "npm run start --workspace=@file-brain/website",
+    "install:website": "npm install --workspace=@file-brain/website",
     "dev:app": "cd apps/file-brain && poetry run python -m file_brain.main --mode dev",
     "start:app": "cd apps/file-brain && poetry run python -m file_brain.main --mode prod",
     "install:app": "npm install --workspace=@file-brain/app && cd apps/file-brain && poetry install",
