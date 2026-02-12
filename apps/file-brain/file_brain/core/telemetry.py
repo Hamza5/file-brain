@@ -43,6 +43,7 @@ class TelemetryManager:
         self.event_counters: Dict[str, int] = {}
         self.last_flush = time.time()
         self.flush_interval = settings.posthog_batch_flush_interval
+        self.last_heartbeat = time.time()
 
         # Always determine environment and generate device ID
         self._determine_environment()
@@ -388,6 +389,46 @@ class TelemetryManager:
                 logger.debug("PostHog client shutdown complete")
         except Exception as e:
             logger.error(f"Error shutting down telemetry: {e}", exc_info=True)
+
+    def check_heartbeat(self):
+        """
+        Check if it's time to send a heartbeat event and do so if needed.
+
+        Should be called periodically from a background loop.
+        """
+        if not self.enabled:
+            return
+
+        try:
+            current_time = time.time()
+            if current_time - self.last_heartbeat >= self.flush_interval:
+                # Import here to avoid circular dependencies
+                from file_brain.services.crawler.manager import get_crawl_job_manager
+
+                try:
+                    # Get crawler status
+                    crawl_manager = get_crawl_job_manager()
+                    status = crawl_manager.get_status()
+
+                    stats = {
+                        "auto_indexing_enabled": status.get("monitoring_active", False),
+                        "crawl_active": status.get("running", False),
+                        "files_indexed": status.get("files_indexed", 0),
+                        "files_discovered": status.get("files_discovered", 0),
+                        "queue_size": status.get("queue_size", 0),
+                        "orphan_count": status.get("orphan_count", 0),
+                        "files_skipped": status.get("files_skipped", 0),
+                    }
+
+                    logger.debug(f"Sending telemetry heartbeat: {stats}")
+                    self.capture_event("heartbeat", stats)
+                    self.last_heartbeat = current_time
+
+                except Exception as e:
+                    logger.debug(f"Failed to gather heartbeat stats: {e}")
+
+        except Exception as e:
+            logger.error(f"Error in telemetry heartbeat check: {e}")
 
 
 # Global instance

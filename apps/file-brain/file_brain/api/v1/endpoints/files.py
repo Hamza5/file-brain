@@ -4,6 +4,7 @@ File operations API for cross-platform file opening functionality
 
 import os
 import platform
+import shutil
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -107,18 +108,68 @@ def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
         elif system == "Darwin":  # macOS
             args = ["open", "-R", file_path]
         elif system == "Linux":
-            # Try to use xdg-open to open the folder
-            import shutil
+            # Try to use DBus to select the file (Standard freedesktop method)
+            # This works for Nautilus, Dolphin, Nemo, Thunar, Caja, etc.
+            # dbus-send --session --print-reply --dest=org.freedesktop.FileManager1 \
+            #   /org/freedesktop/FileManager1 org.freedesktop.FileManager1.ShowItems \
+            #   array:string:"file:///path/to/file" string:""
+            if shutil.which("dbus-send"):
+                try:
+                    # Convert path to URI
+                    from urllib.parse import quote
 
-            if shutil.which("xdg-open"):
-                args = ["xdg-open", folder_path]
+                    file_uri = f"file://{quote(file_path)}"
+
+                    # We run this synchronously because it's a quick DBus call and we want to know if it fails
+                    # to fallback to other methods.
+                    subprocess.run(
+                        [
+                            "dbus-send",
+                            "--session",
+                            "--print-reply",
+                            "--dest=org.freedesktop.FileManager1",
+                            "/org/freedesktop/FileManager1",
+                            "org.freedesktop.FileManager1.ShowItems",
+                            f"array:string:{file_uri}",
+                            "string:",
+                        ],
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return True, "Folder opened and file selected successfully via DBus"
+                except (subprocess.CalledProcessError, Exception):
+                    # DBus call failed, fall back to other methods
+                    pass
+
+            # Fallback: try common file managers with --select flag
+            # Most modern file managers support --select
+            file_managers_with_select = [
+                ("nautilus", ["--select"]),
+                ("dolphin", ["--select"]),
+                ("nemo", ["--select"]),
+                ("caja", ["--select"]),
+                ("konqueror", ["--select"]),
+                (
+                    "thunar",
+                    [],
+                ),  # Thunar selects if you pass the file path directly in newer versions, or just opens folder
+                ("pcmanfm", ["--show-pref"]),  # pcmanfm usually just opens folder but let's try
+            ]
+
+            # Try to detect which file manager is actually the default or running
+            # For now, we just iterate and try the first one found
+            for fm, flags in file_managers_with_select:
+                if shutil.which(fm):
+                    if fm == "thunar":
+                        args = [fm, file_path]
+                    else:
+                        args = [fm] + flags + [file_path]
+                    break
             else:
-                # Fallback: try common file managers
-                file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm", "caja", "nemo"]
-                for fm in file_managers:
-                    if shutil.which(fm):
-                        args = [fm, folder_path]
-                        break
+                # Last resort: xdg-open the folder
+                if shutil.which("xdg-open"):
+                    args = ["xdg-open", folder_path]
                 else:
                     return False, "No file manager found to open folder"
         else:

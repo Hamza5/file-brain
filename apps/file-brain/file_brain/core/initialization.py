@@ -263,6 +263,7 @@ def init_crawl_manager_for_wizard():
 
 def health_monitoring_loop():
     """Background health monitoring loop."""
+    from file_brain.core.telemetry import telemetry
     from file_brain.database.repositories import WizardStateRepository
     from file_brain.services.service_manager import get_service_manager
 
@@ -279,6 +280,10 @@ def health_monitoring_loop():
                     continue
 
             service_manager.check_all_services_health()
+
+            # Application Heartbeat
+            telemetry.check_heartbeat()
+
             time.sleep(30)
         except Exception as e:
             logger.error(f"Health monitoring loop error: {e}")

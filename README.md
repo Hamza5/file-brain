@@ -103,7 +103,7 @@ See all your indexed files, storage usage, and recently indexed files at a glanc
 
 ### Semantic Search
 
-Search naturally, like "Airplane ticket" to find relevant documents even if the filename is different.
+Search naturally, like "Flight ticket" to find relevant documents even if the filename is different.
 
 ![Semantic Search](docs/images/search.png)
 

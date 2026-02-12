@@ -126,7 +126,7 @@ export const AppMockup: React.FC = () => {
                                                 backgroundColor: 'white', 
                                                 opacity: 1,
                                                 paddingLeft: '2.5rem',
-                                                paddingRight: '5.5rem',
+                                                paddingRight: '8rem',
                                                 height: '2.5rem'
                                             }}
                                         />
@@ -136,7 +136,7 @@ export const AppMockup: React.FC = () => {
                                             className="p-button-text"
                                             style={{
                                                 position: 'absolute',
-                                                right: '2.5rem',
+                                                right: '5.5rem',
                                                 top: '50%',
                                                 transform: 'translateY(-50%)',
                                                 width: '2rem',
@@ -150,7 +150,21 @@ export const AppMockup: React.FC = () => {
                                             className="p-button-text"
                                             style={{
                                                 position: 'absolute',
-                                                right: '0.25rem',
+                                                right: '3rem',
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                width: '2rem',
+                                                height: '2rem',
+                                                color: '#94a3b8',
+                                            }}
+                                        />
+                                        <Button
+                                            icon="fa-solid fa-sliders"
+                                            rounded
+                                            className="p-button-text"
+                                            style={{
+                                                position: 'absolute',
+                                                right: '0.5rem',
                                                 top: '50%',
                                                 transform: 'translateY(-50%)',
                                                 width: '2rem',
