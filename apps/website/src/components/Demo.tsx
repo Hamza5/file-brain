@@ -3,6 +3,7 @@ import React from "react";
 import { Button } from "primereact/button";
 import posthog from "posthog-js";
 import { useSectionTracking } from "@/hooks/useSectionTracking";
+import { SectionAnchor } from "@/components/SectionAnchor";
 
 export const Demo: React.FC = () => {
   const sectionRef = useSectionTracking("demo");
@@ -23,13 +24,14 @@ export const Demo: React.FC = () => {
             See it in action
           </span>
           <h2
-            className="text-4xl md:text-5xl font-bold mt-2 mb-4"
+            className="text-4xl md:text-5xl font-bold mt-2 mb-4 flex justify-content-center align-items-center"
             style={{ color: "var(--text-color)" }}
           >
             Experience the Power of{" "}
             <span style={{ color: "var(--primary-color)" }}>
               Semantic Search
             </span>
+            <SectionAnchor id="demo" className="ml-3 active:scale-95" />
           </h2>
           <p
             className="text-xl mb-6 max-w-40rem mx-auto"

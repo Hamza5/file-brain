@@ -4,18 +4,20 @@ import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
 import posthog from 'posthog-js';
 import { GithubStars } from './GithubStars';
+import { SectionAnchor } from '@/components/SectionAnchor';
 
 export const Hero: React.FC = () => {
     return (
-        <section className="hero-section text-center py-4">
+        <section id="hero" className="hero-section text-center py-4">
             <div className="landing-container">
                 <div className="flex flex-column align-items-center">
                     <div className="mb-4">
                         <Tag value="UNLOCK YOUR PRODUCTIVITY POTENTIAL" rounded severity="info" className="text-xs font-semibold tracking-wider px-3 py-2" style={{ backgroundColor: 'var(--surface-ground)', color: 'var(--primary-color)', border: '1px solid var(--surface-border)' }}></Tag>
                     </div>
                     
-                    <h1 className="text-5xl md:text-6xl font-bold mb-4 tracking-tight" style={{ color: 'var(--text-color)', lineHeight: 1.1 }}>
+                    <h1 className="text-5xl md:text-6xl font-bold mb-4 tracking-tight relative" style={{ color: 'var(--text-color)', lineHeight: 1.1 }}>
                         Master Your Data with <span style={{ color: 'var(--primary-color)' }}>File Brain</span>
+                        <SectionAnchor id="hero" className="ml-3 active:scale-95" />
                     </h1>
                     
                     <p className="text-xl mb-6 max-w-30rem mx-auto" style={{ color: 'var(--text-color-secondary)' }}>

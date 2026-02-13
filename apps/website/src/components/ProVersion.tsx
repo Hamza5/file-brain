@@ -5,6 +5,7 @@ import { Tag } from "primereact/tag";
 import { ButtonProps } from "primereact/button";
 import posthog from "posthog-js";
 import { useSectionTracking } from "@/hooks/useSectionTracking";
+import { SectionAnchor } from "@/components/SectionAnchor";
 
 export const ProVersion = () => {
   const sectionRef = useSectionTracking("pro-version");
@@ -26,6 +27,7 @@ export const ProVersion = () => {
         "Everything in Free",
         "Chat with files",
         "Find similar files by text",
+        "Agentic & MCP support",
       ],
       severity: "info" as ButtonProps["severity"],
     },
@@ -36,8 +38,9 @@ export const ProVersion = () => {
       launchPrice: "$199",
       features: [
         "Everything in Knowledge Engine",
-        "Image search by text/image",
-        "Video scene search",
+        "Understanding visual content",
+        "Find specific scenes in videos",
+        "Find specific objects in images",
       ],
       severity: "help" as ButtonProps["severity"],
     },
@@ -50,6 +53,7 @@ export const ProVersion = () => {
         "Everything in Media Suite",
         "Network drives (FTP, SFTP, SMB, WebDAV)",
         "Cloud storage (Google Drive, Dropbox, S3, OneDrive, Box)",
+        "Remote Access & Web UI",
       ],
       severity: "warning" as ButtonProps["severity"],
     },
@@ -85,6 +89,20 @@ export const ProVersion = () => {
       cloud: true,
     },
     {
+      name: "Command-line support",
+      free: false,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Agentic & MCP support",
+      free: false,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
       name: "Chat with files",
       free: false,
       knowledge: true,
@@ -99,14 +117,36 @@ export const ProVersion = () => {
       cloud: true,
     },
     {
-      name: "Image search by text/image",
+      name: "Visual content understanding",
       free: false,
       knowledge: false,
       media: true,
       cloud: true,
     },
     {
-      name: "Video scene search",
+      name: "Image search by text",
+      free: false,
+      knowledge: false,
+      media: true,
+      cloud: true,
+    },
+
+    {
+      name: "Image search by image",
+      free: false,
+      knowledge: false,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Video scene search by text",
+      free: false,
+      knowledge: false,
+      media: true,
+      cloud: true,
+    },
+    {
+      name: "Video scene search by image",
       free: false,
       knowledge: false,
       media: true,
@@ -121,6 +161,13 @@ export const ProVersion = () => {
     },
     {
       name: "Cloud storage (Google Drive, Dropbox, S3, OneDrive, Box)",
+      free: false,
+      knowledge: false,
+      media: false,
+      cloud: true,
+    },
+    {
+      name: "Remote Access & Web UI",
       free: false,
       knowledge: false,
       media: false,
@@ -165,11 +212,12 @@ export const ProVersion = () => {
             ></Tag>
           </div>
           <h2
-            className="text-4xl md:text-5xl font-bold mt-2"
+            className="text-4xl md:text-5xl font-bold mt-2 flex justify-content-center align-items-center"
             style={{ color: "var(--text-color)" }}
           >
             Choose Your{" "}
             <span style={{ color: "var(--primary-color)" }}>Pro Tier</span>
+            <SectionAnchor id="pro-version" className="ml-3 active:scale-95" />
           </h2>
           <p
             className="text-xl mt-4 max-w-2xl mx-auto"

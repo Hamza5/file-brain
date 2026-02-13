@@ -76,14 +76,16 @@ One-time payment. Auto-updates and priority support for one year.
 - Everything in Free
 - Chat with files
 - Find similar files by text
+- Agentic & MCP support
 
 ### 🎬 Media Suite
 
 **$129** (Preorder) / ~~$199~~
 
 - Everything in Knowledge Engine
-- Image search by text/image
-- Video scene search
+- Understanding visual content
+- Find specific scenes in videos
+- Find specific objects in images
 
 ### ☁️ Cloud Connect
 
@@ -92,6 +94,7 @@ One-time payment. Auto-updates and priority support for one year.
 - Everything in Media Suite
 - Network drives (FTP, SFTP, SMB, WebDAV)
 - Cloud storage (Google Drive, Dropbox, S3, OneDrive, Box)
+- Remote Access & Web UI
 
 [Contact to Preorder](mailto:hamza.abbad@scrapingbrain.com?subject=File%20Brain%20Pro%20Preorder)
 
@@ -103,11 +106,17 @@ One-time payment. Auto-updates and priority support for one year.
 | Fuzzy & typo-resistant search |   ✅   |        ✅        |      ✅       |      ✅       |
 | Text-based semantic search    |   ✅   |        ✅        |      ✅       |      ✅       |
 | Auto-indexing                 |   ✅   |        ✅        |      ✅       |      ✅       |
+| Command-line support          |   ❌   |        ✅        |      ✅       |      ✅       |
+| Agentic & MCP support         |   ❌   |        ✅        |      ✅       |      ✅       |
 | Chat with files               |   ❌   |        ✅        |      ✅       |      ✅       |
 | Find similar files by text    |   ❌   |        ✅        |      ✅       |      ✅       |
-| Image search by text/image    |   ❌   |        ❌        |      ✅       |      ✅       |
-| Video scene search            |   ❌   |        ❌        |      ✅       |      ✅       |
+| Visual content understanding  |   ❌   |        ❌        |      ✅       |      ✅       |
+| Image search by text          |   ❌   |        ❌        |      ✅       |      ✅       |
+| Image search by image         |   ❌   |        ❌        |      ✅       |      ✅       |
+| Video scene search by text    |   ❌   |        ❌        |      ✅       |      ✅       |
+| Video scene search by image   |   ❌   |        ❌        |      ✅       |      ✅       |
 | Network drives                |   ❌   |        ❌        |      ❌       |      ✅       |
 | Cloud storage                 |   ❌   |        ❌        |      ❌       |      ✅       |
+| Remote Access & Web UI        |   ❌   |        ❌        |      ❌       |      ✅       |
 | Updates                       | Manual |  Auto (1 year)   | Auto (1 year) | Auto (1 year) |
 | Priority support              |   ❌   |      1 year      |    1 year     |    1 year     |

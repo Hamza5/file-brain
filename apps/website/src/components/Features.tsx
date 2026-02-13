@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { useSectionTracking } from '@/hooks/useSectionTracking';
+import { SectionAnchor } from '@/components/SectionAnchor';
 
 const features = [
     {
@@ -43,8 +44,9 @@ export const Features: React.FC = () => {
             <div className="landing-container">
                 <div className="text-center mb-8">
                     <span className="font-bold uppercase tracking-widest text-sm" style={{ color: 'var(--primary-color)' }}>Powerful Capabilities</span>
-                    <h2 className="text-4xl md:text-5xl font-bold mt-2" style={{ color: 'var(--text-color)' }}>
+                    <h2 className="text-4xl md:text-5xl font-bold mt-2 flex justify-content-center align-items-center" style={{ color: 'var(--text-color)' }}>
                         Everything you need to <span style={{ color: 'var(--primary-color)' }}>master your data</span>
+                        <SectionAnchor id="features" className="ml-3 active:scale-95" />
                     </h2>
                 </div>
                 <div className="grid">
