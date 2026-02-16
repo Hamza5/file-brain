@@ -959,10 +959,8 @@ def start_app_containers():
         try:
             docker_manager = get_docker_manager()
 
-            if not docker_manager.is_docker_available():
-                logger.error("Docker not available for app container startup")
-                return
-
+            # Note: We already checked general connection in the main thread,
+            # but start_services does its own checks too.
             logger.info("Starting app containers in background...")
             result = docker_manager.start_services()
 
@@ -973,6 +971,13 @@ def start_app_containers():
 
         except Exception as e:
             logger.error(f"Error in app container startup task: {e}", exc_info=True)
+
+    docker_manager = get_docker_manager()
+
+    # Check connection first - fail fast if Docker is down
+    conn_result = docker_manager.check_docker_connection()
+    if not conn_result["success"]:
+        return {"success": False, "error": conn_result["error"], "timestamp": int(time.time() * 1000)}
 
     # Start the background thread
     thread = threading.Thread(target=_start_containers_task, daemon=True)
@@ -1026,6 +1031,7 @@ def stream_app_containers_status():
                         "running": status_result.get("running", False),
                         "healthy": status_result.get("healthy", False),
                         "services": status_result.get("services", []),
+                        "error": status_result.get("error"),
                         "timestamp": time.time(),
                         "check_count": check_count,
                     }

@@ -263,11 +263,11 @@ export async function addWatchPath(
     is_excluded: isExcluded,
     enabled: true,
   };
-  
+
   if (fileTypeFilter) {
     body.file_type_filter = fileTypeFilter;
   }
-  
+
   return requestJSON<WatchPath>("/api/v1/config/watch-paths", {
     method: "POST",
     body: JSON.stringify(body),
@@ -291,7 +291,10 @@ export async function updateWatchPath(
   update: {
     enabled?: boolean;
     include_subdirectories?: boolean;
-    file_type_filter?: { mode: "include" | "exclude"; extensions: string[] } | null;
+    file_type_filter?: {
+      mode: "include" | "exclude";
+      extensions: string[];
+    } | null;
   },
 ): Promise<WatchPath> {
   return requestJSON(`/api/v1/config/watch-paths/${pathId}`, {
@@ -521,7 +524,6 @@ export function getPreviewUrl(filePath: string, maxSize: number = 300): string {
   });
   return `${API_BASE_URL}/api/v1/files/preview?${params.toString()}`;
 }
-
 
 export interface CheckDetail {
   passed: boolean;
@@ -811,6 +813,7 @@ export async function resetWizard(): Promise<{
 export async function startAppContainers(): Promise<{
   success: boolean;
   message?: string;
+  error?: string;
   timestamp: number;
 }> {
   return requestJSON("/api/v1/wizard/app-containers-start", { method: "POST" });

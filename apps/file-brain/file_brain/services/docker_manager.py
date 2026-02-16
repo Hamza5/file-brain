@@ -110,9 +110,38 @@ class DockerManager:
         Returns:
             Command name ('docker') or None if not found
         """
-        # Check for docker
         if shutil.which("docker"):
             return "docker"
+        return None
+
+    def _get_friendly_error_message(self, error_msg: str) -> Optional[str]:
+        """
+        Check for common Docker connection errors and return a friendly message.
+
+        Args:
+            error_msg: The error message string to check
+
+        Returns:
+            Friendly error message if a known connection error is found, else None
+        """
+        error_msg_lower = error_msg.lower()
+        is_connection_error = (
+            "the system cannot find the file specified" in error_msg_lower
+            or "connection refused" in error_msg_lower
+            or "error while fetching server api version" in error_msg_lower
+            or "error during connect" in error_msg_lower
+            or "is the docker daemon running" in error_msg_lower
+        )
+
+        if is_connection_error:
+            return "Docker Desktop is likely not running. Please start Docker Desktop and try again."
+
+        if "permission denied" in error_msg_lower:
+            return (
+                "Permissions error: You may need to add your user to the 'docker' group (linux) "
+                "or run as administrator."
+            )
+
         return None
 
     def is_docker_available(self) -> bool:
@@ -230,8 +259,13 @@ class DockerManager:
             )
 
             if result.returncode != 0:
+                error_msg = result.stderr or result.stdout
+
+                # Check for friendly error
+                friendly_msg = self._get_friendly_error_message(error_msg)
+
                 logger.error(f"Failed to list images: {result.stderr}")
-                return {"success": False, "error": f"Failed to list images: {result.stderr}"}
+                return {"success": False, "error": friendly_msg or f"Failed to list images: {result.stderr}"}
 
             local_images = set(result.stdout.strip().split("\n"))
 
@@ -307,14 +341,41 @@ class DockerManager:
             return self._pull_images_docker_sdk(images, progress_callback)
 
         except ImportError as e:
-            logger.warning(f"Docker SDK not available ({e}), falling back to CLI")
-            return self._pull_images_cli(images, progress_callback)
+            msg = "Docker SDK not installed"
+            logger.error(f"{msg}: {e}")
+            if progress_callback:
+                progress_callback({"error": msg})
+            return {"success": False, "error": msg}
 
         except Exception as e:
             logger.error(f"Error pulling images: {e}")
             if progress_callback:
                 progress_callback({"error": str(e)})
             return {"success": False, "error": str(e)}
+
+    def check_docker_connection(self) -> Dict[str, any]:
+        """
+        Check if we can actually connect to the Docker daemon.
+
+        Returns:
+            Dictionary with success and error message
+        """
+        if not self.docker_cmd:
+            return {"success": False, "error": "Docker not found"}
+
+        try:
+            import docker
+
+            client = docker.from_env()
+            client.ping()
+            client.close()
+            return {"success": True}
+        except Exception as e:
+            error_msg = str(e)
+            friendly_msg = self._get_friendly_error_message(error_msg)
+            if friendly_msg:
+                return {"success": False, "error": friendly_msg}
+            return {"success": False, "error": f"Failed to connect to Docker: {error_msg}"}
 
     def _pull_images_docker_sdk(self, images: List[str], progress_callback=None):
         """Pull images using Docker SDK with progress streaming (non-blocking)"""
@@ -330,7 +391,23 @@ class DockerManager:
         def pull_in_thread():
             """Run synchronous Docker SDK pull in thread to avoid blocking event loop"""
             try:
-                client = docker.from_env()
+                try:
+                    client = docker.from_env()
+                except Exception as e:
+                    # Check for common "Docker not running" errors
+                    error_msg = str(e)
+                    friendly_msg = self._get_friendly_error_message(error_msg)
+
+                    if friendly_msg:
+                        logger.warning(f"Docker connection failed: {e}")
+                        progress_queue.put({"error": friendly_msg})
+                    else:
+                        logger.error(f"Failed to connect to Docker: {e}")
+                        progress_queue.put({"error": str(e)})
+
+                    progress_queue.put(None)  # Signal completion
+                    return
+
                 total_images = len(images)
                 completed_images = 0
 
@@ -431,56 +508,6 @@ class DockerManager:
                     logger.error(f"Error processing progress event: {e}")
                     continue
 
-    def _pull_images_cli(self, images: List[str], progress_callback=None) -> Dict[str, any]:
-        """
-        Fallback: Pull images using compose CLI (no detailed progress)
-        """
-        try:
-            logger.info(f"Pulling docker images from {self.compose_file} (CLI mode)")
-
-            # Build compose command with all files
-            cmd = self._build_compose_command("pull")
-
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                cwd=self.compose_file.parent,
-                text=True,
-            )
-
-            # Read output line by line
-            for line in iter(process.stdout.readline, ""):
-                if not line:
-                    break
-                log_line = line.rstrip()
-                if log_line and progress_callback:
-                    progress_callback(
-                        {
-                            "status": "Pulling",
-                            "message": log_line,
-                        }
-                    )
-
-            process.wait()
-
-            if process.returncode == 0:
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "complete": True,
-                            "message": "All images pulled successfully",
-                            "overall_percent": 100,
-                        }
-                    )
-                return {"success": True, "message": "Docker images pulled successfully"}
-            else:
-                return {"success": False, "error": "Failed to pull docker images"}
-
-        except Exception as e:
-            logger.error(f"Error pulling docker images (CLI): {e}")
-            return {"success": False, "error": str(e)}
-
     def start_services(self) -> Dict[str, any]:
         """
         Start docker-compose services
@@ -533,10 +560,14 @@ class DockerManager:
                 }
             else:
                 error_msg = result.stderr or result.stdout
+
+                # Check for friendly error
+                friendly_msg = self._get_friendly_error_message(error_msg)
+
                 logger.error(f"Failed to start docker services: {error_msg}")
                 return {
                     "success": False,
-                    "error": f"Failed to start docker services: {error_msg}",
+                    "error": friendly_msg or f"Failed to start docker services: {error_msg}",
                     "stdout": result.stdout,
                     "stderr": result.stderr,
                 }
@@ -746,9 +777,14 @@ class DockerManager:
                     "healthy": overall_healthy,
                 }
             else:
+                error_msg = result.stderr or result.stdout
+
+                # Check for friendly error
+                friendly_msg = self._get_friendly_error_message(error_msg)
+
                 return {
                     "success": False,
-                    "error": f"Failed to get services status: {result.stderr}",
+                    "error": friendly_msg or f"Failed to get services status: {result.stderr}",
                     "services": [],
                     "running": False,
                     "healthy": False,

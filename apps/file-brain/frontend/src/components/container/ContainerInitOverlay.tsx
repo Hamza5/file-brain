@@ -41,7 +41,13 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
 
     try {
       // Trigger container startup
-      await startAppContainers();
+      const res = await startAppContainers();
+      
+      if (!res.success && res.error) {
+        setError(res.error);
+        setIsStarting(false);
+        return;
+      }
 
       // Connect to status stream
       const cleanup = connectAppContainerStatusStream(
@@ -110,9 +116,10 @@ export function ContainerInitOverlay({ isVisible, onReady }: ContainerInitOverla
 
   const services = getServicesByName();
   // Don't show failures during the initial grace period to avoid premature "container failed" message
-  const hasFailures = !inGracePeriod && (containerStatus?.services?.some(s => 
+  // But show explicit errors (Docker connection failed, etc.) immediately
+  const hasFailures = !!error || !!containerStatus?.error || (!inGracePeriod && containerStatus?.services?.some(s => 
     s.health === 'unhealthy' || s.state !== 'running'
-  ) || !!error);
+  ));
 
   // Determine overlay message based on state
   const getOverlayMessage = () => {
