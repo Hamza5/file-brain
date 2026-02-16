@@ -480,16 +480,9 @@ def stream_crawler_status(db: Session = Depends(get_db)):
                 logger.error(f"Error in crawler SSE stream: {e}")
                 break
 
-    from fastapi.responses import StreamingResponse
+    from file_brain.api.v1.sse import sse_response
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return sse_response(event_generator())
 
 
 @router.get("/settings", response_model=Dict[str, Any])

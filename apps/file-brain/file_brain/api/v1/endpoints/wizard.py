@@ -6,9 +6,9 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from file_brain.api.v1.sse import sse_response
 from file_brain.core.logging import logger
 from file_brain.database.models import db_session
 from file_brain.database.repositories.wizard_state_repository import WizardStateRepository
@@ -353,14 +353,7 @@ def pull_docker_images():
                 yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
                 break
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return sse_response(event_generator())
 
 
 @router.post("/docker-start", response_model=DockerStartResponse)
@@ -490,14 +483,7 @@ def stream_docker_logs():
 
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return sse_response(event_generator())
 
 
 class ModelStatusResponse(BaseModel):
@@ -621,14 +607,7 @@ def download_model():
                 yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
                 break
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return sse_response(event_generator())
 
 
 @router.post("/collection-create", response_model=CollectionCreateResponse)
@@ -867,15 +846,7 @@ def stream_collection_logs():
             if "proc" in locals():
                 proc.terminate()
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return sse_response(event_generator())
 
 
 @router.post("/complete")
@@ -1068,12 +1039,4 @@ def stream_app_containers_status():
             logger.error(f"Error in container status stream: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return sse_response(event_generator())

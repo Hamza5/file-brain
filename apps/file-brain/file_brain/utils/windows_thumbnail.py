@@ -1,14 +1,15 @@
-import logging
-import platform
 import ctypes
 import io
-from ctypes import POINTER, byref, c_int, c_uint, c_void_p, c_ushort, windll
+import logging
+import platform
+from ctypes import POINTER, byref, c_int, c_ushort, c_void_p, windll
 from ctypes.wintypes import DWORD, HBITMAP
 from typing import Optional
 
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
 
 # Define Windows structures and constants
 class BITMAP(ctypes.Structure):
@@ -21,6 +22,7 @@ class BITMAP(ctypes.Structure):
         ("bmBitsPixel", c_ushort),
         ("bmBits", c_void_p),
     ]
+
 
 class BITMAPINFOHEADER(ctypes.Structure):
     _fields_ = [
@@ -37,8 +39,10 @@ class BITMAPINFOHEADER(ctypes.Structure):
         ("biClrImportant", DWORD),
     ]
 
+
 class SIZE(ctypes.Structure):
     _fields_ = [("cx", c_int), ("cy", c_int)]
+
 
 def get_windows_thumbnail(file_path: str, max_size: int) -> Optional[bytes]:
     """
@@ -52,12 +56,12 @@ def get_windows_thumbnail(file_path: str, max_size: int) -> Optional[bytes]:
 
         # These imports are Windows-only typically, but ctypes.windll is available in standard library on Windows
         try:
-             gdi32 = windll.gdi32
-             shell32 = windll.shell32
-             ole32 = windll.ole32
+            gdi32 = windll.gdi32
+            shell32 = windll.shell32
+            ole32 = windll.ole32
         except AttributeError:
-             # Not on Windows or wine
-             return None
+            # Not on Windows or wine
+            return None
 
         # Initialize COM
         ole32.CoInitialize(None)
@@ -115,20 +119,20 @@ def get_windows_thumbnail(file_path: str, max_size: int) -> Optional[bytes]:
                 # Get bitmap info (try DIBSECTION first for orientation info)
                 dib = DIBSECTION()
                 res = gdi32.GetObjectW(hbitmap, ctypes.sizeof(DIBSECTION), byref(dib))
-                
+
                 is_bottom_up = False
                 width = 0
                 height = 0
-                
+
                 if res == ctypes.sizeof(DIBSECTION):
                     # It's a DIBSECTION, we can check orientation
                     width = dib.dsBm.bmWidth
                     height = dib.dsBm.bmHeight
-                    
+
                     # dbBmih.biHeight > 0 means bottom-up (standard GDI), < 0 means top-down
                     if dib.dsBmih.biHeight > 0:
                         is_bottom_up = True
-                    
+
                     bm_bits = dib.dsBm.bmBits
                 elif res == ctypes.sizeof(BITMAP):
                     # It's just a BITMAP (failed to get DIBSECTION), use BITMAP struct
@@ -140,7 +144,7 @@ def get_windows_thumbnail(file_path: str, max_size: int) -> Optional[bytes]:
                     bm_bits = bm.bmBits
                 else:
                     return None
-                    
+
                 # Check if we have direct bit access (DIB section)
                 if bm_bits:
                     # DIB Section - we can read directly from memory
@@ -150,7 +154,7 @@ def get_windows_thumbnail(file_path: str, max_size: int) -> Optional[bytes]:
                     ctypes.memmove(buffer, bm_bits, buffer_size)
                 else:
                     # DDB - we need to use GetDIBits
-                    
+
                     # Create device contexts
                     hdc = windll.user32.GetDC(None)
                     mem_dc = gdi32.CreateCompatibleDC(hdc)
@@ -196,13 +200,13 @@ def get_windows_thumbnail(file_path: str, max_size: int) -> Optional[bytes]:
 
                 # Convert to PIL Image (BGRA -> RGBA)
                 img = Image.frombytes("RGBA", (width, height), buffer.raw, "raw", "BGRA")
-                
+
                 # Check for transparency to distinguish between:
                 # 1. Icons (GDI, Bottom-Up, usually have transparency) -> Need Flip
                 # 2. Thumbnails (Top-Down data despite flags, usually opaque) -> No Flip
                 # This is a heuristic: if the image is fully opaque, we assume it's a thumbnail (Top-Down data).
                 # If it has transparency, we assume it's an icon (Bottom-Up data).
-                
+
                 has_transparency = False
                 try:
                     extrema = img.getextrema()
@@ -216,10 +220,10 @@ def get_windows_thumbnail(file_path: str, max_size: int) -> Optional[bytes]:
 
                 # Flip if bottom-up AND has transparency
                 if is_bottom_up and has_transparency:
-                   logger.debug("Flipping Bottom-Up image with transparency (Icon)")
-                   img = img.transpose(Image.FLIP_TOP_BOTTOM)
+                    logger.debug("Flipping Bottom-Up image with transparency (Icon)")
+                    img = img.transpose(Image.FLIP_TOP_BOTTOM)
                 elif is_bottom_up:
-                   logger.debug("Skipping flip for Bottom-Up image (Opaque/Thumbnail)")
+                    logger.debug("Skipping flip for Bottom-Up image (Opaque/Thumbnail)")
 
                 # Convert to PNG bytes
                 png_buffer = io.BytesIO()

@@ -6,8 +6,8 @@ import json
 import time
 
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
 
+from file_brain.api.v1.sse import sse_response
 from file_brain.core.logging import logger
 from file_brain.services.service_manager import ServiceState, get_service_manager
 
@@ -97,11 +97,4 @@ def stream_initialization_status():
                 yield f"event: error\ndata: {error_payload}\n\n"
                 time.sleep(2.0)
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+    return sse_response(event_generator())
