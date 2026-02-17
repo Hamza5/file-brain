@@ -1,5 +1,47 @@
 import fs from 'fs';
 import path from 'path';
+import Jimp from 'jimp';
+
+async function isDefaultAvatar(avatarUrl) {
+    try {
+        // Fetch the image
+        const response = await fetch(avatarUrl);
+        if (!response.ok) return false;
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        // Load image with jimp
+        const image = await Jimp.read(buffer);
+        
+        // Count unique colors (sample every 4th pixel for performance)
+        const colors = new Set();
+        const width = image.bitmap.width;
+        const height = image.bitmap.height;
+        
+        for (let y = 0; y < height; y += 2) {
+            for (let x = 0; x < width; x += 2) {
+                const idx = (width * y + x) << 2;
+                const r = image.bitmap.data[idx];
+                const g = image.bitmap.data[idx + 1];
+                const b = image.bitmap.data[idx + 2];
+                const a = image.bitmap.data[idx + 3];
+                
+                // Only count opaque pixels
+                if (a > 200) {
+                    colors.add(`${r},${g},${b}`);
+                }
+            }
+        }
+        
+        // GitHub default avatars typically have very few colors (2-3)
+        // Custom avatars usually have many more
+        return colors.size <= 5;
+    } catch (error) {
+        console.warn(`Failed to analyze avatar ${avatarUrl}:`, error.message);
+        return false; // If we can't analyze, assume it's fine
+    }
+}
 
 function updateEnvFile(envValues) {
     const envPath = path.join(process.cwd(), '.env.production');
@@ -56,6 +98,7 @@ async function fetchGitHubStars() {
         }
     `;
 
+
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -96,17 +139,33 @@ async function fetchGitHubStars() {
             approxStars = `${roundedStars}+`;
         }
 
-        // Filter stargazers: latest first
-        const latestStargazers = repo.stargazers.edges
+        // Filter stargazers: latest first, excluding GitHub default avatars
+        // We analyze the actual image to detect simple 2-color default avatars
+        const allStargazers = repo.stargazers.edges
             .map(edge => ({
                 id: edge.node.databaseId,
                 login: edge.node.login,
                 avatar_url: edge.node.avatarUrl,
                 starred_at: edge.starredAt
             }))
-            .sort((a, b) => new Date(b.starred_at).getTime() - new Date(a.starred_at).getTime())
-            .slice(0, 5)
-            .map(({ id, login, avatar_url }) => ({ id, login, avatar_url }));
+            .sort((a, b) => new Date(b.starred_at).getTime() - new Date(a.starred_at).getTime());
+
+        // Analyze avatars to filter out default ones
+        const latestStargazers = [];
+        for (const user of allStargazers) {
+            if (latestStargazers.length >= 5) break;
+            
+            if (user.avatar_url) {
+                const isDefault = await isDefaultAvatar(user.avatar_url);
+                if (!isDefault) {
+                    latestStargazers.push({
+                        id: user.id,
+                        login: user.login,
+                        avatar_url: user.avatar_url
+                    });
+                }
+            }
+        }
 
         console.log(`Found ${stars} stars and ${latestStargazers.length} valid stargazers.`);
 
