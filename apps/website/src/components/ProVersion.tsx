@@ -12,9 +12,25 @@ export const ProVersion = () => {
   const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
   // Tier color CSS variable names (using PrimeReact color palette)
   const tierColors: Record<string, string> = {
+    free: "var(--primary-color)",
     info: "var(--blue-500)",
     help: "var(--purple-500)",
     warning: "var(--orange-500)",
+  };
+
+  // Helper function to render comparison table cells
+  const renderCell = (value: boolean | string, color: string) => {
+    if (typeof value === "boolean") {
+      return value ? (
+        <i className="fa-solid fa-check text-xl" style={{ color }}></i>
+      ) : (
+        <i
+          className="fa-solid fa-xmark text-xl"
+          style={{ color: "var(--text-color-secondary)" }}
+        ></i>
+      );
+    }
+    return <span style={{ color: "var(--text-color-secondary)" }}>{value}</span>;
   };
 
   const pricingTiers = [
@@ -199,48 +215,62 @@ export const ProVersion = () => {
       <div className="landing-container">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="mb-3">
-            <Tag
-              value="GO PRO"
-              rounded
-              severity="info"
-              className="text-sm font-bold tracking-widest px-3 py-2"
-              style={{
-                backgroundColor: "rgba(6, 182, 212, 0.1)",
-                color: "var(--primary-color)",
-              }}
-            ></Tag>
-          </div>
-          <h2
-            className="text-4xl md:text-5xl font-bold mt-2 flex justify-content-center align-items-center"
-            style={{ color: "var(--text-color)" }}
-          >
-            Choose Your{" "}
-            <span style={{ color: "var(--primary-color)" }}>Pro Tier</span>
-            <SectionAnchor id="pro-version" className="ml-3 active:scale-95" />
-          </h2>
-          <p
-            className="text-xl mt-4 max-w-2xl mx-auto"
-            style={{ color: "var(--text-color-secondary)" }}
-          >
-            One-time payment. Auto-updates and priority support for one year.
-          </p>
-          <div
-            className="mt-4 p-3 border-round-xl inline-block"
-            style={{
-              backgroundColor: "rgba(6, 182, 212, 0.1)",
-              border: "1px solid var(--primary-color)",
-            }}
-          >
-            <p
-              className="m-0 text-lg"
-              style={{ color: "var(--primary-color)" }}
-            >
-              <i className="fa-solid fa-lightbulb mr-2"></i>
-              <strong>Preorder Bonus:</strong> Request specific features and we
-              will consider them for the Pro release!
+            <Tag value="UNLOCK YOUR POTENTIAL" rounded severity="info" className="text-xs font-semibold tracking-wider px-3 py-2 mb-4" style={{ backgroundColor: 'rgba(6, 182, 212, 0.1)', color: 'var(--primary-color)' }}></Tag>
+            
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 flex justify-content-center align-items-center" style={{ color: "var(--text-color)" }}>
+                Go Beyond Simple Search
+                <SectionAnchor id="pro-version" className="ml-3 active:scale-95" />
+            </h2>
+            
+            <p className="text-xl mb-8 max-w-3xl mx-auto" style={{ color: "var(--text-color-secondary)" }}>
+                File Brain Pro transforms your files into an intelligent knowledge base with conversational AI, computer vision, and cloud connectivity.
             </p>
-          </div>
+
+            <div className="grid mb-8">
+                <div className="col-12 md:col-4 p-3">
+                    <div className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+                        <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3" style={{ backgroundColor: 'var(--blue-100)', color: 'var(--blue-500)' }}>
+                            <i className="fa-solid fa-comments text-2xl"></i>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Chat with Files</h3>
+                        <p className="m-0 line-height-3" style={{ color: 'var(--text-color-secondary)' }}>Don&apos;t just search. Ask questions and get answers directly from your documents and notes.</p>
+                    </div>
+                </div>
+                <div className="col-12 md:col-4 p-3">
+                    <div className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+                        <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3" style={{ backgroundColor: 'var(--purple-100)', color: 'var(--purple-500)' }}>
+                            <i className="fa-solid fa-eye text-2xl"></i>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Visual Understanding</h3>
+                        <p className="m-0 line-height-3" style={{ color: 'var(--text-color-secondary)' }}>Find specific scenes in videos (&quot;birthday cake&quot;) and objects in images without manual tagging.</p>
+                    </div>
+                </div>
+                <div className="col-12 md:col-4 p-3">
+                    <div className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+                        <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3" style={{ backgroundColor: 'var(--orange-100)', color: 'var(--orange-500)' }}>
+                            <i className="fa-solid fa-cloud text-2xl"></i>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Cloud Connection</h3>
+                        <p className="m-0 line-height-3" style={{ color: 'var(--text-color-secondary)' }}>Unified search across Google Drive, Dropbox, OneDrive, and network shares (SMB/FTP).</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-8 mb-6">
+                <h3 className="text-3xl font-bold flex justify-content-center align-items-center" style={{ color: "var(--text-color)" }}>
+                    Choose Your <span style={{ color: "var(--primary-color)" }} className='ml-2'>Pro Tier</span>
+                </h3>
+                <p className="text-lg mt-2 mb-4" style={{ color: "var(--text-color-secondary)" }}>
+                    One-time payment. Auto-updates and priority support for one year.
+                </p>
+                
+                <div className="p-3 border-round-xl inline-block surface-50 border-1 border-300">
+                    <p className="m-0 text-base" style={{ color: "var(--text-color)" }}>
+                        <i className="fa-solid fa-lightbulb mr-2 text-yellow-500"></i>
+                        <strong>Preorder Bonus:</strong> Request specific features and we will consider them for the Pro release!
+                    </p>
+                </div>
+            </div>
         </div>
 
         {/* Pricing Cards */}
@@ -250,7 +280,7 @@ export const ProVersion = () => {
               <div
                 className="h-full p-6 border-round-2xl flex flex-column"
                 style={{
-                  backgroundColor: "white",
+                  backgroundColor: "var(--surface-card)",
                   boxShadow: "0 4px 15px rgba(0,0,0,0.06)",
                 }}
               >
@@ -340,7 +370,7 @@ export const ProVersion = () => {
             <table
               className="w-full"
               style={{
-                backgroundColor: "white",
+                backgroundColor: "var(--surface-card)",
                 borderRadius: "12px",
                 overflow: "hidden",
               }}
@@ -394,80 +424,16 @@ export const ProVersion = () => {
                       {feature.name}
                     </td>
                     <td className="text-center p-3">
-                      {typeof feature.free === "boolean" ? (
-                        feature.free ? (
-                          <i
-                            className="fa-solid fa-check text-xl"
-                            style={{ color: "var(--primary-color)" }}
-                          ></i>
-                        ) : (
-                          <i
-                            className="fa-solid fa-xmark text-xl"
-                            style={{ color: "var(--text-color-secondary)" }}
-                          ></i>
-                        )
-                      ) : (
-                        <span style={{ color: "var(--text-color-secondary)" }}>
-                          {feature.free}
-                        </span>
-                      )}
+                      {renderCell(feature.free, tierColors.free)}
                     </td>
                     <td className="text-center p-3">
-                      {typeof feature.knowledge === "boolean" ? (
-                        feature.knowledge ? (
-                          <i
-                            className="fa-solid fa-check text-xl"
-                            style={{ color: tierColors.info }}
-                          ></i>
-                        ) : (
-                          <i
-                            className="fa-solid fa-xmark text-xl"
-                            style={{ color: "var(--text-color-secondary)" }}
-                          ></i>
-                        )
-                      ) : (
-                        <span style={{ color: "var(--text-color-secondary)" }}>
-                          {feature.knowledge}
-                        </span>
-                      )}
+                      {renderCell(feature.knowledge, tierColors.info)}
                     </td>
                     <td className="text-center p-3">
-                      {typeof feature.media === "boolean" ? (
-                        feature.media ? (
-                          <i
-                            className="fa-solid fa-check text-xl"
-                            style={{ color: tierColors.help }}
-                          ></i>
-                        ) : (
-                          <i
-                            className="fa-solid fa-xmark text-xl"
-                            style={{ color: "var(--text-color-secondary)" }}
-                          ></i>
-                        )
-                      ) : (
-                        <span style={{ color: "var(--text-color-secondary)" }}>
-                          {feature.media}
-                        </span>
-                      )}
+                      {renderCell(feature.media, tierColors.help)}
                     </td>
                     <td className="text-center p-3">
-                      {typeof feature.cloud === "boolean" ? (
-                        feature.cloud ? (
-                          <i
-                            className="fa-solid fa-check text-xl"
-                            style={{ color: tierColors.warning }}
-                          ></i>
-                        ) : (
-                          <i
-                            className="fa-solid fa-xmark text-xl"
-                            style={{ color: "var(--text-color-secondary)" }}
-                          ></i>
-                        )
-                      ) : (
-                        <span style={{ color: "var(--text-color-secondary)" }}>
-                          {feature.cloud}
-                        </span>
-                      )}
+                      {renderCell(feature.cloud, tierColors.warning)}
                     </td>
                   </tr>
                 ))}

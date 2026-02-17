@@ -2,13 +2,16 @@
 import React from 'react';
 import { Button } from 'primereact/button';
 import posthog from 'posthog-js';
+import { useSectionTracking } from '@/hooks/useSectionTracking';
 
 export const CTA: React.FC = () => {
+    const sectionRef = useSectionTracking('cta');
+
     return (
-        <section className="cta-section py-8 text-center" style={{ backgroundColor: 'var(--primary-color)', color: 'var(--primary-color-text)' }}>
+        <section ref={sectionRef} className="cta-section py-8 text-center" style={{ backgroundColor: 'var(--primary-color)', color: 'var(--primary-color-text)' }}>
             <div className="landing-container">
                 <div className="flex flex-column align-items-center">
-                    <h2 className="text-4xl md:text-5xl font-bold mb-4 text-primary">Ready to master your data?</h2>
+                    <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: 'var(--primary-color-text)' }}>Ready to find your files?</h2>
                     <p className="text-xl mb-6 max-w-30rem mx-auto">
                         Get started with File Brain today and experience the future of local file search.
                     </p>

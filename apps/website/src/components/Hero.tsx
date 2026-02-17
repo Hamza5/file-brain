@@ -4,11 +4,13 @@ import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
 import posthog from 'posthog-js';
 import { GithubStars } from './GithubStars';
-import { SectionAnchor } from '@/components/SectionAnchor';
+import { useSectionTracking } from '@/hooks/useSectionTracking';
 
 export const Hero: React.FC = () => {
+    const sectionRef = useSectionTracking('hero');
+
     return (
-        <section id="hero" className="hero-section text-center py-4">
+        <section id="hero" ref={sectionRef} className="hero-section text-center py-4">
             <div className="landing-container">
                 <div className="flex flex-column align-items-center">
                     <div className="mb-4">
@@ -16,15 +18,14 @@ export const Hero: React.FC = () => {
                     </div>
                     
                     <h1 className="text-5xl md:text-6xl font-bold mb-4 tracking-tight relative" style={{ color: 'var(--text-color)', lineHeight: 1.1 }}>
-                        Master Your Data with <span style={{ color: 'var(--primary-color)' }}>File Brain</span>
-                        <SectionAnchor id="hero" className="ml-3 active:scale-95" />
+                        The Intelligent <span style={{ color: 'var(--primary-color)' }}>Local File Search Engine</span>
                     </h1>
                     
                     <p className="text-xl mb-6 max-w-30rem mx-auto" style={{ color: 'var(--text-color-secondary)' }}>
-                        Empower your file search with advanced semantic intelligence. Find anything, anywhere, instantly.
+                        Instantly find any file on your computer with advanced semantic search and OCR.
                     </p>
                     
-                    <div className="flex gap-3 justify-content-center mb-6">
+                    <div className="flex flex-wrap gap-3 justify-content-center mb-6">
                         <Button
                             label="Get Started"
                             icon="fa-brands fa-github"

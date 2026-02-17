@@ -24,7 +24,7 @@ Search by concepts, meanings, and context—not just matching exact keywords.
 
 ### 📄 Extensive Format Support
 
-Supports over 1400+ file formats including documents, archives, and binary files.
+Supports over 1000 file formats including documents, archives, and binary files.
 
 ### 🌐 Cross-Language Search
 

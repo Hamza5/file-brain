@@ -94,7 +94,17 @@ export const AppMockup: React.FC = () => {
             <div className="landing-container">
                 <div className="relative mx-auto" style={{ maxWidth: '1200px' }}>
                     {/* Shadow/Glow effect */}
-                    <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-2xl blur opacity-20 transition duration-1000 group-hover:opacity-100"></div>
+                    <div 
+                        className="absolute border-round-2xl" 
+                        style={{ 
+                            inset: '-4px',
+                            background: 'linear-gradient(to right, var(--cyan-400), var(--blue-500))',
+                            filter: 'blur(20px)',
+                            opacity: 0.2,
+                            transition: 'opacity 1s',
+                            zIndex: -1
+                        }}
+                    ></div>
                     
                     {/* Mockup Container */}
                     <div className="relative p-1 surface-card border-round-2xl shadow-8">

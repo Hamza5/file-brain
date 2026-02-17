@@ -4,7 +4,7 @@ import logo from '@/app/icon.svg';
 
 export const Footer: React.FC = () => {
     return (
-        <footer className="footer-section py-8 border-top-1 border-100 bg-white">
+        <footer className="footer-section py-8 border-top-1 border-100 surface-card">
             <div className="landing-container">
                 <div className="flex flex-column md:flex-row justify-content-between align-items-center gap-4">
                     <div className="flex align-items-center gap-3">
@@ -12,8 +12,18 @@ export const Footer: React.FC = () => {
                         <span className="font-bold text-xl text-900">File Brain</span>
                     </div>
                     
-                    <div className="text-500 text-sm">
-                        &copy; {new Date().getFullYear()} File Brain. Built for researchers, managers, and everyone handling complex data.
+                    <div className="flex align-items-center gap-4">
+                        <a 
+                            href="https://github.com/Hamza5/file-brain" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-500 hover:text-900 transition-colors"
+                        >
+                            <i className="fa-brands fa-github text-xl"></i>
+                        </a>
+                        <div className="text-500 text-sm">
+                            &copy; {new Date().getFullYear()} File Brain. Built for researchers, managers, and everyone handling complex data.
+                        </div>
                     </div>
                 </div>
             </div>

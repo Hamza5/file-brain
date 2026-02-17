@@ -35,17 +35,17 @@ export const UseCases: React.FC = () => {
                 <div className="text-center mb-8">
                     <span className="font-bold uppercase tracking-widest text-sm" style={{ color: 'var(--primary-color)' }}>Real World Scenarios</span>
                     <h2 className="text-4xl md:text-5xl font-bold mt-2 flex justify-content-center align-items-center" style={{ color: 'var(--text-color)' }}>
-                        How can <span style={{ color: 'var(--primary-color)' }}>File Brain</span> help you?
+                        How <span style={{ color: 'var(--primary-color)' }} className='mx-2'>File Brain</span> helps you find files
                         <SectionAnchor id="use-cases" className="ml-3 active:scale-95" />
                     </h2>
                 </div>
                 <div className="grid">
                     {useCases.map((useCase, index) => (
                         <div key={index} className="col-12 md:col-6 p-4">
-                            <div className="flex flex-column h-full border-round-xl p-5 shadow-2 bg-white transition-all transition-duration-300 hover:shadow-4 border-left-3" style={{ borderColor: 'var(--primary-color)' }}>
+                            <div className="flex flex-column h-full border-round-xl p-5 shadow-2 surface-card transition-all transition-duration-300 hover:shadow-4 border-left-3" style={{ borderColor: 'var(--primary-color)' }}>
                                 <div className="flex align-items-center mb-4">
-                                    <div className="w-3rem h-3rem border-circle flex align-items-center justify-content-center mr-3" style={{ backgroundColor: 'var(--primary-color)', color: 'white' }}>
-                                        <i className={`${useCase.icon} text-xl`}></i>
+                                    <div className="w-4rem h-4rem border-circle flex align-items-center justify-content-center mr-3" style={{ backgroundColor: 'var(--primary-color)', color: 'white' }}>
+                                        <i className={`${useCase.icon} text-2xl`}></i>
                                     </div>
                                     <h3 className="text-2xl font-bold m-0" style={{ color: 'var(--text-color)' }}>{useCase.title}</h3>
                                 </div>

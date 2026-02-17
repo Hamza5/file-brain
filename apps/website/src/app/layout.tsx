@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "primereact/resources/themes/lara-light-cyan/theme.css";
 import "primereact/resources/primereact.min.css";
 import "primeflex/primeflex.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const geistMono = Geist_Mono({
@@ -16,15 +17,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_TITLE = "File Brain - Intelligent Local File Search & Document Finder";
+const SITE_DESCRIPTION = "File Brain is the intelligent local file search engine for your desktop. Find documents, images, and files instantly with semantic search and OCR. Privacy-first and works completely offline.";
+
 export const metadata: Metadata = {
-  title: "File Brain - Effortless Intelligent Search For Your Files",
-  description:
-    "File Brain indexes your local files and makes them searchable with semantic search. Privacy-first, lightning-fast, and works completely offline.",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   keywords: [
     "file search",
     "local search",
     "AI search",
     "semantic search",
+    "document finder",
+    "OCR search",
+    "local search engine",
     "file indexing",
     "privacy-first",
     "offline search",
@@ -42,23 +48,21 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://file-brain.com",
     siteName: "File Brain",
-    title: "File Brain - Effortless Intelligent Search For Your Files",
-    description:
-      "File Brain indexes your local files and makes them searchable with semantic search. Privacy-first, lightning-fast, and works completely offline.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "File Brain - Local Semantic File Search Engine",
+        alt: SITE_TITLE,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "File Brain - Effortless Intelligent Search For Your Files",
-    description:
-      "File Brain indexes your local files and makes them searchable with semantic search. Privacy-first, lightning-fast, and works completely offline.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: ["/og-image.png"],
   },
   robots: {
@@ -82,7 +86,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${plusJakartaSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
       </body>
