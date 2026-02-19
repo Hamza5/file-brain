@@ -5,6 +5,7 @@ import "primereact/resources/primereact.min.css";
 import "primeflex/primeflex.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./globals.css";
+import { Navbar } from "@/components/Navbar";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta-sans",
@@ -78,6 +79,34 @@ export const metadata: Metadata = {
   },
 };
 
+const softwareApplicationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "File Brain",
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Windows, macOS, Linux",
+  description: SITE_DESCRIPTION,
+  url: "https://file-brain.com",
+  author: {
+    "@type": "Person",
+    name: "Hamza Abbad",
+  },
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  softwareVersion: "latest",
+  downloadUrl: "https://github.com/Hamza5/file-brain",
+  featureList: [
+    "Semantic search using vector embeddings",
+    "Built-in OCR for scanned documents",
+    "Supports 1,400+ file formats",
+    "100% offline and privacy-first",
+    "Model Context Protocol (MCP) support",
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -88,8 +117,14 @@ export default function RootLayout({
       <body
         className={`${plusJakartaSans.variable} ${geistMono.variable} antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationJsonLd) }}
+        />
+        <Navbar />
         {children}
       </body>
     </html>
   );
 }
+

@@ -1,0 +1,57 @@
+<svg width="1200" height="675" viewBox="0 0 1200 675" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background: White/Light Gray -->
+  <rect width="1200" height="675" fill="#f8fafc"/>
+  
+  <!-- Subtle Grid -->
+  <defs>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="675" fill="url(#grid)"/>
+
+  <!-- Axis Lines -->
+  <line x1="100" y1="575" x2="1100" y2="575" stroke="#94a3b8" stroke-width="2"/>
+  <line x1="100" y1="575" x2="100" y2="75" stroke="#94a3b8" stroke-width="2"/>
+  
+  <!-- "Context" Noise Dots (Light Gray) -->
+  <circle cx="200" cy="400" r="4" fill="#cbd5e1"/>
+  <circle cx="350" cy="150" r="4" fill="#cbd5e1"/>
+  <circle cx="800" cy="500" r="4" fill="#cbd5e1"/>
+  <circle cx="950" cy="200" r="4" fill="#cbd5e1"/>
+  <circle cx="500" cy="500" r="4" fill="#cbd5e1"/>
+  <circle cx="150" cy="250" r="4" fill="#cbd5e1"/>
+  
+  <!-- Semantic Cluster (Travel) -->
+  <!-- Query Point -->
+  <g transform="translate(580, 300)">
+    <circle r="14" fill="#3b82f6" stroke="#2563eb" stroke-width="2"/>
+    <text x="24" y="6" fill="#0f172a" font-family="sans-serif" font-size="22" font-weight="bold">Query: "airplane ticket"</text>
+  </g>
+
+  <!-- Result Point -->
+  <g transform="translate(640, 340)">
+    <circle r="14" fill="#a855f7" stroke="#9333ea" stroke-width="2"/>
+    <text x="24" y="6" fill="#0f172a" font-family="sans-serif" font-size="22" font-weight="bold">File: "booking_conf.pdf"</text>
+  </g>
+
+  <!-- Connection Line -->
+  <line x1="580" y1="300" x2="640" y2="340" stroke="#475569" stroke-width="3" stroke-dasharray="6 6" opacity="0.8"/>
+  
+  <!-- Semantic Distance Label - Enriched visibility -->
+  <rect x="555" y="305" width="130" height="24" rx="4" fill="#f1f5f9" opacity="0.9"/>
+  <text x="620" y="322" fill="#334155" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">High Similarity</text>
+
+  <!-- "Different" Cluster (Financial) -->
+  <g transform="translate(900, 150)" opacity="0.8">
+    <circle r="6" fill="#94a3b8"/>
+    <text x="15" y="4" fill="#475569" font-family="sans-serif" font-size="16">invoice_2024.pdf</text>
+  </g>
+  <g transform="translate(850, 180)" opacity="0.8">
+    <circle r="6" fill="#94a3b8"/>
+    <text x="-90" y="4" fill="#475569" font-family="sans-serif" font-size="16">receipt.jpg</text>
+  </g>
+
+  <!-- Keywords Label -->
+  <text x="100" y="50" fill="#475569" font-family="sans-serif" font-size="18" font-weight="bold">VECTOR SPACE</text>
+</svg>
