@@ -51,9 +51,9 @@ export function FileContextMenu({
 
   if (!isOpen) return null;
 
-  const handleFileOperation = (operation: 'file' | 'folder' | 'delete' | 'forget') => {
+  const handleFileOperation = (operation: 'file' | 'folder' | 'delete' | 'forget' | 'ask') => {
     onFileOperation({ file_path: filePath, operation });
-    onClose();
+    setTimeout(onClose, 0);
   };
 
   // Ensure menu doesn't go off-screen
@@ -134,6 +134,38 @@ export function FileContextMenu({
           }} 
         />
         <span>Open Folder</span>
+      </div>
+
+      <div
+        style={{
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          color: 'var(--text-color)',
+          transition: 'background-color 0.15s ease'
+        }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleFileOperation('ask');
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <i 
+          className="fas fa-comment-dots" 
+          style={{ 
+            width: '16px',
+            color: 'var(--primary-color)'
+          }} 
+        />
+        <span>Ask Question</span>
       </div>
 
       {/* Divider */}

@@ -45,6 +45,7 @@ export const ProFeatureDialog: React.FC<ProFeatureDialogProps> = ({
       header="File Brain Pro Feature"
       style={{ width: "90vw", maxWidth: "450px" }}
       breakpoints={{ "960px": "75vw", "641px": "90vw" }}
+      appendTo={typeof document !== 'undefined' ? document.body : null}
     >
       <div className="flex flex-column align-items-center text-center gap-4 py-2">
         <i

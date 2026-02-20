@@ -4,6 +4,7 @@ import { getRecentFiles, type RecentFile } from '../../api/client';
 import { FileContextMenu } from '../modals/FileContextMenu';
 import { FileItem } from '../common/FileItem';
 import { useFileOperations } from '../../hooks/useFileOperations';
+import { ProFeatureDialog } from '../shared/ProFeatureDialog';
 
 interface RecentFilesListProps {
   onRefresh?: () => void;
@@ -12,7 +13,14 @@ interface RecentFilesListProps {
 export const RecentFilesList: React.FC<RecentFilesListProps> = ({ onRefresh }) => {
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
 
-  const { contextMenu, handleContextMenu, closeContextMenu, handleFileOperation } = useFileOperations({
+  const { 
+    contextMenu, 
+    handleContextMenu, 
+    closeContextMenu, 
+    handleFileOperation,
+    showAskProDialog,
+    setShowAskProDialog
+  } = useFileOperations({
     onSuccess: () => {
       // Refresh the list after delete/forget
       fetchRecent();
@@ -20,7 +28,7 @@ export const RecentFilesList: React.FC<RecentFilesListProps> = ({ onRefresh }) =
   });
 
   // Fetch recent files
-  const fetchRecent = async () => {
+  const fetchRecent = React.useCallback(async () => {
     try {
       const result = await getRecentFiles(10);
       setRecentFiles(result.files);
@@ -28,13 +36,13 @@ export const RecentFilesList: React.FC<RecentFilesListProps> = ({ onRefresh }) =
     } catch {
       // Failed to fetch recent files - silent failure
     }
-  };
+  }, [onRefresh]);
 
   useEffect(() => {
     fetchRecent();
     const interval = setInterval(fetchRecent, 30000);
     return () => clearInterval(interval);
-  }, [onRefresh]);
+  }, [fetchRecent]);
 
   return (
     <div className="surface-card border-round-2xl p-3 shadow-2 h-full flex flex-column gap-3">
@@ -68,6 +76,13 @@ export const RecentFilesList: React.FC<RecentFilesListProps> = ({ onRefresh }) =
         filePath={contextMenu.filePath}
         onClose={closeContextMenu}
         onFileOperation={handleFileOperation}
+      />
+
+      <ProFeatureDialog
+        visible={showAskProDialog}
+        onHide={() => setShowAskProDialog(false)}
+        featureName="Ask Question"
+        minimumTier="Knowledge Engine"
       />
     </div>
   );

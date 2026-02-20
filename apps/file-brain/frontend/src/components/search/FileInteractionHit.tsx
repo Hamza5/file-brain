@@ -7,6 +7,7 @@ import { showConfirmDialog } from "../../utils/dialogUtils";
 import { Tooltip } from 'primereact/tooltip';
 import { useInstantSearch } from 'react-instantsearch';
 import { FileContextMenu } from '../modals/FileContextMenu';
+import { ProFeatureDialog } from '../shared/ProFeatureDialog';
 import { fileOperationsService } from '../../services/fileOperations';
 
 import { getFileName } from '../../utils/fileUtils';
@@ -34,6 +35,7 @@ interface FileInteractionHitProps {
 
 export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [showAskProDialog, setShowAskProDialog] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const { refresh } = useInstantSearch();
@@ -82,9 +84,13 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
     setShowContextMenu(false);
   };
 
-  const handleFileOperation = async (request: { file_path: string; operation: 'file' | 'folder' | 'delete' | 'forget' }) => {
+  const handleFileOperation = async (request: { file_path: string; operation: 'file' | 'folder' | 'delete' | 'forget' | 'ask' }) => {
     try {
       switch (request.operation) {
+        case 'ask':
+          console.log('Setting showAskProDialog to true for', request.file_path);
+          setShowAskProDialog(true);
+          return;
         case 'file':
           await fileOperationsService.openFile(request.file_path);
           break;
@@ -137,6 +143,14 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
   const handleMouseLeave = () => {
     setIsHovered(false);
     onHover?.(null);
+  };
+
+  const onDialogHide = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setShowAskProDialog(false);
   };
 
   const cardStyle = {
@@ -394,6 +408,13 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
         position={contextMenuPosition}
         onClose={handleContextMenuClose}
         onFileOperation={handleFileOperation}
+      />
+
+      <ProFeatureDialog
+        visible={showAskProDialog}
+        onHide={onDialogHide}
+        featureName="Ask Question"
+        minimumTier="Knowledge Engine"
       />
     </>
   );

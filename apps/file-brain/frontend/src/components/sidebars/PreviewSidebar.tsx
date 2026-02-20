@@ -7,6 +7,7 @@ import { type SearchHit } from '../../types/search';
 import { showConfirmDialog } from '../../utils/dialogUtils';
 import { Tooltip } from 'primereact/tooltip';
 import { formatSize, formatDate } from '../../utils/fileUtils';
+import { ProFeatureDialog } from '../shared/ProFeatureDialog';
 import { Snippet, useInstantSearch } from 'react-instantsearch';
 
 
@@ -20,6 +21,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
     const { refresh } = useInstantSearch();
     const [isOpeningFile, setIsOpeningFile] = React.useState(false);
     const [isOpeningFolder, setIsOpeningFolder] = React.useState(false);
+    const [showAskProDialog, setShowAskProDialog] = React.useState(false);
     
     if (!file) return null;
 
@@ -281,6 +283,13 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                         onClick={handleOpenFolder}
                         loading={isOpeningFolder}
                     />
+                    <Button
+                        label="Ask Question"
+                        icon="fa-solid fa-comment-dots"
+                        severity="info"
+                        onClick={() => setShowAskProDialog(true)}
+                        style={{ flex: 1 }}
+                    />
                     <Button 
                         icon="fa-solid fa-trash" 
                         severity="danger" 
@@ -289,6 +298,14 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
                     />
                 </div>
             </div>
+
+            <ProFeatureDialog
+                visible={showAskProDialog}
+                onHide={() => setShowAskProDialog(false)}
+                featureName="Ask Question"
+                minimumTier="Knowledge Engine"
+            />
+
             <style>{`
                 .search-snippet mark {
                     background-color: var(--primary-200);

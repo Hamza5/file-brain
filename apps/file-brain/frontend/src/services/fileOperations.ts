@@ -6,7 +6,7 @@ import { requestJSON } from '../api/client';
 
 export interface FileOperationRequest {
   file_path: string;
-  operation: 'file' | 'folder' | 'delete' | 'forget';
+  operation: 'file' | 'folder' | 'delete' | 'forget' | 'ask';
 }
 
 export interface FileOperationResponse {

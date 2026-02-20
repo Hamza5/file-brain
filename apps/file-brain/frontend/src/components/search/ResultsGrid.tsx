@@ -10,7 +10,7 @@ import { usePostHog } from '../../context/PostHogProvider';
 import { useSearch } from '../../context/SearchContext';
 import { SearchPagination } from './SearchPagination';
 import { FileThumbnail } from '../common/FileThumbnail';
-
+import { ProFeatureDialog } from '../shared/ProFeatureDialog';
 
 interface ResultsGridProps {
     onResultClick: (result: SearchHit) => void;
@@ -35,6 +35,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         filePath: '',
         file: null
     });
+    const [showAskProDialog, setShowAskProDialog] = useState(false);
 
     const searchStartTimeRef = React.useRef<number | null>(null);
 
@@ -78,7 +79,10 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
     };
 
     const handleFileOperation = async (request: FileOperationRequest) => {
-        if (request.operation === 'delete') {
+        if (request.operation === 'ask') {
+            setShowAskProDialog(true);
+            return;
+        } else if (request.operation === 'delete') {
             showConfirmDialog({
                 message: 'Are you sure you want to delete this file?',
                 header: 'Confirm Delete',
@@ -359,6 +363,13 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                 filePath={contextMenu.filePath}
                 onClose={() => setContextMenu(prev => ({ ...prev, isOpen: false }))}
                 onFileOperation={handleFileOperation}
+            />
+
+            <ProFeatureDialog
+                visible={showAskProDialog}
+                onHide={() => setShowAskProDialog(false)}
+                featureName="Ask Question"
+                minimumTier="Knowledge Engine"
             />
         </>
     );

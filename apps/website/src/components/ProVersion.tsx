@@ -126,6 +126,13 @@ export const ProVersion = () => {
       cloud: true,
     },
     {
+      name: "Ask questions on files",
+      free: false,
+      knowledge: true,
+      media: true,
+      cloud: true,
+    },
+    {
       name: "Find similar files by text",
       free: false,
       knowledge: true,

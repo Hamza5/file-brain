@@ -18,6 +18,7 @@ export const useFileOperations = (options?: UseFileOperationsOptions) => {
     position: { x: 0, y: 0 },
     filePath: "",
   });
+  const [showAskProDialog, setShowAskProDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleContextMenu = (e: React.MouseEvent, filePath: string) => {
@@ -37,7 +38,10 @@ export const useFileOperations = (options?: UseFileOperationsOptions) => {
     file_path: string;
     operation: string;
   }) => {
-    if (request.operation === "file") {
+    if (request.operation === "ask") {
+      setShowAskProDialog(true);
+      return;
+    } else if (request.operation === "file") {
       setIsLoading(true);
       try {
         await fileOperationsService.openFile(request.file_path);
@@ -97,5 +101,7 @@ export const useFileOperations = (options?: UseFileOperationsOptions) => {
     closeContextMenu,
     handleFileOperation,
     isLoading,
+    showAskProDialog,
+    setShowAskProDialog,
   };
 };
