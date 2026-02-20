@@ -217,7 +217,7 @@ export const ProVersion = () => {
         <div className="text-center mb-8">
             <Tag value="UNLOCK YOUR POTENTIAL" rounded severity="info" className="text-xs font-semibold tracking-wider px-3 py-2 mb-4" style={{ backgroundColor: 'rgba(6, 182, 212, 0.1)', color: 'var(--primary-color)' }}></Tag>
             
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 flex justify-content-center align-items-center" style={{ color: "var(--text-color)" }}>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-center" style={{ color: "var(--text-color)" }}>
                 Go Beyond Simple Search
                 <SectionAnchor id="pro-version" className="ml-3 active:scale-95" />
             </h2>
@@ -257,11 +257,11 @@ export const ProVersion = () => {
             </div>
 
             <div className="mt-8 mb-6">
-                <h3 className="text-3xl font-bold flex justify-content-center align-items-center" style={{ color: "var(--text-color)" }}>
+                <h3 className="text-3xl font-bold text-center" style={{ color: "var(--text-color)" }}>
                     Choose Your <span style={{ color: "var(--primary-color)" }} className='ml-2'>Pro Tier</span>
                 </h3>
                 <p className="text-lg mt-2 mb-4" style={{ color: "var(--text-color-secondary)" }}>
-                    One-time payment. Auto-updates and priority support for one year.
+                    <strong style={{ color: "var(--text-color)" }}>Perpetual License.</strong> One-time payment, you own it forever. Includes auto-updates and priority support for one year.
                 </p>
                 
                 <div className="p-3 border-round-xl inline-block surface-50 border-1 border-300">

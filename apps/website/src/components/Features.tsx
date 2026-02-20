@@ -42,12 +42,14 @@ export const Features: React.FC = () => {
     return (
         <section id="features" ref={sectionRef} className="features-section py-8" style={{ backgroundColor: 'var(--surface-ground)' }}>
             <div className="landing-container">
-                <div className="text-center mb-8">
-                    <span className="font-bold uppercase tracking-widest text-sm" style={{ color: 'var(--primary-color)' }}>Powerful Capabilities</span>
-                    <h2 className="text-4xl md:text-5xl font-bold mt-2 flex justify-content-center align-items-center" style={{ color: 'var(--text-color)' }}>
-                        Everything you need to <span style={{ color: 'var(--primary-color)' }} className='ml-2'>find your documents</span>
+                <div className="text-center mb-10">
+                    <h2 className="text-4xl md:text-5xl font-bold mt-2 text-center" style={{ color: 'var(--text-color)' }}>
+                        Powerful <span style={{ color: "var(--primary-color)" }} className='ml-2'>Capabilities</span>
                         <SectionAnchor id="features" className="ml-3 active:scale-95" />
                     </h2>
+                    <p className="text-xl max-w-2xl mx-auto" style={{ color: 'var(--text-color-secondary)' }}>
+                        Everything you need to find your documents.
+                    </p>
                 </div>
                 <div className="grid">
                     {features.map((feature, index) => (

@@ -24,13 +24,10 @@ export const Demo: React.FC = () => {
             See it in action
           </span>
           <h2
-            className="text-4xl md:text-5xl font-bold mt-2 mb-4 flex justify-content-center align-items-center"
+            className="text-4xl md:text-5xl font-bold mt-2 mb-4 text-center"
             style={{ color: "var(--text-color)" }}
           >
-            Experience the Power of
-            <span style={{ color: "var(--primary-color)" }} className="ml-2">
-              Semantic Search
-            </span>
+            See File Brain in <span style={{ color: "var(--primary-color)" }} className='ml-2'>Action</span>
             <SectionAnchor id="demo" className="ml-3 active:scale-95" />
           </h2>
           <p

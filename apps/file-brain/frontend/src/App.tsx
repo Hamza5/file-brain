@@ -141,7 +141,7 @@ function AppContent() {
             height: "3.5rem",
             boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
           }}
-          tooltip="Chat with Files (Pro)"
+          tooltip="Chat with Files"
           tooltipOptions={{ position: "left" }}
         />
 

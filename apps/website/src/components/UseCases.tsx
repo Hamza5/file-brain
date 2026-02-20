@@ -34,7 +34,7 @@ export const UseCases: React.FC = () => {
             <div className="landing-container">
                 <div className="text-center mb-8">
                     <span className="font-bold uppercase tracking-widest text-sm" style={{ color: 'var(--primary-color)' }}>Real World Scenarios</span>
-                    <h2 className="text-4xl md:text-5xl font-bold mt-2 flex justify-content-center align-items-center" style={{ color: 'var(--text-color)' }}>
+                    <h2 className="text-4xl md:text-5xl font-bold mt-2 text-center" style={{ color: 'var(--text-color)' }}>
                         How <span style={{ color: 'var(--primary-color)' }} className='mx-2'>File Brain</span> helps you find files
                         <SectionAnchor id="use-cases" className="ml-3 active:scale-95" />
                     </h2>

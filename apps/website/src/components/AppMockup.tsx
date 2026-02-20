@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Card } from 'primereact/card';
 import { InputText } from 'primereact/inputtext';
 import { InputSwitch } from 'primereact/inputswitch';
@@ -12,6 +12,29 @@ import logo from '@/app/icon.svg';
 import { centerTextPlugin } from '@file-brain/shared';
 
 export const AppMockup: React.FC = () => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(1);
+
+    useEffect(() => {
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                if (width === 0) continue;
+                // Maximum mock width is 1200, so scale down if container is smaller
+                if (width < 1200) {
+                    setScale(width / 1200);
+                } else {
+                    setScale(1);
+                }
+            }
+        });
+        
+        if (containerRef.current) {
+            resizeObserver.observe(containerRef.current);
+        }
+        
+        return () => resizeObserver.disconnect();
+    }, []);
     // File Types Chart Data (total should match indexed count: 1,248)
     const fileTypesData = {
         labels: ['.pdf', '.xlsx', '.docx', '.pptx', '.jpg', 'Other'],
@@ -91,8 +114,20 @@ export const AppMockup: React.FC = () => {
 
     return (
         <section className="app-mockup-section pb-8 pt-2" style={{ position: 'relative', zIndex: 10 }}>
-            <div className="landing-container">
-                <div className="relative mx-auto" style={{ maxWidth: '1200px' }}>
+            <div className="landing-container" ref={containerRef}>
+                <div style={{ 
+                    height: `${800 * scale}px`, // Approximate base height that scales down
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    width: '100%',
+                    overflow: 'visible' 
+                }}>
+                    <div className="relative" style={{ 
+                        width: '1200px', 
+                        transform: `scale(${scale})`, 
+                        transformOrigin: 'top center',
+                        flexShrink: 0
+                    }}>
                     {/* Shadow/Glow effect */}
                     <div 
                         className="absolute border-round-2xl" 
@@ -405,6 +440,7 @@ export const AppMockup: React.FC = () => {
                     </div>
                 </div>
             </div>
+        </div>
         </section>
     );
 };

@@ -15,11 +15,11 @@ export const CTA: React.FC = () => {
                     <p className="text-xl mb-6 max-w-30rem mx-auto">
                         Get started with File Brain today and experience the future of local file search.
                     </p>
-                    <div className="flex gap-3 justify-content-center">
+                    <div className="flex flex-column sm:flex-row gap-3 justify-content-center w-full px-3">
                         <Button
                             label="Check Installation Instructions"
                             icon="fa-brands fa-github"
-                            className="p-button-rounded p-button-lg shadow-4"
+                            className="p-button-rounded p-button-lg shadow-4 w-full sm:w-auto"
                             onClick={() => {
                                 posthog.capture('cta_check_installation_clicked', {
                                     location: 'cta_section',
@@ -31,7 +31,7 @@ export const CTA: React.FC = () => {
                         <Button
                             label="Contact Us"
                             icon="fa-solid fa-envelope"
-                            className="p-button-rounded p-button-lg shadow-4"
+                            className="p-button-rounded p-button-lg shadow-4 w-full sm:w-auto"
                             onClick={() => {
                                 posthog.capture('cta_contact_us_clicked', {
                                     location: 'cta_section',

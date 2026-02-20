@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { CTA } from "@/components/CTA";
 import { UseCases } from "@/components/UseCases";
 import { ProVersion } from "@/components/ProVersion";
+import { FAQ } from "@/components/FAQ";
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
       <Features />
       <UseCases />
       <ProVersion />
+      <FAQ />
       <CTA />
       <Footer />
     </main>
