@@ -5,7 +5,12 @@ import { Checkbox } from "primereact/checkbox";
 import { Message } from "primereact/message";
 import { Dropdown } from "primereact/dropdown";
 import { Chips } from "primereact/chips";
-import { getFsRoots, listFs, type FsRoot, type FsEntry } from "../../api/client";
+import {
+  getFsRoots,
+  listFs,
+  type FsRoot,
+  type FsEntry,
+} from "../../api/client";
 
 type FolderSelectModalProps = {
   isOpen: boolean;
@@ -14,7 +19,10 @@ type FolderSelectModalProps = {
     path: string,
     includeSubdirectories: boolean,
     isExcluded: boolean,
-    fileTypeFilter?: { mode: "include" | "exclude"; extensions: string[] } | null,
+    fileTypeFilter?: {
+      mode: "include" | "exclude";
+      extensions: string[];
+    } | null,
   ) => void;
   includeSubdirectories: boolean;
   onIncludeSubdirectoriesChange: (checked: boolean) => void;
@@ -40,17 +48,20 @@ export function FolderSelectModal({
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // File type filter state (only for included folders)
-  const [filterMode, setFilterMode] = useState<"include" | "exclude">("include");
+  const [filterMode, setFilterMode] = useState<"include" | "exclude">(
+    "include",
+  );
   const [filterExtensions, setFilterExtensions] = useState<string[]>([]);
 
   // Filter entries based on the filter text
-  const filteredEntries = filter.trim() === ""
-    ? entries
-    : entries.filter(entry =>
-      entry.name.toLowerCase().includes(filter.toLowerCase())
-    );
+  const filteredEntries =
+    filter.trim() === ""
+      ? entries
+      : entries.filter((entry) =>
+          entry.name.toLowerCase().includes(filter.toLowerCase()),
+        );
 
   // Reset when closed
   useEffect(() => {
@@ -90,15 +101,14 @@ export function FolderSelectModal({
         if (!rootsResp || rootsResp.length === 0) {
           setRoots([]);
           setError(
-            "No filesystem roots available. Please type the path manually in the Settings page."
+            "No filesystem roots available. Please type the path manually in the Settings page.",
           );
           return;
         }
 
         setRoots(rootsResp);
 
-        const defaultRoot =
-          rootsResp.find((r) => r.isDefault) ?? rootsResp[0];
+        const defaultRoot = rootsResp.find((r) => r.isDefault) ?? rootsResp[0];
 
         setActiveRoot(defaultRoot);
         setCurrentPath(defaultRoot.path);
@@ -108,7 +118,7 @@ export function FolderSelectModal({
       } catch {
         if (!cancelled) {
           setError(
-            "Unable to browse filesystem. Please type the path manually in the Settings page."
+            "Unable to browse filesystem. Please type the path manually in the Settings page.",
           );
         }
       } finally {
@@ -136,7 +146,7 @@ export function FolderSelectModal({
       if (!cancelledFlag) {
         setEntries([]);
         setError(
-          "Unable to list this folder. Check permissions or choose another location."
+          "Unable to list this folder. Check permissions or choose another location.",
         );
       }
     } finally {
@@ -207,25 +217,42 @@ export function FolderSelectModal({
 
   function handleConfirm() {
     if (!selectedPath) return;
-    
+
     // Only pass file type filter for included folders
-    const fileTypeFilter = !isExcludedMode && filterExtensions.length > 0
-      ? { mode: filterMode, extensions: filterExtensions }
-      : null;
-    
-    onConfirm(selectedPath, includeSubdirectories, isExcludedMode, fileTypeFilter);
+    const fileTypeFilter =
+      !isExcludedMode && filterExtensions.length > 0
+        ? { mode: filterMode, extensions: filterExtensions }
+        : null;
+
+    onConfirm(
+      selectedPath,
+      includeSubdirectories,
+      isExcludedMode,
+      fileTypeFilter,
+    );
   }
 
   const breadcrumbSegments = getBreadcrumbSegments(currentPath);
 
   return (
     <Dialog
-      header={isExcludedMode ? "Exclude Folder from Indexing" : "Select Folder to Watch"}
+      header={
+        isExcludedMode
+          ? "Exclude Folder from Indexing"
+          : "Select Folder to Watch"
+      }
       visible={isOpen}
       style={{ width: "90vw", height: "90vh" }}
       onHide={onClose}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "100%" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1rem",
+          height: "100%",
+        }}
+      >
         {/* Breadcrumb */}
         <div
           style={{
@@ -241,15 +268,25 @@ export function FolderSelectModal({
           }}
         >
           {breadcrumbSegments.length === 0 ? (
-            <span style={{ color: "var(--text-color-secondary)" }}>No location</span>
+            <span style={{ color: "var(--text-color-secondary)" }}>
+              No location
+            </span>
           ) : (
             breadcrumbSegments.map((segPath, idx) => {
               const label = getBreadcrumbLabel(segPath, idx);
               const isLast = idx === breadcrumbSegments.length - 1;
               return (
-                <span key={segPath} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span
+                  key={segPath}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
+                >
                   <button
                     type="button"
+                    className="ph-no-capture"
                     disabled={isLast}
                     onClick={() =>
                       !isLast && void handleBreadcrumbClick(segPath)
@@ -270,11 +307,13 @@ export function FolderSelectModal({
                     }}
                     onMouseEnter={(e) => {
                       if (!isLast) {
-                        (e.target as HTMLButtonElement).style.backgroundColor = "var(--surface-100)";
+                        (e.target as HTMLButtonElement).style.backgroundColor =
+                          "var(--surface-100)";
                       }
                     }}
                     onMouseLeave={(e) => {
-                      (e.target as HTMLButtonElement).style.backgroundColor = "transparent";
+                      (e.target as HTMLButtonElement).style.backgroundColor =
+                        "transparent";
                     }}
                   >
                     {label}
@@ -296,7 +335,9 @@ export function FolderSelectModal({
         </div>
 
         {/* Main content */}
-        <div style={{ display: "flex", gap: "1rem", flex: 1, overflow: "hidden" }}>
+        <div
+          style={{ display: "flex", gap: "1rem", flex: 1, overflow: "hidden" }}
+        >
           {/* Roots (left sidebar) */}
           <div
             style={{
@@ -310,12 +351,22 @@ export function FolderSelectModal({
             }}
           >
             {initializing && (
-              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  color: "var(--text-color-secondary)",
+                }}
+              >
                 Loading roots…
               </div>
             )}
             {!initializing && roots.length === 0 && (
-              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  color: "var(--text-color-secondary)",
+                }}
+              >
                 No roots available
               </div>
             )}
@@ -401,6 +452,7 @@ export function FolderSelectModal({
               />
               <input
                 type="text"
+                className="ph-no-capture"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder="Filter folders in current location..."
@@ -417,7 +469,8 @@ export function FolderSelectModal({
                 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = "var(--primary-color)";
-                  e.target.style.boxShadow = "0 0 0 2px var(--primary-color-emphasis)";
+                  e.target.style.boxShadow =
+                    "0 0 0 2px var(--primary-color-emphasis)";
                 }}
                 onBlur={(e) => {
                   e.target.style.borderColor = "var(--surface-border)";
@@ -442,10 +495,14 @@ export function FolderSelectModal({
                     transition: "all 0.2s ease",
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--surface-100)";
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = "var(--surface-100)";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = "transparent";
                   }}
                 >
                   <i
@@ -460,24 +517,41 @@ export function FolderSelectModal({
               )}
             </div>
 
-
             {loading && (
-              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  color: "var(--text-color-secondary)",
+                }}
+              >
                 Loading folders…
               </div>
             )}
 
             {!loading && !error && entries.length === 0 && (
-              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  color: "var(--text-color-secondary)",
+                }}
+              >
                 This folder has no subdirectories.
               </div>
             )}
 
-            {!loading && !error && entries.length > 0 && filteredEntries.length === 0 && (
-              <div style={{ fontSize: "0.9rem", color: "var(--text-color-secondary)" }}>
-                No folders match the filter "{filter}".
-              </div>
-            )}
+            {!loading &&
+              !error &&
+              entries.length > 0 &&
+              filteredEntries.length === 0 && (
+                <div
+                  style={{
+                    fontSize: "0.9rem",
+                    color: "var(--text-color-secondary)",
+                  }}
+                >
+                  No folders match the filter "{filter}".
+                </div>
+              )}
 
             <div
               style={{
@@ -526,6 +600,7 @@ export function FolderSelectModal({
                       }}
                     />
                     <span
+                      className="ph-no-capture"
                       style={{
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -556,6 +631,7 @@ export function FolderSelectModal({
                 Selected Folder
               </div>
               <div
+                className="ph-no-capture"
                 style={{
                   padding: "0.5rem",
                   borderRadius: "6px",
@@ -581,30 +657,36 @@ export function FolderSelectModal({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "1rem"
+            gap: "1rem",
           }}
         >
           {/* File Type Filter - Only for included folders */}
           {!isExcludedMode && (
-            <div style={{ 
-              display: "flex", 
-              flexDirection: "column", 
-              gap: "0.5rem",
-              padding: "0.75rem",
-              backgroundColor: "var(--surface-50)",
-              borderRadius: "6px",
-              border: "1px solid var(--surface-border)"
-            }}>
-              <div style={{ 
-                fontSize: "0.75rem", 
-                fontWeight: 600, 
-                color: "var(--text-color-secondary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px"
-              }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                padding: "0.75rem",
+                backgroundColor: "var(--surface-50)",
+                borderRadius: "6px",
+                border: "1px solid var(--surface-border)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  color: "var(--text-color-secondary)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}
+              >
                 File Type Filter (Optional)
               </div>
-              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+              >
                 <Dropdown
                   value={filterMode}
                   options={[
@@ -628,15 +710,17 @@ export function FolderSelectModal({
                   value={filterExtensions}
                   onChange={(e) => {
                     // Ensure extensions start with a dot
-                    const validated = (e.value || []).map((ext) => 
-                      ext.startsWith(".") ? ext.toLowerCase() : `.${ext.toLowerCase()}`
+                    const validated = (e.value || []).map((ext) =>
+                      ext.startsWith(".")
+                        ? ext.toLowerCase()
+                        : `.${ext.toLowerCase()}`,
                     );
                     setFilterExtensions(validated);
                   }}
                   separator=","
                   placeholder={`File types to ${filterMode === "include" ? "include" : "exclude"}`}
                   style={{ flex: 1, fontSize: "0.85rem" }}
-                  pt={ { container: { style: {width: "100%"} } } }
+                  pt={{ container: { style: { width: "100%" } } }}
                   tooltip="Enter file extensions separated by commas (e.g., .pdf, .txt, .log)"
                   tooltipOptions={{ position: "top" }}
                 />
@@ -653,13 +737,20 @@ export function FolderSelectModal({
               gap: "0.75rem",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+            >
               <Checkbox
                 inputId="modalIncludeSubdirectories"
                 checked={includeSubdirectories}
-                onChange={(e) => onIncludeSubdirectoriesChange(e.checked ?? true)}
+                onChange={(e) =>
+                  onIncludeSubdirectoriesChange(e.checked ?? true)
+                }
               />
-              <label htmlFor="modalIncludeSubdirectories" style={{ cursor: "pointer", fontSize: "0.85rem" }}>
+              <label
+                htmlFor="modalIncludeSubdirectories"
+                style={{ cursor: "pointer", fontSize: "0.85rem" }}
+              >
                 Include Subdirectories
               </label>
             </div>
