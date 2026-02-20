@@ -10,6 +10,7 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 import { AdvancedSearchOverlay } from '../search/AdvancedSearchOverlay';
 import { usePostHog } from '../../context/PostHogProvider';
 import { getAppConfig, type AppConfig } from '../../api/client';
+import { ProFeatureDialog } from '../shared/ProFeatureDialog';
 
 interface HeaderProps {
     isCrawlerActive: boolean;
@@ -58,7 +59,12 @@ export const Header: React.FC<HeaderProps> = ({
     const [isTogglingMonitor, setIsTogglingMonitor] = useState(false);
     const [config, setConfig] = useState<AppConfig | null>(null);
     const overlayRef = useRef<OverlayPanel>(null);
+    const semanticOverlayRef = useRef<OverlayPanel>(null);
     const posthog = usePostHog();
+
+    const [proFeatureVisible, setProFeatureVisible] = useState(false);
+    const [proFeatureName, setProFeatureName] = useState('');
+    const [proFeatureTier, setProFeatureTier] = useState('');
 
     // Load app config for version display
     React.useEffect(() => {
@@ -97,8 +103,12 @@ export const Header: React.FC<HeaderProps> = ({
         return "Add folders via the dashboard first";
     };
 
-
-
+    const handleSemanticFeatureClick = (featureName: string, minimumTier: string) => {
+        semanticOverlayRef.current?.hide();
+        setProFeatureName(featureName);
+        setProFeatureTier(minimumTier);
+        setProFeatureVisible(true);
+    };
     return (
         <header className="sticky top-0 z-5 surface-card shadow-2 surface-border px-3 py-2">
             {/* Tooltips */}
@@ -147,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
                             style={{
                                 width: '100%',
                                 paddingLeft: '2.5rem',
-                                paddingRight: searchValue && hasIndexedFiles ? '5.5rem' : '3rem',
+                                paddingRight: searchValue && hasIndexedFiles ? '7.5rem' : '5rem',
                                 cursor: hasIndexedFiles ? 'text' : 'not-allowed',
                                 opacity: hasIndexedFiles ? 1 : 0.6
                             }}
@@ -168,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 tooltipOptions={{ position: 'bottom' }}
                                 style={{
                                     position: 'absolute',
-                                    right: searchValue ? '5rem' : '2.5rem',
+                                    right: searchValue ? '7rem' : '4.5rem',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     width: '2rem',
@@ -188,7 +198,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 tooltipOptions={{ position: 'bottom' }}
                                 style={{
                                     position: 'absolute',
-                                    right: '2.5rem',
+                                    right: '4.5rem',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     width: '2rem',
@@ -197,6 +207,24 @@ export const Header: React.FC<HeaderProps> = ({
                                 }}
                             />
                         )}
+                        <Button
+                            icon="fa-solid fa-file"
+                            rounded
+                            onClick={(e) => semanticOverlayRef.current?.toggle(e)}
+                            className="p-button-text"
+                            aria-label="Semantic Search"
+                            tooltip="Search by similar files"
+                            tooltipOptions={{ position: 'bottom' }}
+                            style={{
+                                position: 'absolute',
+                                right: '2.5rem',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                width: '2rem',
+                                height: '2rem',
+                                color: 'var(--text-color-secondary)',
+                            }}
+                        />
                         <Button
                             icon="fa-solid fa-sliders"
                             rounded
@@ -288,6 +316,32 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Advanced Search Overlay */}
             <AdvancedSearchOverlay overlayRef={overlayRef} />
+
+            {/* Semantic Search Overlay */}
+            <OverlayPanel ref={semanticOverlayRef} className="semantic-search-overlay p-2">
+                <div className="flex flex-column align-items-start gap-2">
+                    <div className="text-sm font-semibold text-color-secondary mb-1">Search by file</div>
+                    <Button 
+                        icon="fa-solid fa-file-lines" 
+                        label="Similar Documents" 
+                        className="p-button-text p-button-secondary justify-content-start" 
+                        onClick={() => handleSemanticFeatureClick("Text-based semantic search", "Knowledge Engine")}
+                    />
+                    <Button 
+                        icon="fa-solid fa-image" 
+                        label="Similar Images" 
+                        className="p-button-text p-button-secondary justify-content-start" 
+                        onClick={() => handleSemanticFeatureClick("Visual semantic search", "Media Suite")}
+                    />
+                </div>
+            </OverlayPanel>
+
+            <ProFeatureDialog
+                visible={proFeatureVisible}
+                onHide={() => setProFeatureVisible(false)}
+                featureName={proFeatureName}
+                minimumTier={proFeatureTier}
+            />
         </header>
     );
 };
