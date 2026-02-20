@@ -17,6 +17,7 @@ import { InitializationWizard } from "./components/wizard/InitializationWizard";
 import { StatusBar } from "./components/layout/StatusBar";
 import { ContainerInitOverlay } from "./components/container/ContainerInitOverlay";
 import { PremiumLoading } from "./components/shared/PremiumLoading";
+import { ProFeatureDialog } from "./components/shared/ProFeatureDialog";
 import {
   startCrawler,
   stopCrawler,
@@ -43,6 +44,7 @@ function AppContent() {
 
   const [previewVisible, setPreviewVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<SearchHit | null>(null);
+  const [proDialogVisible, setProDialogVisible] = useState(false);
 
   // Sync local state with global status
   useEffect(() => {
@@ -121,6 +123,33 @@ function AppContent() {
           visible={previewVisible}
           onHide={() => setPreviewVisible(false)}
           file={selectedFile}
+        />
+
+        {/* Floating Chat Button (Pro Feature Trigger) */}
+        <Button
+          icon="fas fa-comment-dots"
+          rounded
+          size="large"
+          aria-label="Chat with Files"
+          onClick={() => setProDialogVisible(true)}
+          style={{
+            position: "fixed",
+            bottom: "4rem",
+            right: "2rem",
+            zIndex: 1000,
+            width: "3.5rem",
+            height: "3.5rem",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+          }}
+          tooltip="Chat with Files (Pro)"
+          tooltipOptions={{ position: "left" }}
+        />
+
+        <ProFeatureDialog
+          visible={proDialogVisible}
+          onHide={() => setProDialogVisible(false)}
+          featureName="Chat with Files"
+          minimumTier="Knowledge Engine"
         />
       </div>
     </SearchClientWrapper>

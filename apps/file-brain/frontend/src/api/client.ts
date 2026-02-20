@@ -100,6 +100,13 @@ export async function getAppConfig(): Promise<AppConfig> {
   return requestJSON("/api/v1/config");
 }
 
+export async function openExternalUrl(url: string): Promise<{ success: boolean; message: string }> {
+  return requestJSON("/api/v1/system/open-url", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+}
+
 // Types for stats API (Typesense-backed)
 export interface CrawlTotals {
   discovered: number;

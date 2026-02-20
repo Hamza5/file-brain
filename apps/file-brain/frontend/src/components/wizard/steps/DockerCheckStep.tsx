@@ -3,6 +3,7 @@ import { Message } from "primereact/message";
 import { Button } from "primereact/button";
 import {
   checkDockerInstallation,
+  openExternalUrl,
   type DockerCheckResult,
 } from "../../../api/client";
 import { usePostHog } from "../../../context/PostHogProvider";
@@ -135,7 +136,7 @@ export const DockerCheckStep: React.FC<DockerCheckStepProps> = ({
                       icon="fas fa-external-link-alt"
                       className="p-button-outlined"
                       size="large"
-                      onClick={() => window.open(dockerDownloadLink, "_blank")}
+                      onClick={() => openExternalUrl(dockerDownloadLink)}
                     />
                   </div>
                 </div>

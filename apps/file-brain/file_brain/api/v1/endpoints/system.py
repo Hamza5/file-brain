@@ -3,13 +3,19 @@ System API endpoints for initialization status and service management
 """
 
 import time
+import webbrowser
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, HttpUrl
 
 from file_brain.core.logging import logger
 from file_brain.services.service_manager import get_service_manager
 
 router = APIRouter(prefix="/system", tags=["system"])
+
+
+class OpenUrlRequest(BaseModel):
+    url: HttpUrl
 
 
 @router.get("/initialization")
@@ -142,4 +148,19 @@ def get_service_logs(service_name: str, limit: int = 100):
         }
     except Exception as e:
         logger.error(f"Error getting service logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/open-url")
+def open_external_url(request: OpenUrlRequest):
+    """Open a URL in the default system web browser"""
+    try:
+        # webbrowser.open returns True if browser was successfully launched
+        success = webbrowser.open(str(request.url))
+        if not success:
+            logger.warning(f"webbrowser.open returned False for url: {request.url}")
+
+        return {"success": True, "message": f"Opened {request.url} in system browser"}
+    except Exception as e:
+        logger.error(f"Error opening URL {request.url}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
