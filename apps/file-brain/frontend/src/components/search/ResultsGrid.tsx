@@ -3,7 +3,7 @@ import { useHits, useInstantSearch, useSearchBox } from 'react-instantsearch';
 import { FileContextMenu } from '../modals/FileContextMenu';
 import { fileOperationsService, type FileOperationRequest } from '../../services/fileOperations';
 import { type SearchHit } from '../../types/search';
-import { confirmDialog } from 'primereact/confirmdialog';
+import { showConfirmDialog } from '../../utils/dialogUtils';
 import { Tooltip } from 'primereact/tooltip';
 import { pickIconClass, formatDate, getFileName } from '../../utils/fileUtils';
 import { usePostHog } from '../../context/PostHogProvider';
@@ -79,7 +79,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
 
     const handleFileOperation = async (request: FileOperationRequest) => {
         if (request.operation === 'delete') {
-            confirmDialog({
+            showConfirmDialog({
                 message: 'Are you sure you want to delete this file?',
                 header: 'Confirm Delete',
                 icon: 'fa fa-circle-exclamation',
@@ -98,7 +98,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                 }
             });
         } else if (request.operation === 'forget') {
-            confirmDialog({
+            showConfirmDialog({
                 message: 'Are you sure you want to remove this file from the search index? The file will remain on disk but won\'t appear in search results.',
                 header: 'Remove from Search Index',
                 icon: 'fa fa-triangle-exclamation',

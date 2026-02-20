@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Message } from 'primereact/message';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
-import { confirmDialog } from 'primereact/confirmdialog';
+import { showConfirmDialog } from '../../../utils/dialogUtils';
 import { createTypesenseCollection, getCollectionStatus, restartTypesense, connectCollectionLogsStream } from '../../../api/client';
 import { WizardStepLayout } from '../shared/WizardStepLayout';
 import { WizardLogViewer } from '../shared/WizardLogViewer';
@@ -90,7 +90,7 @@ export const CollectionCreateStep: React.FC<CollectionCreateStepProps> = ({ onCo
   };
 
   const handleResetCollection = () => {
-    confirmDialog({
+    showConfirmDialog({
       message: 'Are you sure you want to reset the collection? This will DELETE all indexed data and start with a fresh index.',
       header: 'Reset & Delete Data',
       icon: 'fas fa-exclamation-triangle',

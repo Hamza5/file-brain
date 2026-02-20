@@ -3,7 +3,7 @@ import { Steps } from 'primereact/steps';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { Message } from 'primereact/message';
-import { ConfirmDialog } from 'primereact/confirmdialog';
+import { SharedConfirmDialog } from '../shared/SharedConfirmDialog';
 import { completeWizard, getAppConfig, type AppConfig } from '../../api/client';
 import { ThemeSwitcher } from '../layout/ThemeSwitcher';
 import { DockerCheckStep } from './steps/DockerCheckStep';
@@ -128,7 +128,7 @@ export function InitializationWizard({ onComplete, startStep = 0, isUpgrade = fa
 
   return (
     <div className="flex flex-column h-full p-4 overflow-y-auto">
-      <ConfirmDialog />
+      <SharedConfirmDialog />
       
       {/* Theme Switcher - Positioned in top right */}
       <div className="fixed top-0 right-0 m-3" style={{ zIndex: 1000 }}>

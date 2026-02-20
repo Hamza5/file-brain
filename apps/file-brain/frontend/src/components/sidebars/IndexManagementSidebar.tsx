@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
-import { confirmDialog } from 'primereact/confirmdialog';
+import { showConfirmDialog } from '../../utils/dialogUtils';
 import { clearIndexes, resetWizard } from '../../api/client';
 
 interface IndexManagementSidebarProps {
@@ -16,8 +16,8 @@ export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ 
     const toast = useRef<Toast>(null);
 
     const handleClearIndexes = () => {
-        confirmDialog({
-            message: 'Are you sure you want to remove all indexed files? This action cannot be undone, and you will need to re-index your files to search them again.',
+        showConfirmDialog({
+            message: 'Are you sure you want to clear the search index? This action cannot be undone, and you will need to re-index your files to search them again. Your actual files on disk will NOT be deleted.',
             header: 'Reset Search Data',
             icon: 'fa-solid fa-triangle-exclamation',
             acceptLabel: 'Clear Data',
@@ -52,7 +52,7 @@ export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ 
     };
 
     const handleResetWizard = () => {
-        confirmDialog({
+        showConfirmDialog({
             message: 'Are you sure you want to run the setup wizard again? This allows you to change your initial configuration. Your existing data will be preserved unless you choose to clear it.',
             header: 'Reconfigure System',
             icon: 'fa-solid fa-redo',
@@ -114,7 +114,7 @@ export const IndexManagementSidebar: React.FC<IndexManagementSidebarProps> = ({ 
                                 <span className="text-lg font-semibold text-900">Reset Search Data</span>
                             </div>
                             <p className="text-secondary m-0 mb-4 line-height-3">
-                                Remove all indexed files from the system. This allows you to start fresh if your search results are outdated or incorrect.
+                                Clear all search indexing data from the system. This allows you to start fresh if your search results are outdated or incorrect. Your files will not be deleted.
                             </p>
                         </div>
                         <Button

@@ -4,7 +4,7 @@ import { Sidebar } from 'primereact/sidebar';
 import { Button } from 'primereact/button';
 import { fileOperationsService } from '../../services/fileOperations';
 import { type SearchHit } from '../../types/search';
-import { confirmDialog } from 'primereact/confirmdialog';
+import { showConfirmDialog } from '../../utils/dialogUtils';
 import { Tooltip } from 'primereact/tooltip';
 import { formatSize, formatDate } from '../../utils/fileUtils';
 import { Snippet, useInstantSearch } from 'react-instantsearch';
@@ -42,7 +42,7 @@ export const PreviewSidebar: React.FC<PreviewSidebarProps> = ({ visible, onHide,
     };
 
     const handleDelete = () => {
-        confirmDialog({
+        showConfirmDialog({
             message: 'Are you sure you want to delete this file?',
             header: 'Confirm Delete',
             icon: 'fa fa-exclamation-triangle',

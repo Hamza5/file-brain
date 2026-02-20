@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { Card } from 'primereact/card';
-import { confirmDialog } from "primereact/confirmdialog";
+import { showConfirmDialog } from "../../utils/dialogUtils";
 import { Tooltip } from 'primereact/tooltip';
 import { useInstantSearch } from 'react-instantsearch';
 import { FileContextMenu } from '../modals/FileContextMenu';
@@ -92,7 +92,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
           await fileOperationsService.openFolder(request.file_path);
           break;
         case 'delete':
-          confirmDialog({
+          showConfirmDialog({
             message: `Are you sure you want to permanently delete "${getFileName(hit.file_path)}"? This action cannot be undone.`,
             header: 'Confirm Deletion',
             icon: 'fa fa-info-circle',
@@ -108,7 +108,7 @@ export function FileInteractionHit({ hit, onHover }: FileInteractionHitProps) {
           });
           return;
         case 'forget':
-          confirmDialog({
+          showConfirmDialog({
             message: `Are you sure you want to remove "${getFileName(hit.file_path)}" from the search index? The file will remain on disk but won't appear in search results.`,
             header: 'Remove from Search Index',
             icon: 'fa fa-exclamation-triangle',

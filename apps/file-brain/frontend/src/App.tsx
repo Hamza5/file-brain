@@ -6,7 +6,7 @@ import { useNotification } from "./context/NotificationContext";
 import { IndexingNotifier } from "./context/IndexingNotifier";
 import { ThemeProvider } from "./context/ThemeContext";
 import { SearchProvider } from "./context/SearchContext";
-import { ConfirmDialog } from "primereact/confirmdialog";
+import { SharedConfirmDialog } from "./components/shared/SharedConfirmDialog";
 import { Button } from "primereact/button";
 import { Message } from "primereact/message";
 import { type SearchHit } from "./types/search";
@@ -277,7 +277,7 @@ export default function App() {
               />
 
               {/* Global Confirm Dialog - Single instance for all delete operations */}
-              <ConfirmDialog />
+              <SharedConfirmDialog />
               <StatusBar />
             </NotificationProvider>
           </StatusProvider>

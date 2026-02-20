@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { confirmDialog } from "primereact/confirmdialog";
+import { showConfirmDialog } from "../utils/dialogUtils";
 import { fileOperationsService } from "../services/fileOperations";
 
 interface ContextMenuState {
@@ -52,7 +52,7 @@ export const useFileOperations = (options?: UseFileOperationsOptions) => {
         setIsLoading(false);
       }
     } else if (request.operation === "delete") {
-      confirmDialog({
+      showConfirmDialog({
         message: "Delete this file permanently?",
         header: "Confirm Delete",
         icon: "fa fa-exclamation-triangle",
@@ -70,7 +70,7 @@ export const useFileOperations = (options?: UseFileOperationsOptions) => {
         },
       });
     } else if (request.operation === "forget") {
-      confirmDialog({
+      showConfirmDialog({
         message:
           "Remove this file from the search index? The file will remain on disk.",
         header: "Remove from Index",
