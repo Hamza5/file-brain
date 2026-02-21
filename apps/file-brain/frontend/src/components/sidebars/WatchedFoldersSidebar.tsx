@@ -13,6 +13,8 @@ import {
   type WatchPath,
 } from "../../api/client";
 import { FolderSelectModal } from "../modals/FolderSelectModal";
+import { SplitButton } from "primereact/splitbutton";
+import { ProFeatureDialog } from "../shared/ProFeatureDialog";
 
 interface WatchedFoldersSidebarProps {
   visible: boolean;
@@ -29,6 +31,9 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({
   const [folderPickerVisible, setFolderPickerVisible] = useState(false);
   const [isAddingExcluded, setIsAddingExcluded] = useState(false);
   const [includeSubdirectories, setIncludeSubdirectories] = useState(true);
+  const [proDialogVisible, setProDialogVisible] = useState(false);
+  const [proFeatureName, setProFeatureName] = useState("");
+  const [proMinimumTier, setProMinimumTier] = useState("Pro");
   const toast = useRef<Toast>(null);
 
   const loadWatchPaths = async () => {
@@ -293,23 +298,69 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({
               Manage the directories that File Brain indexes.
             </span>
             <div className="flex gap-2">
-              <Button
+              <SplitButton
                 label="Add Folder"
-                icon="fa-solid fa-plus"
+                icon="fa-solid fa-folder-plus"
                 onClick={() => {
                   setIsAddingExcluded(false);
                   setFolderPickerVisible(true);
                 }}
+                model={[
+                  {
+                    label: "Add Excluded",
+                    icon: "fa-solid fa-folder-minus",
+                    className: "text-red-500",
+                    command: () => {
+                      setIsAddingExcluded(true);
+                      setFolderPickerVisible(true);
+                    },
+                  },
+                ]}
                 className="p-button-sm"
               />
-              <Button
-                label="Add Excluded"
-                icon="fa-solid fa-ban"
+              <SplitButton
+                label="Add Network Drive"
+                icon="fa-solid fa-network-wired"
                 onClick={() => {
-                  setIsAddingExcluded(true);
-                  setFolderPickerVisible(true);
+                  setProFeatureName("Network Drives");
+                  setProMinimumTier("Cloud Connect");
+                  setProDialogVisible(true);
                 }}
-                className="p-button-sm p-button-danger p-button-outlined"
+                model={[
+                  {
+                    label: "Add Excluded",
+                    icon: "fa-solid fa-ban",
+                    className: "text-red-500",
+                    command: () => {
+                      setProFeatureName("Network Drives");
+                      setProMinimumTier("Cloud Connect");
+                      setProDialogVisible(true);
+                    },
+                  },
+                ]}
+                className="p-button-sm p-button-secondary p-button-outlined"
+              />
+              <SplitButton
+                label="Add Cloud Storage"
+                icon="fa-solid fa-cloud"
+                onClick={() => {
+                  setProFeatureName("Cloud Storage Integration");
+                  setProMinimumTier("Cloud Connect");
+                  setProDialogVisible(true);
+                }}
+                model={[
+                  {
+                    label: "Add Excluded",
+                    icon: "fa-solid fa-ban",
+                    className: "text-red-500",
+                    command: () => {
+                      setProFeatureName("Cloud Storage Integration");
+                      setProMinimumTier("Cloud Connect");
+                      setProDialogVisible(true);
+                    },
+                  },
+                ]}
+                className="p-button-sm p-button-secondary p-button-outlined"
               />
             </div>
           </div>
@@ -330,6 +381,13 @@ export const WatchedFoldersSidebar: React.FC<WatchedFoldersSidebarProps> = ({
                 includeSubdirectories={includeSubdirectories}
                 onIncludeSubdirectoriesChange={setIncludeSubdirectories}
                 isExcludedMode={isAddingExcluded}
-            /> </Sidebar>
+            /> 
+            <ProFeatureDialog
+              visible={proDialogVisible}
+              onHide={() => setProDialogVisible(false)}
+              featureName={proFeatureName}
+              minimumTier={proMinimumTier}
+            />
+    </Sidebar>
   );
 };
