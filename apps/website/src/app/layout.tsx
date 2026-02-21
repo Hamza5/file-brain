@@ -101,7 +101,7 @@ const softwareApplicationJsonLd = {
   featureList: [
     "Semantic search using vector embeddings",
     "Built-in OCR for scanned documents",
-    "Supports 1,400+ file formats",
+    "Supports 1000+ file formats",
     "100% offline and privacy-first",
     "Model Context Protocol (MCP) support",
   ],

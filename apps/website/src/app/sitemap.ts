@@ -21,6 +21,11 @@ const GUIDES: GuideEntry[] = [
         lastModified: '2026-02-18',
         priority: 0.8,
     },
+    {
+        slug: 'offline-scanned-document-search',
+        lastModified: '2026-02-21',
+        priority: 0.8,
+    },
     // Add new guides here as they are published:
     // { slug: 'ocr-document-search', lastModified: '2026-03-01', priority: 0.8 },
 ];

@@ -1,5 +1,4 @@
 import { ArticleLayout } from '@/components/ArticleLayout';
-import { ArticleImage } from '@/components/ArticleImage';
 import { ComparisonTable } from '@/components/ComparisonTable';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -330,6 +329,12 @@ export default function LocalSemanticSearchGuide() {
                 <p>
                     Yes. File Brain has built-in OCR powered by Apache Tika, which can extract text from scanned PDFs and over 1,000 file formats.
                     The <Link href="/#pro" className="article-link">Pro version</Link> adds image understanding, allowing you to search photos by their visual content.
+                </p>
+
+                <hr style={{ margin: '3rem 0', borderColor: 'var(--surface-border)' }} />
+
+                <p>
+                    <em>Setting up OCR search for the first time? Read our <Link href="/guides/offline-scanned-document-search/" className="article-link">Practical Guide to Searching Scanned Documents and PDFs Offline</Link>.</em>
                 </p>
             </ArticleLayout>
         </>

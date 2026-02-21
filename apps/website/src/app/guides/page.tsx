@@ -1,4 +1,3 @@
-import React from 'react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
@@ -28,11 +27,19 @@ interface GuideCard {
 const GUIDES: GuideCard[] = [
     {
         href: '/guides/local-semantic-search/',
-        title: 'The Ultimate Guide to Local Semantic Search',
+        title: 'Local Semantic Search: A Practical Guide',
         description: 'Learn how local semantic search transforms document retrieval by matching queries to concepts rather than keywords. Discover how File Brain uses vector embeddings and OCR to find your files privately and offline.',
         date: '2026-02-18',
         tags: ['Semantic Search', 'Privacy', 'OCR'],
         readTime: '8 min read',
+    },
+    {
+        href: '/guides/offline-scanned-document-search/',
+        title: 'A Practical Guide to Searching Scanned Documents and PDFs Offline',
+        description: 'Finding specific information inside scanned documents and images requires Optical Character Recognition (OCR). This practical guide explains how to index and search your scanned files entirely offline.',
+        date: '2026-02-21',
+        tags: ['OCR', 'Offline Search', 'Scanned PDFs'],
+        readTime: '6 min read',
     },
     // Add new guides here as they are published
 ];
