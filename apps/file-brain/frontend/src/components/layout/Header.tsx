@@ -11,6 +11,7 @@ import { AdvancedSearchOverlay } from '../search/AdvancedSearchOverlay';
 import { usePostHog } from '../../context/PostHogProvider';
 import { getAppConfig, type AppConfig } from '../../api/client';
 import { ProFeatureDialog } from '../shared/ProFeatureDialog';
+import { useSearch } from '../../context/SearchContext';
 
 interface HeaderProps {
     isCrawlerActive: boolean;
@@ -54,6 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
     hasFoldersConfigured = false
 }) => {
     const { query, refine } = useSearchBox();
+    const { setHasSearchSubmitted } = useSearch();
     const [searchValue, setSearchValue] = useState('');
     const [isTogglingCrawler, setIsTogglingCrawler] = useState(false);
     const [isTogglingMonitor, setIsTogglingMonitor] = useState(false);
@@ -78,6 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
     }, [query]); // Only depend on query, not searchValue
 
     const handleSearch = () => {
+        setHasSearchSubmitted(true);
         if (hasIndexedFiles) refine(searchValue);
     };
 

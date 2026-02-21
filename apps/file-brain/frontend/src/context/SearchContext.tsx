@@ -7,6 +7,8 @@ interface SearchContextType {
   setSearchMode: (mode: SearchMode) => void;
   fuzzySearchEnabled: boolean;
   setFuzzySearchEnabled: (enabled: boolean) => void;
+  hasSearchSubmitted: boolean;
+  setHasSearchSubmitted: (submitted: boolean) => void;
 }
 
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
@@ -18,6 +20,7 @@ interface SearchProviderProps {
 export const SearchProvider: React.FC<SearchProviderProps> = ({ children }) => {
   const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
   const [fuzzySearchEnabled, setFuzzySearchEnabled] = useState<boolean>(true);
+  const [hasSearchSubmitted, setHasSearchSubmitted] = useState<boolean>(false);
 
   return (
     <SearchContext.Provider
@@ -26,6 +29,8 @@ export const SearchProvider: React.FC<SearchProviderProps> = ({ children }) => {
         setSearchMode,
         fuzzySearchEnabled,
         setFuzzySearchEnabled,
+        hasSearchSubmitted,
+        setHasSearchSubmitted,
       }}
     >
       {children}

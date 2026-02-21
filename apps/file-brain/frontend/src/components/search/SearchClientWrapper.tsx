@@ -3,6 +3,7 @@ import TypesenseInstantSearchAdapter from 'typesense-instantsearch-adapter';
 import { InstantSearch, Configure } from 'react-instantsearch';
 import { useSearch } from '../../context/SearchContext';
 import { getAppConfig } from '../../api/client';
+import { SearchErrorHandler } from './SearchErrorHandler';
 
 interface SearchClientWrapperProps {
     children: React.ReactNode;
@@ -98,6 +99,7 @@ export const SearchClientWrapper: React.FC<SearchClientWrapperProps> = ({ childr
             searchClient={searchClient}
             future={{ preserveSharedStateOnUnmount: true }}
         >
+            <SearchErrorHandler />
             <Configure hitsPerPage={24} />
             {children}
         </InstantSearch>
