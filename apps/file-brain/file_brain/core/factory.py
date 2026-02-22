@@ -21,12 +21,17 @@ def create_app() -> FastAPI:
     # Setup exception handlers
     setup_exception_handlers(app)
 
-    # Configure CORS (if needed, defaulting to permissive for dev)
+    # Configure CORS (permissive only for localhost)
     from fastapi.middleware.cors import CORSMiddleware
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            f"http://localhost:{settings.port}",
+            f"http://127.0.0.1:{settings.port}",
+            f"http://localhost:{settings.frontend_dev_port}",
+            f"http://127.0.0.1:{settings.frontend_dev_port}",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

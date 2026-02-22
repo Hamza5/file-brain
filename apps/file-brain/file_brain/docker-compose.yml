@@ -4,7 +4,7 @@ services:
     image: hamza5/tika:latest-full
     container_name: file-brain-data-extractor
     ports:
-      - "9998:9998"
+      - "127.0.0.1:9998:9998"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -17,7 +17,7 @@ services:
     image: typesense/typesense:29.0
     container_name: file-brain-search-engine
     ports:
-      - "8108:8108"
+      - "127.0.0.1:8108:8108"
     environment:
       TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz-typesense-key}
       TYPESENSE_DATA_DIR: /data

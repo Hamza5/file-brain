@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     app_description: str = get_app_description()
     debug: bool = False
     port: int = Field(default=8274, description="Default application port")
-    host: str = Field(default="0.0.0.0", description="Default application host")
+    host: str = Field(default="127.0.0.1", description="Default application host")
 
     # Typesense
     typesense_host: str = Field(default="localhost")

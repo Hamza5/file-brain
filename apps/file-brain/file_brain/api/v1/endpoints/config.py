@@ -23,13 +23,17 @@ def get_config():
     This allows dynamic configuration (like API keys) to be passed to the UI.
     """
     from file_brain.core.telemetry import telemetry
+    from file_brain.services.typesense_client import get_typesense_client
+
+    client = get_typesense_client()
+    search_only_key = client.get_search_only_api_key()
 
     return {
         "app_version": settings.app_version,
         "app_name": settings.app_name,
         "install_type": telemetry.environment,
         "typesense": {
-            "api_key": settings.typesense_api_key,
+            "api_key": search_only_key,
             "host": settings.typesense_host,
             "port": settings.typesense_port,
             "protocol": settings.typesense_protocol,

@@ -596,6 +596,19 @@ class TypesenseClient:
         logger.info(f"Batch cleanup completed: {successful} successful, {failed} failed")
         return {"successful": successful, "failed": failed}
 
+    def get_search_only_api_key(self) -> str:
+        """
+        Generate and return a scoped search-only API key for the frontend.
+        """
+        try:
+            scoped_key = self.client.keys.generate_scoped_search_key(settings.typesense_api_key, {})
+            if hasattr(scoped_key, "decode"):
+                return scoped_key.decode("utf-8")
+            return str(scoped_key)
+        except Exception as e:
+            logger.error(f"Failed to generate scoped search API key: {e}")
+            return settings.typesense_api_key
+
 
 # Global client instance
 _client: Optional[TypesenseClient] = None

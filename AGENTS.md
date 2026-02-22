@@ -25,13 +25,15 @@ This document provides guidelines for AI agents working on this project.
 - **Remove Unused Code**: Aggressively remove dead code, unused imports, and commented-out blocks.
 - Keep the codebase clean and lean.
 
+### Security
+
+- **Network Binding**: Always bind internal services and APIs to `127.0.0.1` (localhost) rather than `0.0.0.0` unless external network access is explicitly intended and authenticated. This prevents Local Area Network (LAN) DDoS attacks and unauthorized access.
+  - E.g., FastAPI host in `config.py` should default to `127.0.0.1`.
+  - E.g., Docker container ports in `docker-compose.yml` should be prefixed with `127.0.0.1:` (e.g., `127.0.0.1:8108:8108`).
+
 ### Data Accuracy
 
 - **No Hallucinations**: Never hallucinate URLs, credentials, or similar data. Always extract them from existing configuration files (like `pyproject.toml`) or ask the user to supply them if they are not explicitly mentioned in the project.
-
-### Telemetry & Tracking
-
-- **PostHog Tracking**: Always add PostHog event tracking when introducing new Pro features or points where users might request premium functionality. Ensure that `usePostHog()` is used to capture appropriate events (e.g., `pro_feature_requested`, `pro_feature_learn_more_clicked`) to analyze user interest and conversion funnels. Do not track PII data.
 
 ### Dependency Management
 

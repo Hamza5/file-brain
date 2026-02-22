@@ -9,7 +9,6 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -45,9 +44,25 @@ class FileOperationRequest(BaseModel):
     operation: str  # "file", "folder", "delete", or "forget"
 
 
-class MultipleFileOperationRequest(BaseModel):
-    file_paths: List[str]
-    operation: str  # "file", "folder", "delete", or "forget"
+def is_path_allowed(file_path: str) -> bool:
+    """Check if the path belongs to one of the configured watch_paths"""
+    from file_brain.core.config import settings
+
+    if not settings.watch_paths:
+        return False
+
+    allowed_paths = [os.path.abspath(p.strip()) for p in settings.watch_paths.split(",") if p.strip()]
+    abs_file_path = os.path.abspath(file_path)
+
+    for allowed_path in allowed_paths:
+        try:
+            if os.path.commonpath([abs_file_path, allowed_path]) == allowed_path:
+                return True
+        except ValueError:
+            # Different drives on Windows
+            continue
+
+    return False
 
 
 def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
@@ -65,6 +80,10 @@ def open_file_cross_platform(file_path: str) -> tuple[bool, str]:
 
         # Normalize the path
         file_path = os.path.abspath(file_path)
+
+        # Security: ensure path is within configured watch paths
+        if not is_path_allowed(file_path):
+            return False, "Security Error: Path is outside configured watch directories"
 
         # Determine command based on OS
         if system == "Windows":
@@ -100,6 +119,11 @@ def open_folder_cross_platform(file_path: str) -> tuple[bool, str]:
 
         # Normalize the path
         file_path = os.path.abspath(file_path)
+
+        # Security: ensure path is within configured watch paths
+        if not is_path_allowed(file_path):
+            return False, "Security Error: Path is outside configured watch directories"
+
         folder_path = str(Path(file_path).parent)
 
         # Determine command based on OS
@@ -198,6 +222,10 @@ def delete_file_cross_platform(file_path: str) -> tuple[bool, str]:
         # Normalize the path
         file_path = os.path.abspath(file_path)
 
+        # Security: ensure path is within configured watch paths
+        if not is_path_allowed(file_path):
+            return False, "Security Error: Path is outside configured watch directories"
+
         # Additional security: ensure it's a file, not a directory
         if os.path.isdir(file_path):
             return False, "Cannot delete directories, only files"
@@ -230,6 +258,13 @@ def forget_file_from_index(file_path: str, typesense_client: TypesenseClient) ->
         # Security: prevent directory traversal
         if ".." in file_path:
             return False, "Invalid file path: directory traversal not allowed"
+
+        # Normalize the path
+        file_path = os.path.abspath(file_path)
+
+        # Security: ensure path is within configured watch paths
+        if not is_path_allowed(file_path):
+            return False, "Security Error: Path is outside configured watch directories"
 
         # Remove from Typesense index
         typesense_client.remove_from_index(file_path)
@@ -285,48 +320,6 @@ def open_file_operation(request: FileOperationRequest):
 
         telemetry.capture_event("file_operation_failure", {"operation": request.operation, "error": str(e)})
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@router.post("/open-multiple")
-def open_multiple_files_operation(request: MultipleFileOperationRequest):
-    """Open multiple files or containing folders"""
-    results = []
-    errors = []
-
-    for file_path in request.file_paths:
-        try:
-            if not os.path.exists(file_path):
-                errors.append(f"File not found: {file_path}")
-                continue
-
-            # Security: prevent directory traversal and absolute paths outside scope
-            if ".." in file_path:
-                errors.append(f"Invalid file path: {file_path}")
-                continue
-
-            if request.operation == "file":
-                success, message = open_file_cross_platform(file_path)
-            elif request.operation == "folder":
-                success, message = open_folder_cross_platform(file_path)
-            else:
-                errors.append(f"Invalid operation '{request.operation}' for: {file_path}")
-                continue
-
-            if success:
-                results.append(file_path)
-            else:
-                errors.append(f"{file_path}: {message}")
-
-        except Exception as e:
-            errors.append(f"Error processing {file_path}: {str(e)}")
-
-    return {
-        "success": len(errors) == 0,
-        "processed": len(results),
-        "total_requested": len(request.file_paths),
-        "errors": errors,
-        "operation": request.operation,
-    }
 
 
 @router.get("/info")
@@ -472,91 +465,4 @@ def forget_file_operation(request: FileOperationRequest):
         from file_brain.core.telemetry import telemetry
 
         telemetry.capture_event("file_operation_failure", {"operation": "forget", "error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@router.post("/delete-multiple")
-def delete_multiple_files_operation(request: MultipleFileOperationRequest):
-    """Delete multiple files from the filesystem and remove from search index"""
-    results = []
-    errors = []
-
-    try:
-        if request.operation != "delete":
-            raise HTTPException(status_code=400, detail="Invalid operation. Must be 'delete'")
-
-        for file_path in request.file_paths:
-            try:
-                success, message = delete_file_cross_platform(file_path)
-
-                if success:
-                    results.append(file_path)
-                    # Immediately remove from search index
-                    try:
-                        typesense_client = TypesenseClient()
-                        typesense_client.remove_from_index(file_path)
-                    except Exception as e:
-                        logger.warning(f"Failed to remove deleted file from index {file_path}: {e}")
-                else:
-                    errors.append(f"{file_path}: {message}")
-
-            except Exception as e:
-                errors.append(f"Error processing {file_path}: {str(e)}")
-
-        # Track multiple file deletions
-        if len(results) > 0:
-            from file_brain.core.telemetry import telemetry
-
-            telemetry.capture_event("files_deleted", {"count": len(results)})
-
-        return {
-            "success": len(errors) == 0,
-            "processed": len(results),
-            "total_requested": len(request.file_paths),
-            "errors": errors,
-            "operation": request.operation,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@router.post("/forget-multiple")
-def forget_multiple_files_operation(request: MultipleFileOperationRequest):
-    """Remove multiple files from the search index"""
-    results = []
-    errors = []
-
-    try:
-        if request.operation != "forget":
-            raise HTTPException(status_code=400, detail="Invalid operation. Must be 'forget'")
-
-        # Initialize Typesense client
-        typesense_client = TypesenseClient()
-
-        for file_path in request.file_paths:
-            try:
-                success, message = forget_file_from_index(file_path, typesense_client)
-
-                if success:
-                    results.append(file_path)
-                else:
-                    errors.append(f"{file_path}: {message}")
-
-            except Exception as e:
-                errors.append(f"Error processing {file_path}: {str(e)}")
-
-        return {
-            "success": len(errors) == 0,
-            "processed": len(results),
-            "total_requested": len(request.file_paths),
-            "errors": errors,
-            "operation": request.operation,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
