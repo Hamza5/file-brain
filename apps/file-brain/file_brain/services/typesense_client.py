@@ -36,6 +36,8 @@ class TypesenseClient:
         self.collection_name = settings.typesense_collection_name
         # Flag to indicate whether the collection is confirmed ready.
         self.collection_ready = False
+        # Cache for search-only frontend API key
+        self._search_only_key: Optional[str] = None
 
     def check_collection_exists(self) -> bool:
         """
@@ -598,15 +600,26 @@ class TypesenseClient:
 
     def get_search_only_api_key(self) -> str:
         """
-        Generate and return a scoped search-only API key for the frontend.
+        Generate and return a search-only API key for the frontend.
+        The key is cached to avoid creating a new one on every request.
         """
+        if getattr(self, "_search_only_key", None):
+            return str(self._search_only_key)
+
         try:
-            scoped_key = self.client.keys.generate_scoped_search_key(settings.typesense_api_key, {})
-            if hasattr(scoped_key, "decode"):
-                return scoped_key.decode("utf-8")
-            return str(scoped_key)
+            # We must create a real API key with search permissions to use it safely.
+            # Typesense rejects scoped keys generated directly from the root API key.
+            key_schema = {
+                "description": "Frontend Search-only API Key",
+                "actions": ["documents:search"],
+                "collections": ["*"],
+            }
+            key_info = self.client.keys.create(key_schema)
+            self._search_only_key = str(key_info["value"])
+            return self._search_only_key
         except Exception as e:
-            logger.error(f"Failed to generate scoped search API key: {e}")
+            logger.error(f"Failed to create search-only API key: {e}")
+            # Fallback to root key
             return settings.typesense_api_key
 
 

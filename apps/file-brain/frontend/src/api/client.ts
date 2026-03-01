@@ -986,3 +986,25 @@ export interface IndexStorageResponse {
 export async function getIndexStorage(): Promise<IndexStorageResponse> {
   return requestJSON("/api/v1/stats/index-storage");
 }
+
+// Export API
+export interface SaveExportRequest {
+  filename: string;
+  content: string;
+  encoding?: "utf-8" | "base64";
+  directory?: string;
+}
+
+export interface SaveExportResponse {
+  saved_path: string;
+}
+
+export async function saveExport(
+  req: SaveExportRequest,
+): Promise<SaveExportResponse> {
+  return requestJSON<SaveExportResponse>("/api/v1/fs/save-export", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+

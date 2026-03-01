@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import base64
 import os
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -11,6 +12,63 @@ from pydantic import BaseModel
 from file_brain.core.paths import app_paths
 
 router = APIRouter(prefix="/fs", tags=["filesystem"])
+
+
+class SaveExportRequest(BaseModel):
+    filename: str
+    """File name (e.g., 'export-2026-03-01.csv')"""
+    content: str
+    """File content – either plain text (UTF-8) or base64-encoded binary depending on *encoding*."""
+    encoding: str = "utf-8"
+    """'utf-8' for text formats (csv, md, json, txt), 'base64' for binary (xlsx)."""
+    directory: Optional[str] = None
+    """Destination directory. Defaults to the user's Downloads folder."""
+
+
+class SaveExportResponse(BaseModel):
+    saved_path: str
+
+
+@router.post("/save-export", response_model=SaveExportResponse)
+def save_export(req: SaveExportRequest) -> SaveExportResponse:
+    """
+    Write an export file to disk (defaults to the user's Downloads folder).
+
+    The frontend sends the serialised content here so that the save goes
+    through the OS filesystem rather than triggering a browser download popup.
+    """
+    # Resolve destination directory
+    if req.directory:
+        dest_dir = Path(req.directory).expanduser().resolve()
+    else:
+        dest_dir = app_paths.user_downloads_dir.resolve()
+
+    if not dest_dir.exists():
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Cannot create directory: {exc}") from exc
+
+    if not dest_dir.is_dir():
+        raise HTTPException(status_code=400, detail="Destination is not a directory")
+
+    # Sanitise filename – strip any path separators the client might have sent
+    safe_name = Path(req.filename).name
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    dest_path = dest_dir / safe_name
+
+    try:
+        if req.encoding == "base64":
+            data = base64.b64decode(req.content)
+            dest_path.write_bytes(data)
+        else:
+            dest_path.write_text(req.content, encoding="utf-8")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write file: {exc}") from exc
+
+    return SaveExportResponse(saved_path=str(dest_path))
 
 
 class FsRoot(BaseModel):

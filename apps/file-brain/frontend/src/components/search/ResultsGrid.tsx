@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHits, useInstantSearch, useSearchBox } from 'react-instantsearch';
 import { FileContextMenu } from '../modals/FileContextMenu';
 import { fileOperationsService, type FileOperationRequest } from '../../services/fileOperations';
 import { type SearchHit } from '../../types/search';
 import { showConfirmDialog } from '../../utils/dialogUtils';
 import { Tooltip } from 'primereact/tooltip';
+import { Checkbox } from 'primereact/checkbox';
+import { SplitButton } from 'primereact/splitbutton';
+import { Message } from 'primereact/message';
 import { pickIconClass, formatDate, getFileName } from '../../utils/fileUtils';
 import { usePostHog } from '../../context/PostHogProvider';
 import { useSearch } from '../../context/SearchContext';
 import { SearchPagination } from './SearchPagination';
 import { FileThumbnail } from '../common/FileThumbnail';
 import { ProFeatureDialog } from '../shared/ProFeatureDialog';
+import { SaveFileDialog } from '../modals/SaveFileDialog';
+import { useSelectionExport } from '../../hooks/useSelectionExport';
+import { generateExportContent, saveExportContent, type ExportFormat } from '../../services/exportService';
 
 interface ResultsGridProps {
     onResultClick: (result: SearchHit) => void;
@@ -24,6 +30,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
     const posthog = usePostHog();
     const { searchMode, fuzzySearchEnabled } = useSearch();
     const isSearching = status === 'loading' || status === 'stalled';
+
     const [contextMenu, setContextMenu] = useState<{
         isOpen: boolean;
         position: { x: number; y: number };
@@ -36,8 +43,54 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
         file: null
     });
     const [showAskProDialog, setShowAskProDialog] = useState(false);
+    const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const exportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const searchStartTimeRef = React.useRef<number | null>(null);
+    // Pending export: holds the generated content while the Save dialog is open
+    const [pendingExport, setPendingExport] = useState<{
+        content: string;
+        encoding: 'utf-8' | 'base64';
+        defaultFilename: string;
+    } | null>(null);
+
+    const searchStartTimeRef = useRef<number | null>(null);
+
+    const showExportResult = (type: 'success' | 'error', text: string) => {
+        if (exportTimerRef.current) clearTimeout(exportTimerRef.current);
+        setExportStatus({ type, text });
+        exportTimerRef.current = setTimeout(() => setExportStatus(null), 5000);
+    };
+
+    /** Open the Save dialog for the requested format. */
+    const handleExport = (format: ExportFormat) => {
+        if (selectedHits.length === 0) return;
+        const exportContent = generateExportContent(selectedHits, format);
+        setPendingExport(exportContent);
+    };
+
+    /** Called when the user confirms filename + directory in the Save dialog. */
+    const handleSaveConfirm = (directory: string, filename: string) => {
+        if (!pendingExport) return;
+        const { content, encoding } = pendingExport;
+        setPendingExport(null);
+        saveExportContent(directory, filename, content, encoding)
+            .then((savedPath) => {
+                showExportResult('success', `Saved to ${savedPath}`);
+            })
+            .catch((err: unknown) => {
+                const message = err instanceof Error ? err.message : 'Export failed';
+                showExportResult('error', message);
+            });
+    };
+
+    const {
+        selectedHits,
+        isAllSelected,
+        isSelected,
+        toggleSelect,
+        toggleSelectAll,
+        selectionCount,
+    } = useSelectionExport(query);
 
     // Track when a search starts to measure latency
     useEffect(() => {
@@ -49,8 +102,8 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
     // Track search events when results change
     useEffect(() => {
         if (results && query && posthog && !isSearching) {
-            const latency = searchStartTimeRef.current 
-                ? performance.now() - searchStartTimeRef.current 
+            const latency = searchStartTimeRef.current
+                ? performance.now() - searchStartTimeRef.current
                 : null;
 
             posthog.capture('search_performed', {
@@ -163,6 +216,31 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
     }
 
     const totalResults = results?.nbHits || 0;
+    const currentHits = (results?.hits ?? []) as SearchHit[];
+    const allOnPageSelected = isAllSelected(currentHits);
+
+    const exportMenuItems: { label: string; icon: string; command: () => void }[] = [
+        {
+            label: 'Markdown (.md)',
+            icon: 'fa fa-brands fa-markdown',
+            command: () => handleExport('md'),
+        },
+        {
+            label: 'Excel (.xlsx)',
+            icon: 'fa fa-file-excel',
+            command: () => handleExport('xlsx'),
+        },
+        {
+            label: 'JSON (.json)',
+            icon: 'fa fa-code',
+            command: () => handleExport('json'),
+        },
+        {
+            label: 'Plain Text (.txt)',
+            icon: 'fa fa-file-lines',
+            command: () => handleExport('txt'),
+        },
+    ];
 
     return (
         <>
@@ -192,166 +270,232 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
             <Tooltip target=".grid-tooltip" />
 
             {/* Result Count Header */}
-            {
-                !isSearching && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: '1rem',
-                        padding: '0.75rem 0.5rem',
-                        borderBottom: '1px solid var(--surface-border)'
-                    }}>
-                        <div style={{
-                            fontSize: '0.95rem',
-                            color: 'var(--text-color-secondary)',
-                            fontWeight: 500
-                        }}>
-                            {totalResults.toLocaleString()} {totalResults === 1 ? 'result' : 'results'} found
-                        </div>
+            {!isSearching && (
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '1rem',
+                    padding: '0.75rem 0.5rem',
+                    borderBottom: '1px solid var(--surface-border)',
+                    gap: '0.75rem',
+                    flexWrap: 'wrap',
+                }}>
+                    {/* Left: result count + select-all */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <Checkbox
+                            inputId="select-all-results"
+                            checked={allOnPageSelected}
+                            onChange={() => toggleSelectAll(currentHits)}
+                            tooltip={allOnPageSelected ? 'Deselect all on this page' : 'Select all on this page'}
+                            tooltipOptions={{ position: 'right' }}
+                        />
+                        <label
+                            htmlFor="select-all-results"
+                            style={{
+                                fontSize: '0.95rem',
+                                color: 'var(--text-color-secondary)',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                            }}
+                        >
+                            {selectionCount > 0
+                                ? `${selectionCount} selected`
+                                : `${totalResults.toLocaleString()} ${totalResults === 1 ? 'result' : 'results'} found`}
+                        </label>
                     </div>
-                )
-            }
+
+                    {/* Right: export split button */}
+                    <SplitButton
+                        label="Export CSV"
+                        icon="fa fa-download"
+                        model={exportMenuItems}
+                        disabled={selectionCount === 0}
+                        size="small"
+                        onClick={() => handleExport('csv')}
+                        tooltip={selectionCount === 0 ? 'Select results to export' : `Export ${selectionCount} file${selectionCount !== 1 ? 's' : ''}`}
+                        tooltipOptions={{ position: 'left' }}
+                        pt={{
+                            root: { style: { flexShrink: 0 } },
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* Export save notification */}
+            {exportStatus && (
+                <div style={{ marginBottom: '0.75rem' }}>
+                    <Message
+                        severity={exportStatus.type === 'success' ? 'success' : 'error'}
+                        text={exportStatus.text}
+                        style={{ width: '100%', fontSize: '0.85rem' }}
+                    />
+                </div>
+            )}
 
             {/* Results Grid */}
-            {
-                !isSearching && (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                        gap: '0.75rem'
-                    }}>
-                        {
-                            results?.hits.map((hit) => {
-                                const searchHit = hit as SearchHit;
-                                const iconClass = pickIconClass(undefined, searchHit.mime_type, searchHit.file_extension);
-                                const extension = searchHit.file_extension ? searchHit.file_extension.replace('.', '').toUpperCase() : 'FILE';
+            {!isSearching && (
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '0.75rem'
+                }}>
+                    {currentHits.map((searchHit) => {
+                        const iconClass = pickIconClass(undefined, searchHit.mime_type, searchHit.file_extension);
+                        const extension = searchHit.file_extension ? searchHit.file_extension.replace('.', '').toUpperCase() : 'FILE';
+                        const selected = isSelected(searchHit.objectID);
 
-                                return (
-                                    <div key={searchHit.objectID} style={{ padding: '0.5rem' }}>
-                                        <div
+                        return (
+                            <div key={searchHit.objectID} style={{ padding: '0.5rem' }}>
+                                <div
+                                    style={{
+                                        border: `1px solid ${selected ? 'var(--primary-color)' : 'var(--surface-border)'}`,
+                                        borderRadius: '12px',
+                                        padding: '0.75rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.75rem',
+                                        height: '100%',
+                                        boxShadow: selected
+                                            ? '0 0 0 2px var(--primary-color), 0 1px 3px rgba(0,0,0,0.08)'
+                                            : '0 1px 3px rgba(0,0,0,0.08)',
+                                        position: 'relative',
+                                        backgroundColor: selected ? 'color-mix(in srgb, var(--primary-color) 12%, var(--surface-card))' : 'var(--surface-card)',
+                                    }}
+                                    onClick={() => {
+                                        // Track search result click
+                                        if (posthog && query) {
+                                            const hitIndex = results?.hits.findIndex(h => (h as SearchHit).objectID === searchHit.objectID) || 0;
+                                            posthog.capture('search_result_clicked', {
+                                                hit_position: hitIndex,
+                                                query_length: query.length,
+                                            });
+                                        }
+                                        onResultClick(searchHit);
+                                    }}
+                                    onContextMenu={(e) => handleContextMenu(e, searchHit)}
+                                    onMouseEnter={(e) => {
+                                        if (!selected) {
+                                            e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
+                                            e.currentTarget.style.transform = 'translateY(-4px)';
+                                            e.currentTarget.style.borderColor = 'var(--primary-color)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!selected) {
+                                            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.borderColor = 'var(--surface-border)';
+                                        }
+                                    }}
+                                >
+                                    {/* Selection checkbox — top-right corner */}
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '0.6rem',
+                                            right: '0.6rem',
+                                            zIndex: 1,
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleSelect(searchHit);
+                                        }}
+                                    >
+                                        <Checkbox
+                                            checked={selected}
+                                            onChange={() => toggleSelect(searchHit)}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: 'var(--surface-50)',
+                                        borderRadius: '8px',
+                                        height: '140px',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <FileThumbnail
+                                            filePath={searchHit.file_path}
+                                            maxSize={256}
+                                            iconClass={iconClass}
+                                            alt={getFileName(searchHit.file_path)}
                                             style={{
-                                                backgroundColor: 'var(--surface-card)',
-                                                border: '1px solid var(--surface-border)',
-                                                borderRadius: '12px',
-                                                padding: '0.75rem',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '0.75rem',
+                                                fontSize: '3rem',
+                                                color: 'var(--primary-color)',
+                                                width: '100%',
                                                 height: '100%',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                                                objectFit: 'cover'
                                             }}
-                                            onClick={() => {
-                                                // Track search result click
-                                                if (posthog && query) {
-                                                    const hitIndex = results?.hits.findIndex(h => (h as SearchHit).objectID === searchHit.objectID) || 0;
-                                                    posthog.capture('search_result_clicked', {
-                                                        hit_position: hitIndex,
-                                                        query_length: query.length,
-                                                    });
-                                                }
-                                                onResultClick(searchHit);
-                                            }}
-                                            onContextMenu={(e) => handleContextMenu(e, searchHit)}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
-                                                e.currentTarget.style.transform = 'translateY(-4px)';
-                                                e.currentTarget.style.borderColor = 'var(--primary-color)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
-                                                e.currentTarget.style.transform = 'translateY(0)';
-                                                e.currentTarget.style.borderColor = 'var(--surface-border)';
-                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <div style={{
+                                            fontWeight: 600,
+                                            color: 'var(--text-color)',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                        }}
+                                        className="grid-tooltip"
+                                        data-pr-tooltip={getFileName(searchHit.file_path)}
+                                        data-private  // Mask file name in session recordings
                                         >
-                                            <div style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                backgroundColor: 'var(--surface-50)',
-                                                borderRadius: '8px',
-                                                height: '140px',
-                                                overflow: 'hidden'
+                                            {getFileName(searchHit.file_path)}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '0.75rem',
+                                            color: 'var(--text-color-secondary)',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                        }}
+                                        className="grid-tooltip"
+                                        data-pr-tooltip={searchHit.file_path}
+                                        data-private  // Mask file path in session recordings
+                                        >
+                                            {searchHit.file_path}
+                                        </div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            flexWrap: 'wrap',
+                                            marginTop: 'auto',
+                                            paddingTop: '0.5rem'
+                                        }}>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                backgroundColor: 'var(--primary-reverse)',
+                                                color: 'var(--primary-color)',
+                                                padding: '0.25rem 0.5rem',
+                                                borderRadius: '4px',
+                                                fontWeight: 500,
+                                                flexShrink: 0
                                             }}>
-                                                <FileThumbnail
-                                                    filePath={searchHit.file_path}
-                                                    maxSize={256}
-                                                    iconClass={iconClass}
-                                                    alt={getFileName(searchHit.file_path)}
-                                                    style={{
-                                                        fontSize: '3rem',
-                                                        color: 'var(--primary-color)',
-                                                        width: '100%',
-                                                        height: '100%',
-                                                        objectFit: 'cover'
-                                                    }}
-                                                />
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                                <div style={{
-                                                    fontWeight: 600,
-                                                    color: 'var(--text-color)',
-                                                    whiteSpace: 'nowrap',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis'
-                                                }}
-                                                className="grid-tooltip"
-                                                data-pr-tooltip={getFileName(searchHit.file_path)}
-                                                data-private  // Mask file name in session recordings
-                                                >
-                                                    {getFileName(searchHit.file_path)}
-                                                </div>
-                                                <div style={{
-                                                    fontSize: '0.75rem',
-                                                    color: 'var(--text-color-secondary)',
-                                                    whiteSpace: 'nowrap',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis'
-                                                }}
-                                                className="grid-tooltip"
-                                                data-pr-tooltip={searchHit.file_path}
-                                                data-private  // Mask file path in session recordings
-                                                >
-                                                    {searchHit.file_path}
-                                                </div>
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.5rem',
-                                                    flexWrap: 'wrap',
-                                                    marginTop: 'auto',
-                                                    paddingTop: '0.5rem'
-                                                }}>
-                                                    <span style={{
-                                                        fontSize: '0.75rem',
-                                                        backgroundColor: 'var(--primary-reverse)',
-                                                        color: 'var(--primary-color)',
-                                                        padding: '0.25rem 0.5rem',
-                                                        borderRadius: '4px',
-                                                        fontWeight: 500,
-                                                        flexShrink: 0
-                                                    }}>
-                                                        {extension}
-                                                    </span>
-                                                    <span style={{ 
-                                                        fontSize: '0.75rem', 
-                                                        color: 'var(--text-color-secondary)',
-                                                        whiteSpace: 'nowrap'
-                                                    }}>
-                                                        {formatDate(searchHit.modified_time)}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                                {extension}
+                                            </span>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                color: 'var(--text-color-secondary)',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {formatDate(searchHit.modified_time)}
+                                            </span>
                                         </div>
                                     </div>
-                                );
-                            })
-                        }
-                    </div >
-                )
-            }
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             <div style={{ display: isSearching ? 'none' : 'block' }}>
                 <SearchPagination className="mt-3 mb-7" />
@@ -370,6 +514,13 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({ onResultClick, isCrawl
                 onHide={() => setShowAskProDialog(false)}
                 featureName="Ask Question"
                 minimumTier="Knowledge Engine"
+            />
+
+            <SaveFileDialog
+                isOpen={pendingExport !== null}
+                defaultFilename={pendingExport?.defaultFilename ?? ''}
+                onClose={() => setPendingExport(null)}
+                onConfirm={handleSaveConfirm}
             />
         </>
     );
