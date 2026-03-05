@@ -89,6 +89,7 @@ async function fetchGitHubStars() {
                 starredAt
                 node {
                   login
+                  name
                   avatarUrl
                   databaseId
                 }
@@ -145,6 +146,7 @@ async function fetchGitHubStars() {
             .map(edge => ({
                 id: edge.node.databaseId,
                 login: edge.node.login,
+                name: edge.node.name,
                 avatar_url: edge.node.avatarUrl,
                 starred_at: edge.starredAt
             }))
@@ -153,7 +155,7 @@ async function fetchGitHubStars() {
         // Analyze avatars to filter out default ones
         const latestStargazers = [];
         for (const user of allStargazers) {
-            if (latestStargazers.length >= 5) break;
+            if (latestStargazers.length >= 7) break;
             
             if (user.avatar_url) {
                 const isDefault = await isDefaultAvatar(user.avatar_url);
@@ -161,6 +163,7 @@ async function fetchGitHubStars() {
                     latestStargazers.push({
                         id: user.id,
                         login: user.login,
+                        name: user.name,
                         avatar_url: user.avatar_url
                     });
                 }

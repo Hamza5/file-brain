@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Image from 'next/image';
 import { Button } from 'primereact/button';
 import { Tag } from 'primereact/tag';
 import posthog from 'posthog-js';
@@ -66,8 +67,11 @@ export const Hero: React.FC = () => {
                         />
                     </div>
 
-                    <div className="mt-2 animate-fade-in transition-all transition-duration-500">
+                    <div className="mt-4 animate-fade-in transition-all transition-duration-500 flex flex-wrap justify-content-center align-items-center gap-4">
                         <GithubStars />
+                        <a href="https://launchigniter.com/product/file-brain?ref=badge-file-brain" target="_blank" rel="noopener noreferrer" className="transition-all transition-duration-300 hover:-translate-y-1 block" style={{ transform: 'translateY(0)' }}>
+                            <Image src="https://launchigniter.com/api/badge/file-brain?theme=light" alt="Featured on LaunchIgniter" width={212} height={55} style={{ display: 'block', width: 'auto', height: 'auto' }} unoptimized />
+                        </a>
                     </div>
                 </div>
             </div>

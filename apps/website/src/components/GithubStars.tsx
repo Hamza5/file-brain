@@ -2,11 +2,13 @@
 import React, { useEffect, useState } from 'react';
 import { Avatar } from 'primereact/avatar';
 import { AvatarGroup } from 'primereact/avatargroup';
+import { Tooltip } from 'primereact/tooltip';
 import posthog from 'posthog-js';
 
 interface Stargazer {
     id: number;
     login: string;
+    name?: string;
     avatar_url: string;
 }
 
@@ -112,7 +114,7 @@ export const GithubStars: React.FC = () => {
                     // Analyze avatars to filter out default ones
                     const customAvatars: Stargazer[] = [];
                     for (const user of allStargazers) {
-                        if (customAvatars.length >= 5) break;
+                        if (customAvatars.length >= 7) break;
                         
                         const isDefault = await isDefaultAvatar(user.avatar_url);
                         if (!isDefault) {
@@ -154,18 +156,19 @@ export const GithubStars: React.FC = () => {
                      maxWidth: 'fit-content'
                  }}>
                 <AvatarGroup className="mr-1">
+                    <Tooltip target=".github-avatar-tooltip" position="top" />
                     {stargazers.map((user, index) => (
                         <Avatar 
                             key={user.id} 
                             image={user.avatar_url} 
                             shape="circle" 
                             size="normal"
-                            className="border-2 border-primary transition-all transition-duration-300 hover:z-5"
+                            data-pr-tooltip={user.name || user.login}
+                            className="border-1 border-primary transition-all transition-duration-300 hover:z-5 github-avatar-tooltip"
                             style={{ 
-                                border: '2px solid var(--surface-card)', 
                                 width: '36px', 
                                 height: '36px',
-                                marginLeft: index === 0 ? '0' : '-12px' // Controlled overlap
+                                marginLeft: index === 0 ? '0' : '-8px' // Controlled overlap
                             }}
                             onImageError={() => {
                                 setStargazers(prev => prev.filter(u => u.id !== user.id));
