@@ -30,15 +30,17 @@ export const ProVersion = () => {
         ></i>
       );
     }
-    return <span style={{ color: "var(--text-color-secondary)" }}>{value}</span>;
+    return (
+      <span style={{ color: "var(--text-color-secondary)" }}>{value}</span>
+    );
   };
 
   const pricingTiers = [
     {
       name: "Knowledge Engine",
       icon: "fa-solid fa-brain",
-      preorderPrice: "$99",
-      launchPrice: "$149",
+      preorderPrice: "$49",
+      launchPrice: "$79",
       features: [
         "Everything in Free",
         "Chat with files",
@@ -50,8 +52,8 @@ export const ProVersion = () => {
     {
       name: "Media Suite",
       icon: "fa-solid fa-film",
-      preorderPrice: "$129",
-      launchPrice: "$199",
+      preorderPrice: "$79",
+      launchPrice: "$119",
       features: [
         "Everything in Knowledge Engine",
         "Understanding visual content",
@@ -63,8 +65,8 @@ export const ProVersion = () => {
     {
       name: "Cloud Connect",
       icon: "fa-solid fa-cloud",
-      preorderPrice: "$159",
-      launchPrice: "$249",
+      preorderPrice: "$99",
+      launchPrice: "$169",
       features: [
         "Everything in Media Suite",
         "Network drives (FTP, SFTP, SMB, WebDAV)",
@@ -222,62 +224,156 @@ export const ProVersion = () => {
       <div className="landing-container">
         {/* Header */}
         <div className="text-center mb-8">
-            <Tag value="UNLOCK YOUR POTENTIAL" rounded severity="info" className="text-xs font-semibold tracking-wider px-3 py-2 mb-4" style={{ backgroundColor: 'rgba(6, 182, 212, 0.1)', color: 'var(--primary-color)' }}></Tag>
-            
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-center" style={{ color: "var(--text-color)" }}>
-                Go Beyond Simple Search
-                <SectionAnchor id="pro-version" className="ml-3 active:scale-95" />
-            </h2>
-            
-            <p className="text-xl mb-8 max-w-3xl mx-auto" style={{ color: "var(--text-color-secondary)" }}>
-                File Brain Pro transforms your files into an intelligent knowledge base with conversational AI, computer vision, and cloud connectivity.
+          <Tag
+            value="UNLOCK YOUR POTENTIAL"
+            rounded
+            severity="info"
+            className="text-xs font-semibold tracking-wider px-3 py-2 mb-4"
+            style={{
+              backgroundColor: "rgba(6, 182, 212, 0.1)",
+              color: "var(--primary-color)",
+            }}
+          ></Tag>
+
+          <h2
+            className="text-4xl md:text-5xl font-bold mb-4 text-center"
+            style={{ color: "var(--text-color)" }}
+          >
+            Go Beyond Simple Search
+            <SectionAnchor id="pro-version" className="ml-3 active:scale-95" />
+          </h2>
+
+          <p
+            className="text-xl mb-8 max-w-3xl mx-auto"
+            style={{ color: "var(--text-color-secondary)" }}
+          >
+            File Brain Pro transforms your files into an intelligent knowledge
+            base with conversational AI, computer vision, and cloud
+            connectivity.
+          </p>
+
+          <div className="grid mb-8">
+            <div className="col-12 md:col-4 p-3">
+              <div
+                className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center"
+                style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+              >
+                <div
+                  className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3"
+                  style={{
+                    backgroundColor: "var(--blue-100)",
+                    color: "var(--blue-500)",
+                  }}
+                >
+                  <i className="fa-solid fa-comments text-2xl"></i>
+                </div>
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: "var(--text-color)" }}
+                >
+                  Chat with Files
+                </h3>
+                <p
+                  className="m-0 line-height-3"
+                  style={{ color: "var(--text-color-secondary)" }}
+                >
+                  Don&apos;t just search. Ask questions and get answers directly
+                  from your documents and notes.
+                </p>
+              </div>
+            </div>
+            <div className="col-12 md:col-4 p-3">
+              <div
+                className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center"
+                style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+              >
+                <div
+                  className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3"
+                  style={{
+                    backgroundColor: "var(--purple-100)",
+                    color: "var(--purple-500)",
+                  }}
+                >
+                  <i className="fa-solid fa-eye text-2xl"></i>
+                </div>
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: "var(--text-color)" }}
+                >
+                  Visual Understanding
+                </h3>
+                <p
+                  className="m-0 line-height-3"
+                  style={{ color: "var(--text-color-secondary)" }}
+                >
+                  Find specific scenes in videos (&quot;birthday cake&quot;) and
+                  objects in images without manual tagging.
+                </p>
+              </div>
+            </div>
+            <div className="col-12 md:col-4 p-3">
+              <div
+                className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center"
+                style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+              >
+                <div
+                  className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3"
+                  style={{
+                    backgroundColor: "var(--orange-100)",
+                    color: "var(--orange-500)",
+                  }}
+                >
+                  <i className="fa-solid fa-cloud text-2xl"></i>
+                </div>
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: "var(--text-color)" }}
+                >
+                  Cloud Connection
+                </h3>
+                <p
+                  className="m-0 line-height-3"
+                  style={{ color: "var(--text-color-secondary)" }}
+                >
+                  Unified search across Google Drive, Dropbox, OneDrive, and
+                  network shares (SMB/FTP).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 mb-6">
+            <h3
+              className="text-3xl font-bold text-center"
+              style={{ color: "var(--text-color)" }}
+            >
+              Choose Your{" "}
+              <span style={{ color: "var(--primary-color)" }} className="ml-2">
+                Pro Tier
+              </span>
+            </h3>
+            <p
+              className="text-lg mt-2 mb-4"
+              style={{ color: "var(--text-color-secondary)" }}
+            >
+              <strong style={{ color: "var(--text-color)" }}>
+                Perpetual License.
+              </strong>{" "}
+              One-time payment, you own it forever. Includes auto-updates and
+              priority support for one year.
             </p>
 
-            <div className="grid mb-8">
-                <div className="col-12 md:col-4 p-3">
-                    <div className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
-                        <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3" style={{ backgroundColor: 'var(--blue-100)', color: 'var(--blue-500)' }}>
-                            <i className="fa-solid fa-comments text-2xl"></i>
-                        </div>
-                        <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Chat with Files</h3>
-                        <p className="m-0 line-height-3" style={{ color: 'var(--text-color-secondary)' }}>Don&apos;t just search. Ask questions and get answers directly from your documents and notes.</p>
-                    </div>
-                </div>
-                <div className="col-12 md:col-4 p-3">
-                    <div className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
-                        <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3" style={{ backgroundColor: 'var(--purple-100)', color: 'var(--purple-500)' }}>
-                            <i className="fa-solid fa-eye text-2xl"></i>
-                        </div>
-                        <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Visual Understanding</h3>
-                        <p className="m-0 line-height-3" style={{ color: 'var(--text-color-secondary)' }}>Find specific scenes in videos (&quot;birthday cake&quot;) and objects in images without manual tagging.</p>
-                    </div>
-                </div>
-                <div className="col-12 md:col-4 p-3">
-                    <div className="surface-card p-4 border-round-xl h-full border-1 border-transparent hover:border-primary transition-colors transition-duration-300 flex flex-column align-items-center text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
-                        <div className="w-4rem h-4rem border-round-xl flex align-items-center justify-content-center mb-3" style={{ backgroundColor: 'var(--orange-100)', color: 'var(--orange-500)' }}>
-                            <i className="fa-solid fa-cloud text-2xl"></i>
-                        </div>
-                        <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-color)' }}>Cloud Connection</h3>
-                        <p className="m-0 line-height-3" style={{ color: 'var(--text-color-secondary)' }}>Unified search across Google Drive, Dropbox, OneDrive, and network shares (SMB/FTP).</p>
-                    </div>
-                </div>
+            <div className="p-3 border-round-xl inline-block surface-50 border-1 border-300">
+              <p
+                className="m-0 text-base"
+                style={{ color: "var(--text-color)" }}
+              >
+                <i className="fa-solid fa-lightbulb mr-2 text-yellow-500"></i>
+                <strong>Preorder Bonus:</strong> Request specific features and
+                we will consider them for the Pro release!
+              </p>
             </div>
-
-            <div className="mt-8 mb-6">
-                <h3 className="text-3xl font-bold text-center" style={{ color: "var(--text-color)" }}>
-                    Choose Your <span style={{ color: "var(--primary-color)" }} className='ml-2'>Pro Tier</span>
-                </h3>
-                <p className="text-lg mt-2 mb-4" style={{ color: "var(--text-color-secondary)" }}>
-                    <strong style={{ color: "var(--text-color)" }}>Perpetual License.</strong> One-time payment, you own it forever. Includes auto-updates and priority support for one year.
-                </p>
-                
-                <div className="p-3 border-round-xl inline-block surface-50 border-1 border-300">
-                    <p className="m-0 text-base" style={{ color: "var(--text-color)" }}>
-                        <i className="fa-solid fa-lightbulb mr-2 text-yellow-500"></i>
-                        <strong>Preorder Bonus:</strong> Request specific features and we will consider them for the Pro release!
-                    </p>
-                </div>
-            </div>
+          </div>
         </div>
 
         {/* Pricing Cards */}
@@ -356,7 +452,7 @@ export const ProVersion = () => {
                       location: "pro_version_section",
                     });
                     window.location.href = `mailto:${contactEmail}?subject=File%20Brain%20Pro%20Preorder%20-%20${encodeURIComponent(
-                      tier.name
+                      tier.name,
                     )}`;
                   }}
                 />

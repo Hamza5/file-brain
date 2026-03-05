@@ -71,7 +71,7 @@ One-time payment. Auto-updates and priority support for one year.
 
 ### 🧠 Knowledge Engine
 
-**$99** (Preorder) / ~~$149~~
+**$49** (Preorder) / ~~$79~~
 
 - Everything in Free
 - Chat with files
@@ -80,7 +80,7 @@ One-time payment. Auto-updates and priority support for one year.
 
 ### 🎬 Media Suite
 
-**$129** (Preorder) / ~~$199~~
+**$79** (Preorder) / ~~$119~~
 
 - Everything in Knowledge Engine
 - Understanding visual content
@@ -89,7 +89,7 @@ One-time payment. Auto-updates and priority support for one year.
 
 ### ☁️ Cloud Connect
 
-**$159** (Preorder) / ~~$249~~
+**$99** (Preorder) / ~~$169~~
 
 - Everything in Media Suite
 - Network drives (FTP, SFTP, SMB, WebDAV)
