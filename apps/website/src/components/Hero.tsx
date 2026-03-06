@@ -72,6 +72,9 @@ export const Hero: React.FC = () => {
                         <a href="https://launchigniter.com/product/file-brain?ref=badge-file-brain" target="_blank" rel="noopener noreferrer" className="transition-all transition-duration-300 hover:-translate-y-1 block" style={{ transform: 'translateY(0)' }}>
                             <Image src="https://launchigniter.com/api/badge/file-brain?theme=light" alt="Featured on LaunchIgniter" width={212} height={55} style={{ display: 'block', width: 'auto', height: 'auto' }} unoptimized />
                         </a>
+                        <a href="https://alternativeto.net/software/file-brain/about/" target="_blank" rel="noopener noreferrer" className="transition-all transition-duration-300 hover:-translate-y-1 block" style={{ transform: 'translateY(0)' }}>
+                            <Image src="/featured_on_alternativeto.png" alt="Featured on AlternativeTo" width={212} height={66} style={{ display: 'block', width: 'auto', height: '66px' }} unoptimized />
+                        </a>
                     </div>
                 </div>
             </div>
