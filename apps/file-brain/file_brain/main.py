@@ -11,6 +11,10 @@ import subprocess
 import sys
 import threading
 
+# Prevent python from crashing on macOS when calling fork() in multithreaded apps.
+# e.g. during subprocess.run inside a uvicorn/fastapi worker thread.
+os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+
 from file_brain.api.v1.router import api_router
 from file_brain.core.config import settings
 from file_brain.core.factory import create_app

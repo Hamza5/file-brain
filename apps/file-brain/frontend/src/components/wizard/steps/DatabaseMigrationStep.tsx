@@ -69,7 +69,7 @@ export const DatabaseMigrationStep: React.FC<DatabaseMigrationStepProps> = ({
       {status === "idle" && (
         <Button 
           label="Apply Update" 
-          icon="pi pi-database" 
+          icon="fas fa-database" 
           onClick={startMigration}
           size="large" 
         />
@@ -87,7 +87,7 @@ export const DatabaseMigrationStep: React.FC<DatabaseMigrationStepProps> = ({
           <Message severity="success" text="Database is up to date!" />
           <Button 
             label="Continue" 
-            icon="pi pi-arrow-right" 
+            icon="fas fa-arrow-right" 
             onClick={onComplete} 
             size="large"
           />
@@ -99,7 +99,7 @@ export const DatabaseMigrationStep: React.FC<DatabaseMigrationStepProps> = ({
           <Message severity="error" text="Update failed. Please check logs and try again." />
           <Button 
             label="Retry" 
-            icon="pi pi-refresh" 
+            icon="fas fa-sync" 
             onClick={startMigration} 
             size="large"
             severity="warning"
