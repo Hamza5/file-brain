@@ -124,14 +124,14 @@ jobs:
 
           if [ -z "$previous_tag" ]; then
             # If no previous tag, get all commits
-            commit_messages=$(git log --pretty=format:"- %s")
+            commit_messages=$(git log --pretty=format:"- %s" -- ../../ ":!../../apps/website")
           else
-            commit_messages=$(git log ${previous_tag}..HEAD --pretty=format:"- %s")
+            commit_messages=$(git log ${previous_tag}..HEAD --pretty=format:"- %s" -- ../../ ":!../../apps/website")
           fi
 
           # Summarize using Gemini CLI
           echo "Summarizing commits..."
-          changelog=$(echo "$commit_messages" | npx @google/gemini-cli --model gemini-2.5-flash "Summarize these commit messages into a concise, professional changelog with sections for Features, Bug Fixes, and Improvements. Do not include duplicate or trivial commits. Format the output as Markdown. Do not wrap it in a code block.")
+          changelog=$(echo "$commit_messages" | npx @google/gemini-cli --model gemini-2.5-flash "Summarize these commit messages into a concise, professional changelog with sections for Features, Bug Fixes, and Improvements. Exclude any changes that are not related to the app (e.g. related only to the website in apps/website). Do not include duplicate or trivial commits. Format the output as Markdown. Do not wrap it in a code block.")
 
           # Store changelog for use in release step
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
