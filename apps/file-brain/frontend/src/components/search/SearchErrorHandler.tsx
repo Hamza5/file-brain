@@ -20,7 +20,15 @@ export const SearchErrorHandler: React.FC = () => {
     if (error && isReady) {
       // Only show error if it's new or different
       if (!prevErrorRef.current || prevErrorRef.current.message !== error.message) {
-        showError('Search Error', error.message || 'An error occurred during search.');
+        let errorTitle = 'Search Error';
+        let errorMessage = error.message || 'An error occurred during search.';
+
+        if (errorMessage.includes('Could not find a field named `embedding` in the schema')) {
+          errorTitle = 'Memory Error';
+          errorMessage = 'The embedding model failed to load due to low RAM. Please free up some RAM and restart the app.';
+        }
+
+        showError(errorTitle, errorMessage);
         prevErrorRef.current = error;
       }
     } else if (!error) {

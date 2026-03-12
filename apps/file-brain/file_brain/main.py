@@ -131,11 +131,6 @@ def perform_shutdown(vite_process=None):
     logger.info("👋 Application shutdown complete")
 
 
-def on_startup_sync():
-    """Sync wrapper for FlaskWebGUI's on_startup callback."""
-    startup_handler()
-
-
 def on_shutdown_sync():
     """Sync wrapper for FlaskWebGUI's on_shutdown callback."""
     logger.info("🛑 Browser closed, initiating shutdown...")
@@ -230,7 +225,6 @@ def cli_main():
         port=port,
         width=1200,
         height=800,
-        on_startup=on_startup_sync,
         on_shutdown=on_shutdown_sync,
     ).run()
 
@@ -276,6 +270,5 @@ if __name__ == "__main__":
             port=port,
             width=1200,
             height=800,
-            on_startup=on_startup_sync,
             on_shutdown=on_shutdown_sync,
         ).run()
