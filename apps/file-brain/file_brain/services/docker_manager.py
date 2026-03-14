@@ -134,7 +134,7 @@ class DockerManager:
         )
 
         if is_connection_error:
-            return "Docker Desktop is likely not running. Please start Docker Desktop and try again."
+            return "Docker is not reachable. If you are using Docker Desktop, please start it and try again."
 
         if "permission denied" in error_msg_lower:
             return (
@@ -357,12 +357,22 @@ class DockerManager:
         """
         Check if we can actually connect to the Docker daemon.
 
+        Uses a two-phase approach:
+        1. Try the Docker SDK (docker.from_env()) which reads DOCKER_HOST / Docker SDK env vars.
+        2. If that fails, fall back to running `docker info` via CLI subprocess, which respects
+           Docker Desktop contexts and system-level DOCKER_HOST configurations.
+
+        This handles users pointing the Docker CLI at a remote daemon (e.g. VirtualBox VM)
+        where the SDK may not automatically pick up the active Docker context.
+
         Returns:
             Dictionary with success and error message
         """
         if not self.docker_cmd:
             return {"success": False, "error": "Docker not found"}
 
+        # Try Docker SDK
+        sdk_error: Optional[str] = None
         try:
             import docker
 
@@ -371,11 +381,38 @@ class DockerManager:
             client.close()
             return {"success": True}
         except Exception as e:
-            error_msg = str(e)
+            sdk_error = str(e)
+            logger.debug(f"Docker SDK connection failed: {sdk_error} — will try CLI fallback")
+
+        # CLI fallback via `docker info` — respects Docker contexts and system-level config
+        try:
+            result = subprocess.run(
+                [self.docker_cmd, "info"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                logger.info("Docker daemon reachable via CLI (SDK fallback succeeded)")
+                return {"success": True}
+
+            # CLI also failed — build the best error message we can
+            cli_error = result.stderr or result.stdout or sdk_error or "unknown error"
+            friendly_msg = self._get_friendly_error_message(cli_error) or self._get_friendly_error_message(
+                sdk_error or ""
+            )
+            return {
+                "success": False,
+                "error": friendly_msg or f"Failed to connect to Docker: {cli_error}",
+            }
+        except Exception as cli_exc:
+            # Both SDK and CLI failed; surface the clearest error
+            error_msg = sdk_error or str(cli_exc)
             friendly_msg = self._get_friendly_error_message(error_msg)
-            if friendly_msg:
-                return {"success": False, "error": friendly_msg}
-            return {"success": False, "error": f"Failed to connect to Docker: {error_msg}"}
+            return {
+                "success": False,
+                "error": friendly_msg or f"Failed to connect to Docker: {error_msg}",
+            }
 
     def _pull_images_docker_sdk(self, images: List[str], progress_callback=None):
         """Pull images using Docker SDK with progress streaming (non-blocking)"""

@@ -23,11 +23,11 @@ def test_friendly_error_message(docker_manager):
     msg = docker_manager._get_friendly_error_message(
         "Error response from daemon: Dial pipe //./pipe/docker_engine: The system cannot find the file specified."
     )
-    assert "Docker Desktop is likely not running" in msg
+    assert "Docker is not reachable" in msg
 
     # Test connection error (Mac/Linux connection refused)
     msg = docker_manager._get_friendly_error_message("Connection refused")
-    assert "Docker Desktop is likely not running" in msg
+    assert "Docker is not reachable" in msg
 
     # Test permission error - now handled
     msg = docker_manager._get_friendly_error_message("permission denied while trying to connect to the Docker daemon")
@@ -65,17 +65,24 @@ def test_check_docker_connection_success(docker_manager):
 
 
 def test_check_docker_connection_failure(docker_manager):
-    """Test failed docker connection check."""
+    """Test failed docker connection check - both SDK and CLI fallback fail."""
     mock_docker_module = MagicMock()
     mock_docker_module.from_env.side_effect = Exception("Error while fetching server API version")
 
-    with patch.dict(sys.modules, {"docker": mock_docker_module}):
-        docker_manager.docker_cmd = "docker"
+    # Mock subprocess.run so the CLI fallback also fails
+    mock_cli_result = MagicMock()
+    mock_cli_result.returncode = 1
+    mock_cli_result.stdout = ""
+    mock_cli_result.stderr = "Error while fetching server API version"
 
-        result = docker_manager.check_docker_connection()
+    with patch.dict(sys.modules, {"docker": mock_docker_module}):
+        with patch("subprocess.run", return_value=mock_cli_result):
+            docker_manager.docker_cmd = "docker"
+
+            result = docker_manager.check_docker_connection()
 
     assert result["success"] is False
-    assert "Docker Desktop is likely not running" in result["error"]
+    assert "Docker is not reachable" in result["error"]
 
 
 @patch("subprocess.run")
@@ -109,4 +116,4 @@ def test_start_services_connection_failure(mock_run, docker_manager):
     assert result["success"] is False
     # The start_services method uses logical OR: friendly_msg or f"Failed..."
     # So if friendly_msg is returned, it is used.
-    assert "Docker Desktop is likely not running" in result["error"]
+    assert "Docker is not reachable" in result["error"]
