@@ -75,6 +75,9 @@ export const Hero: React.FC = () => {
                         <a href="https://alternativeto.net/software/file-brain/about/" target="_blank" rel="noopener noreferrer" className="transition-all transition-duration-300 hover:-translate-y-1 block" style={{ transform: 'translateY(0)' }}>
                             <Image src="/featured_on_alternativeto.png" alt="Featured on AlternativeTo" width={212} height={66} style={{ display: 'block', width: 'auto', height: '66px' }} unoptimized />
                         </a>
+                        <a href="https://peerpush.net/p/file-brain" target="_blank" rel="noopener noreferrer" className="transition-all transition-duration-300 hover:-translate-y-1 block" style={{ transform: 'translateY(0)' }}>
+                            <Image src="https://peerpush.net/p/file-brain/badge.png" alt="Featured on PeerPush" width={240} height={54} style={{ display: 'block', width: 'auto', height: '54px' }} unoptimized />
+                        </a>
                     </div>
                 </div>
             </div>
