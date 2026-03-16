@@ -14,6 +14,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from file_brain.core.logging import logger
+from file_brain.database.models import db_session
+from file_brain.database.repositories import WatchPathRepository
 from file_brain.services.typesense_client import TypesenseClient
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -45,16 +47,18 @@ class FileOperationRequest(BaseModel):
 
 
 def is_path_allowed(file_path: str) -> bool:
-    """Check if the path belongs to one of the configured watch_paths"""
-    from file_brain.core.config import settings
-
-    if not settings.watch_paths:
-        return False
-
-    allowed_paths = [os.path.abspath(p.strip()) for p in settings.watch_paths.split(",") if p.strip()]
+    """Check if the path belongs to one of the enabled watch paths stored in the database."""
     abs_file_path = os.path.abspath(file_path)
 
-    for allowed_path in allowed_paths:
+    with db_session() as db:
+        repo = WatchPathRepository(db)
+        enabled_paths = repo.get_enabled()
+
+    if not enabled_paths:
+        return False
+
+    for watch_path in enabled_paths:
+        allowed_path = os.path.abspath(watch_path.path)
         try:
             if os.path.commonpath([abs_file_path, allowed_path]) == allowed_path:
                 return True
