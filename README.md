@@ -15,6 +15,15 @@
   Find what you mean, not just what you say. File Brain runs locally on your machine to index and understand your files.
 </p>
 
+<p align="center">
+  <strong>Sponsored by</strong><br />
+  <a href="https://uptribe.cc/">
+    <img src="https://uptribe.cc/uptribe-logo.svg" alt="UpTribe" width="200" style="vertical-align: middle;" />
+  </a>
+  <br />
+  <small>Community-powered Reddit engagement from real, verified users.</small>
+</p>
+
 ![File Brain Demo](docs/images/FileBrain_demo_annotated.GIF)
 
 ## What is File Brain?

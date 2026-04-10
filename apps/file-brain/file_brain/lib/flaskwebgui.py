@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 import os
 import platform
 import shutil
@@ -33,15 +32,19 @@ if not logger.handlers:
 FLASKWEBGUI_USED_PORT = None
 FLASKWEBGUI_BROWSER_PROCESS = None
 
-DEFAULT_BROWSER = webbrowser.get().name
+
+def get_default_browser_name() -> str:
+    """Return the preferred browser name when one can be resolved."""
+    try:
+        browser = webbrowser.get()
+        return getattr(browser, "name", "")
+    except Exception:
+        return ""
+
+
+DEFAULT_BROWSER = get_default_browser_name()
 OPERATING_SYSTEM = platform.system().lower()
 PY = "python3" if OPERATING_SYSTEM in ["linux", "darwin"] else "python"
-
-try:
-    if OPERATING_SYSTEM == "darwin":
-        multiprocessing.set_start_method("fork")
-except Exception as ex:
-    logger.warning(f"Could not set start method 'fork' for mac: {ex}")
 
 
 linux_browser_paths = [

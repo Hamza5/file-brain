@@ -207,17 +207,73 @@ def get_available_port(start_port: int, max_attempts: int = 100) -> int:
     return start_port
 
 
-def cli_main():
-    """Entry point for packaged distribution (production mode only)."""
-    # Set DEBUG=false to ensure FlaskWebGUI suppresses third-party debug logs
-    # This must be set BEFORE importing FlaskWebGUI
-    os.environ["DEBUG"] = "false"
+def build_desktop_server_command(port: int) -> list[str]:
+    """Build the uvicorn command used for desktop production launches."""
+    return [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "file_brain.main:app",
+        "--host",
+        settings.host,
+        "--port",
+        str(port),
+        "--log-level",
+        "info",
+    ]
+
+
+def _run_macos_desktop_app(port: int) -> None:
+    """Launch the desktop app on macOS without forking the backend process."""
+    from file_brain.lib.flaskwebgui import FlaskUI, close_application
+
+    server_env = os.environ.copy()
+    server_env["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+
+    server_process = subprocess.Popen(
+        build_desktop_server_command(port),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        env=server_env,
+    )
+
+    ui = FlaskUI(
+        app=app,
+        server="fastapi",
+        port=port,
+        width=1200,
+        height=800,
+        on_shutdown=None,
+    )
+    browser_thread = threading.Thread(target=ui.start_browser, args=(server_process,), name="desktop_browser")
+
+    try:
+        browser_thread.start()
+        server_process.wait()
+    except KeyboardInterrupt:
+        logger.info("🛑 Desktop app interrupted, shutting down...")
+    finally:
+        if server_process.poll() is None:
+            server_process.terminate()
+            try:
+                server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server_process.kill()
+                server_process.wait(timeout=5)
+
+        if browser_thread.is_alive():
+            close_application()
+
+        browser_thread.join()
+
+
+def run_production_desktop_app(port: int) -> None:
+    """Run the production desktop UI with a platform-appropriate backend launcher."""
+    if sys.platform == "darwin":
+        _run_macos_desktop_app(port)
+        return
 
     from file_brain.lib.flaskwebgui import FlaskUI
-
-    port = get_available_port(settings.port)
-    logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
-    logger.info("🏭 Running in PRODUCTION mode")
 
     FlaskUI(
         app=app,
@@ -227,6 +283,19 @@ def cli_main():
         height=800,
         on_shutdown=on_shutdown_sync,
     ).run()
+
+
+def cli_main():
+    """Entry point for packaged distribution (production mode only)."""
+    # Set DEBUG=false to ensure FlaskWebGUI suppresses third-party debug logs
+    # This must be set BEFORE importing FlaskWebGUI
+    os.environ["DEBUG"] = "false"
+
+    port = get_available_port(settings.port)
+    logger.info(f"Starting {settings.app_name} on http://localhost:{port}")
+    logger.info("🏭 Running in PRODUCTION mode")
+
+    run_production_desktop_app(port)
 
 
 if __name__ == "__main__":
@@ -262,13 +331,4 @@ if __name__ == "__main__":
     if settings.debug:
         uvicorn.run("file_brain.main:app", host=settings.host, port=port, reload=True, log_level="info")
     else:
-        from file_brain.lib.flaskwebgui import FlaskUI
-
-        FlaskUI(
-            app=app,
-            server="fastapi",
-            port=port,
-            width=1200,
-            height=800,
-            on_shutdown=on_shutdown_sync,
-        ).run()
+        run_production_desktop_app(port)
